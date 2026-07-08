@@ -1,0 +1,217 @@
+syntax = "proto3";
+
+package cn.itcast.demo.mylunarcore.proto;
+
+option java_package = "cn.itcast.demo.mylunarcore.protocol";
+option java_outer_classname = "RogueSystemProto";
+
+import "battle_system.proto";
+
+message RogueBlessing {
+  uint32 id = 1;
+  uint32 level = 2;
+}
+
+message RogueRoomPosition {
+  int32 x = 1;
+  int32 y = 2;
+}
+
+message RogueRoomInfo {
+  uint32 room_id = 1;
+  uint32 room_type = 2; // 1-战斗，2-事件，3-商店，4-祝福，5-奖励，6-Boss
+  RogueRoomPosition position = 3;
+  repeated RogueBlessing blessings = 4; // 祝福房间可选祝福
+}
+
+message RogueRoomsMap {
+  repeated RogueRoomInfo rooms = 1;
+}
+
+message StartRogueCsReq {
+  uint32 rogue_id = 1;
+  uint32 difficulty = 2;
+}
+
+message StartRogueScRsp {
+  int32 retcode = 1;
+  uint32 rogue_id = 2;
+  RogueRoomInfo current_room = 3;
+  repeated RogueBlessing blessings = 4;
+  repeated uint32 miracles = 5;
+  uint32 virtual_currency = 6;
+  uint32 score = 7;
+  uint32 floor = 8;
+  uint32 wave = 9;
+}
+
+message GetRogueInfoCsReq {}
+
+message GetRogueInfoScRsp {
+  int32 retcode = 1;
+  uint32 rogue_id = 2;
+  RogueRoomInfo current_room = 3;
+  RogueRoomsMap rooms_map = 4;
+  repeated RogueBlessing blessings = 5;
+  repeated uint32 miracles = 6;
+  uint32 virtual_currency = 7;
+  uint32 score = 8;
+  uint32 floor = 9;
+  uint32 wave = 10;
+  uint32 status = 11; // 0-进行中，1-已完成，2-已放弃
+}
+
+message RogueMoveCsReq {
+  uint32 next_room_id = 1;
+}
+
+message RogueBattleExtraData {
+  uint32 battle_stage_id = 1;
+  repeated EnemyInfo enemy_info = 2;
+}
+
+message RogueMoveScRsp {
+  int32 retcode = 1;
+  RogueRoomInfo room_info = 2;
+  RogueBattleExtraData extra_data = 3;
+  repeated RogueBlessing blessings = 4;
+  repeated uint32 miracles = 5;
+  uint32 virtual_currency = 6;
+  uint32 score = 7;
+}
+
+message RogueSelectBlessingCsReq {
+  uint32 blessing_id = 1;
+  uint32 room_id = 2;
+}
+
+message RogueSelectBlessingScRsp {
+  int32 retcode = 1;
+  uint32 blessing_id = 2;
+  repeated RogueBlessing new_blessings = 3;
+  uint32 virtual_currency = 4;
+  uint32 score = 5;
+}
+
+message RogueSelectMiracleCsReq {
+  uint32 miracle_id = 1;
+  uint32 room_id = 2;
+}
+
+message RogueSelectMiracleScRsp {
+  int32 retcode = 1;
+  uint32 miracle_id = 2;
+  repeated uint32 new_miracles = 3;
+  uint32 virtual_currency = 4;
+  uint32 score = 5;
+}
+
+message RogueBattleResultCsReq {
+  uint32 rogue_id = 1;
+  uint32 result = 2; // 0-失败，1-胜利
+  repeated uint32 blessings_obtained = 3;
+  uint32 duration = 4;
+  BattleStatistics statistics = 5;
+}
+
+message RogueBattleResultScRsp {
+  int32 retcode = 1;
+  uint32 rogue_id = 2;
+  bool is_win = 3;
+  repeated RogueBlessing new_blessings = 4;
+  uint32 virtual_currency = 5;
+  uint32 score = 6;
+  repeated RewardItem rewards = 7;
+  RogueRoomInfo next_room_info = 8;
+  bool is_run_end = 9;
+}
+
+message RogueEventCsReq {
+  uint32 room_id = 1;
+  uint32 option_id = 2;
+  bytes extra_data = 3;
+}
+
+message RogueEventResult {
+  uint32 type = 1; // 1-获得祝福，2-获得奇物，3-货币变化，4-战斗，5-获得物品，6-无变化
+  uint32 blessing_id = 2;
+  uint32 miracle_id = 3;
+  int32 currency_change = 4;
+  repeated RewardItem reward_items = 5;
+  uint32 battle_stage_id = 6;
+}
+
+message RogueEventScRsp {
+  int32 retcode = 1;
+  uint32 room_id = 2;
+  RogueEventResult event_result = 3;
+  repeated RogueBlessing updated_blessings = 4;
+  repeated uint32 updated_miracles = 5;
+  uint32 virtual_currency = 6;
+  uint32 score = 7;
+}
+
+message RogueQuitCsReq {}
+
+message RoguePlayerDataUpdate {
+  uint32 highest_floor = 1;
+  uint64 total_score = 2;
+  uint32 completed_runs = 3;
+}
+
+message RogueQuitScRsp {
+  int32 retcode = 1;
+  uint32 final_score = 2;
+  uint32 final_floor = 3;
+  repeated RewardItem rewards = 4;
+  RoguePlayerDataUpdate player_data_update = 5;
+}
+
+message GetRogueGlobalInfoCsReq {}
+
+message RogueTalent {
+  uint32 id = 1;
+  uint32 level = 2;
+  bool activated = 3;
+}
+
+message GetRogueGlobalInfoScRsp {
+  int32 retcode = 1;
+  repeated RogueTalent talents = 2;
+  repeated uint32 unlocked_miracles = 3;
+  uint32 selected_path = 4;
+  uint32 completed_runs = 5;
+  uint32 highest_floor = 6;
+  uint64 total_score = 7;
+}
+
+message RogueUpgradeTalentCsReq {
+  uint32 talent_id = 1;
+  uint32 upgrade_to_level = 2; // 目标等级（1~3）
+}
+
+message RogueUpgradeTalentScRsp {
+  int32 retcode = 1;
+  uint32 talent_id = 2;
+  uint32 new_level = 3;
+  bool activated = 4;
+  repeated RewardItem consumed_items = 5;
+}
+
+message RogueSelectPathCsReq {
+  uint32 path_id = 1;
+}
+
+message RogueSelectPathScRsp {
+  int32 retcode = 1;
+  uint32 path_id = 2;
+}
+
+message RogueStateUpdateScNotify {
+  uint32 update_type = 1;
+  int32 value = 2;
+  uint32 blessing_id = 3;
+  uint32 miracle_id = 4;
+  GetRogueInfoScRsp current_state = 5;
+}
+

@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MyLunarCore 静态分析报告</title>
+  <style>
+    @page { size: A3 landscape; margin: 14mm; }
+    body { font-family: "Microsoft YaHei", Arial, sans-serif; margin: 20px; color: #1f2937; line-height: 1.5; }
+    h1, h2 { color: #0f172a; margin-bottom: 8px; }
+    h1 { font-size: 28px; }
+    h2 { font-size: 20px; margin-top: 30px; }
+    .muted { color: #6b7280; font-size: 13px; }
+    .card { border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px; margin: 14px 0; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+    th, td { border: 1px solid #d1d5db; padding: 8px; vertical-align: top; }
+    th { background: #f3f4f6; text-align: left; }
+    code { background: #f3f4f6; padding: 1px 4px; border-radius: 4px; }
+    ul { margin-top: 6px; }
+    .svg-wrap { overflow: visible; border: 1px solid #e5e7eb; border-radius: 10px; padding: 10px; }
+    .svg-wrap svg { display: block; width: 100%; height: auto; max-width: 100%; }
+  </style>
+</head>
+<body>
+  <h1>MyLunarCore 项目静态分析报告</h1>
+  <div class="muted">生成时间：2026-04-27 ｜ 分析范围：主工程 + microservices 子工程（代码静态扫描）</div>
+
+  <h2>1. 架构图</h2>
+  <div class="card">
+    <div class="svg-wrap">
+      <svg viewBox="0 0 980 560" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <style>
+            .box { fill: #f8fafc; stroke: #334155; stroke-width: 1.2; rx: 8; ry: 8; }
+            .group { fill: #eef2ff; stroke: #6366f1; stroke-width: 1.2; rx: 10; ry: 10; }
+            .txt { font: 12px 'Microsoft YaHei', Arial; fill: #0f172a; }
+            .arrow { stroke: #334155; stroke-width: 1.3; marker-end: url(#m); fill: none; }
+          </style>
+          <marker id="m" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#334155"/>
+          </marker>
+        </defs>
+
+        <rect class="group" x="10" y="10" width="960" height="230" />
+        <text class="txt" x="24" y="32">主单体（Spring Boot + Netty/KCP）</text>
+        <rect class="box" x="40" y="50" width="170" height="60" />
+        <text class="txt" x="50" y="75">Admin Web/API</text>
+        <text class="txt" x="50" y="93">Spring MVC + Security</text>
+
+        <rect class="box" x="240" y="50" width="190" height="60" />
+        <text class="txt" x="250" y="75">GameNettyServer / KCP</text>
+        <text class="txt" x="250" y="93">帧编解码 + 指令分发</text>
+
+        <rect class="box" x="460" y="50" width="230" height="60" />
+        <text class="txt" x="470" y="75">PacketCommandRegistry</text>
+        <text class="txt" x="470" y="93">注解注册的命令路由</text>
+
+        <rect class="box" x="720" y="50" width="220" height="60" />
+        <text class="txt" x="730" y="75">业务服务层</text>
+        <text class="txt" x="730" y="93">player/gacha/battle/...service</text>
+
+        <rect class="box" x="130" y="145" width="210" height="60" />
+        <text class="txt" x="140" y="170">Session/Sync/Scene Runtime</text>
+        <text class="txt" x="140" y="188">在线会话、异步加载、周期持久化</text>
+
+        <rect class="box" x="390" y="145" width="180" height="60" />
+        <text class="txt" x="400" y="170">Repository 层</text>
+        <text class="txt" x="400" y="188">JDBC + MySQL</text>
+
+        <rect class="box" x="600" y="145" width="150" height="60" />
+        <text class="txt" x="610" y="170">Event/Metrics</text>
+        <text class="txt" x="610" y="188">领域事件与流量指标</text>
+
+        <rect class="box" x="780" y="145" width="150" height="60" />
+        <text class="txt" x="790" y="170">Reload/Hotfix</text>
+        <text class="txt" x="790" y="188">配置与资源热更新</text>
+
+        <line class="arrow" x1="210" y1="80" x2="240" y2="80"/>
+        <line class="arrow" x1="430" y1="80" x2="460" y2="80"/>
+        <line class="arrow" x1="690" y1="80" x2="720" y2="80"/>
+        <line class="arrow" x1="830" y1="110" x2="830" y2="145"/>
+        <line class="arrow" x1="800" y1="80" x2="340" y2="175"/>
+        <line class="arrow" x1="780" y1="80" x2="570" y2="175"/>
+
+        <rect class="group" x="10" y="260" width="960" height="210" />
+        <text class="txt" x="24" y="282">微服务迁移脚手架（Spring Cloud Alibaba）</text>
+
+        <rect class="box" x="60" y="305" width="180" height="70" />
+        <text class="txt" x="70" y="332">api-gateway</text>
+        <text class="txt" x="70" y="350">JWT校验 + 限流 + 路由</text>
+
+        <rect class="box" x="300" y="305" width="180" height="70" />
+        <text class="txt" x="310" y="332">auth-service</text>
+        <text class="txt" x="310" y="350">登录签发 JWT</text>
+
+        <rect class="box" x="540" y="305" width="180" height="70" />
+        <text class="txt" x="550" y="332">player-service</text>
+        <text class="txt" x="550" y="350">玩家读接口（示例）</text>
+
+        <rect class="box" x="780" y="305" width="150" height="70" />
+        <text class="txt" x="790" y="332">common-api</text>
+        <text class="txt" x="790" y="350">统一响应模型</text>
+
+        <rect class="box" x="300" y="395" width="180" height="50" />
+        <text class="txt" x="320" y="425">Nacos</text>
+        <rect class="box" x="540" y="395" width="180" height="50" />
+        <text class="txt" x="610" y="425">MySQL / Redis</text>
+
+        <line class="arrow" x1="240" y1="340" x2="300" y2="340"/>
+        <line class="arrow" x1="240" y1="340" x2="540" y2="340"/>
+        <line class="arrow" x1="390" y1="375" x2="390" y2="395"/>
+        <line class="arrow" x1="630" y1="375" x2="630" y2="395"/>
+        <line class="arrow" x1="720" y1="340" x2="780" y2="340"/>
+      </svg>
+    </div>
+    <ul>
+      <li>主工程当前承载核心游戏实时链路（Netty/KCP）与大部分业务域。</li>
+      <li><code>microservices</code> 明确标注为迁移脚手架，当前主要是认证、网关、玩家示例接口。</li>
+    </ul>
+  </div>
+
+  <h2>2. 核心流程时序图</h2>
+  <div class="card">
+    <h3>2.1 玩家登录并完成首次同步</h3>
+    <div class="svg-wrap">
+      <svg viewBox="0 0 980 470" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <style>
+            .lifeline { stroke: #94a3b8; stroke-dasharray: 5 4; }
+            .actor { fill: #f8fafc; stroke: #334155; }
+            .txt { font: 12px 'Microsoft YaHei', Arial; fill: #0f172a; }
+            .arrow { stroke: #1e293b; stroke-width: 1.2; marker-end: url(#m2); fill: none; }
+          </style>
+          <marker id="m2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#1e293b"/>
+          </marker>
+        </defs>
+        <g>
+          <rect class="actor" x="30" y="20" width="120" height="34"/><text class="txt" x="65" y="42">Client</text>
+          <rect class="actor" x="200" y="20" width="160" height="34"/><text class="txt" x="220" y="42">Netty Handler</text>
+          <rect class="actor" x="420" y="20" width="170" height="34"/><text class="txt" x="430" y="42">PlayerSessionService</text>
+          <rect class="actor" x="650" y="20" width="140" height="34"/><text class="txt" x="680" y="42">Repository</text>
+          <rect class="actor" x="820" y="20" width="130" height="34"/><text class="txt" x="835" y="42">Session/Sync</text>
+          <line class="lifeline" x1="90" y1="54" x2="90" y2="440"/>
+          <line class="lifeline" x1="280" y1="54" x2="280" y2="440"/>
+          <line class="lifeline" x1="505" y1="54" x2="505" y2="440"/>
+          <line class="lifeline" x1="720" y1="54" x2="720" y2="440"/>
+          <line class="lifeline" x1="885" y1="54" x2="885" y2="440"/>
+
+          <line class="arrow" x1="90" y1="90" x2="280" y2="90"/><text class="txt" x="115" y="84">1. PLAYER_LOGIN_CS_REQ</text>
+          <line class="arrow" x1="280" y1="130" x2="505" y2="130"/><text class="txt" x="310" y="124">2. handleLogin</text>
+          <line class="arrow" x1="505" y1="170" x2="720" y2="170"/><text class="txt" x="530" y="164">3. 查询账号/玩家核心数据</text>
+          <line class="arrow" x1="720" y1="210" x2="505" y2="210"/><text class="txt" x="560" y="204">4. 返回实体数据</text>
+          <line class="arrow" x1="505" y1="250" x2="885" y2="250"/><text class="txt" x="560" y="244">5. createOrReplace + bindToken + async reload</text>
+          <line class="arrow" x1="505" y1="290" x2="280" y2="290"/><text class="txt" x="345" y="284">6. PlayerLoginScRsp</text>
+          <line class="arrow" x1="280" y1="330" x2="90" y2="330"/><text class="txt" x="125" y="324">7. 返回登录响应</text>
+          <line class="arrow" x1="280" y1="370" x2="885" y2="370"/><text class="txt" x="340" y="364">8. pushToSession(SyncReason.LOGIN)</text>
+        </g>
+      </svg>
+    </div>
+
+    <h3>2.2 抽卡流程（单抽/十连）</h3>
+    <div class="svg-wrap">
+      <svg viewBox="0 0 980 280" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <style>
+            .lifeline { stroke: #94a3b8; stroke-dasharray: 5 4; }
+            .actor { fill: #f8fafc; stroke: #334155; }
+            .txt { font: 12px 'Microsoft YaHei', Arial; fill: #0f172a; }
+            .arrow { stroke: #1e293b; stroke-width: 1.2; marker-end: url(#m3); fill: none; }
+          </style>
+          <marker id="m3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#1e293b"/>
+          </marker>
+        </defs>
+        <rect class="actor" x="40" y="20" width="110" height="34"/><text class="txt" x="72" y="42">Client</text>
+        <rect class="actor" x="230" y="20" width="170" height="34"/><text class="txt" x="250" y="42">GachaPacketHandlers</text>
+        <rect class="actor" x="470" y="20" width="170" height="34"/><text class="txt" x="490" y="42">GachaNettyService</text>
+        <rect class="actor" x="730" y="20" width="170" height="34"/><text class="txt" x="750" y="42">GachaRepo/ItemRepo</text>
+        <line class="lifeline" x1="95" y1="54" x2="95" y2="250"/>
+        <line class="lifeline" x1="315" y1="54" x2="315" y2="250"/>
+        <line class="lifeline" x1="555" y1="54" x2="555" y2="250"/>
+        <line class="lifeline" x1="815" y1="54" x2="815" y2="250"/>
+        <line class="arrow" x1="95" y1="90" x2="315" y2="90"/><text class="txt" x="130" y="84">1. DO_GACHA_CS_REQ</text>
+        <line class="arrow" x1="315" y1="130" x2="555" y2="130"/><text class="txt" x="355" y="124">2. handleDoGacha</text>
+        <line class="arrow" x1="555" y1="170" x2="815" y2="170"/><text class="txt" x="580" y="164">3. 读取保底 + 发奖 + 更新保底</text>
+        <line class="arrow" x1="815" y1="205" x2="555" y2="205"/><text class="txt" x="635" y="199">4. 返回持久化结果</text>
+        <line class="arrow" x1="555" y1="235" x2="95" y2="235"/><text class="txt" x="300" y="229">5. DO_GACHA_SC_RSP</text>
+      </svg>
+    </div>
+  </div>
+
+  <h2>3. 每个模块职责说明</h2>
+  <div class="card">
+    <h3>3.1 主工程模块（src/main/java/cn/itcast/demo/mylunarcore）</h3>
+    <table>
+      <tr><th>模块</th><th>职责</th></tr>
+      <tr><td>activity</td><td>活动调度、活动资源配置读取与周期任务触发。</td></tr>
+      <tr><td>admin</td><td>后台管理端 Web/API、RBAC 与 Spring Security 配置。</td></tr>
+      <tr><td>battle</td><td>战斗领域核心：开战、行动结算、波次切换、结果落库与事件发布。</td></tr>
+      <tr><td>cache</td><td>协议响应缓存与可复用包体缓存（如固定响应）。</td></tr>
+      <tr><td>challenge</td><td>挑战玩法相关 runtime、仓储与服务封装。</td></tr>
+      <tr><td>config</td><td>统一配置模型（端口、TLS、线程、同步策略等）与 Bean 配置。</td></tr>
+      <tr><td>console</td><td>控制台命令入口预留（当前文件数为 0）。</td></tr>
+      <tr><td>domain</td><td>领域实体模型（玩家、游戏基础对象等）。</td></tr>
+      <tr><td>event</td><td>领域事件定义、发布器与监听器（含 battle 事件）。</td></tr>
+      <tr><td>gacha</td><td>抽卡系统：卡池配置、保底状态、抽奖算法与奖励发放。</td></tr>
+      <tr><td>game</td><td>在线玩家抽象、主循环 Tick 注册与运行支撑。</td></tr>
+      <tr><td>hotfix</td><td>热修复资源加载、版本元数据管理。</td></tr>
+      <tr><td>item</td><td>物品领域仓储与发放接口，供 gacha/玩法调用。</td></tr>
+      <tr><td>logging</td><td>日志分类、统一 logger 封装。</td></tr>
+      <tr><td>metrics</td><td>流量/包处理指标采集。</td></tr>
+      <tr><td>netty</td><td>网络栈核心：TCP/KCP 启动、编解码、指令注册与分发、协议处理入口。</td></tr>
+      <tr><td>player</td><td>玩家会话与登录业务、心跳与登出处理。</td></tr>
+      <tr><td>reload</td><td>热加载协调器与资源重载入口。</td></tr>
+      <tr><td>repository</td><td>面向游戏/玩家域的 JDBC 仓储实现。</td></tr>
+      <tr><td>resource</td><td>静态资源读取与配置资源对象映射。</td></tr>
+      <tr><td>rogue</td><td>Rogue 玩法相关 domain/runtime/repo/service。</td></tr>
+      <tr><td>scene</td><td>场景 runtime 与场景服务。</td></tr>
+      <tr><td>session</td><td>会话管理、Channel 属性、Token 绑定与在线状态维护。</td></tr>
+      <tr><td>sync</td><td>统一数据同步体系：异步加载、登录推送、周期持久化。</td></tr>
+    </table>
+
+    <h3>3.2 microservices 模块</h3>
+    <table>
+      <tr><th>模块</th><th>职责</th></tr>
+      <tr><td>common/common-api</td><td>微服务统一响应体与跨服务共享基础模型。</td></tr>
+      <tr><td>services/api-gateway</td><td>统一入口网关，负责 HTTPS、服务发现路由、JWT 认证过滤和限流。</td></tr>
+      <tr><td>services/auth-service</td><td>登录认证服务：校验凭据并签发 JWT。</td></tr>
+      <tr><td>services/player-service</td><td>玩家信息 HTTP 接口示例（已接入注册中心发现）。</td></tr>
+      <tr><td>services/battle-service</td><td>已存在构建产物，源码未纳入当前目录（推测为迁移中的战斗微服务）。</td></tr>
+      <tr><td>docker-compose 基础设施</td><td>提供 Nacos、MySQL、Redis 作为微服务运行底座。</td></tr>
+    </table>
+  </div>
+
+  <h2>4. 结论与建议</h2>
+  <div class="card">
+    <ul>
+      <li>当前主业务仍以内聚在单体为主，实时协议链路（Netty/KCP）已经形成清晰分层：网络入口 → 命令分发 → 领域服务 → 仓储。</li>
+      <li>微服务目录处于“迁移脚手架”阶段，建议优先将会话鉴权、玩家读写、战斗结算边界切分后再逐步拆分玩法域。</li>
+      <li>建议后续补充：跨服务调用链跟踪（traceId）、鉴权下沉、以及 battle-service 源码与单体 battle 逻辑的对齐说明。</li>
+    </ul>
+  </div>
+</body>
+</html>

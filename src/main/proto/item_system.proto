@@ -1,0 +1,152 @@
+syntax = "proto3";
+
+package cn.itcast.demo.mylunarcore.proto;
+
+option java_package = "cn.itcast.demo.mylunarcore.protocol";
+option java_outer_classname = "ItemSystemProto";
+
+message SubAffix {
+  uint32 affix_id = 1;
+  uint32 count = 2;
+  uint32 step = 3;
+}
+
+message BagItem {
+  uint64 uid = 1;
+  uint32 item_id = 2;
+  uint32 type = 3; // 1-装备, 2-遗器, 3-材料
+  uint32 count = 4;
+  uint32 level = 5;
+  uint32 exp = 6;
+  uint32 promotion = 7;
+  uint32 rank = 8;
+  bool locked = 9;
+  uint32 main_affix_id = 10;
+  repeated SubAffix sub_affixes = 11;
+  uint32 equip_avatar_id = 12; // 0 means not equipped
+}
+
+message GetBagCsReq {
+  uint32 type_filter = 1; // 0-all, 1-装备,2-遗器,3-材料
+  uint32 page = 2; // 1-based
+  uint32 page_size = 3; // default 50, max 200
+}
+
+message GetBagScRsp {
+  int32 retcode = 1;
+  uint32 total_count = 2;
+  repeated BagItem items = 3;
+}
+
+message UseItemEffects {
+  uint32 player_exp = 1;
+  uint32 avatar_exp = 2;
+  bytes extra = 3;
+}
+
+message UseItemCsReq {
+  uint64 uid = 1; // material/items uid
+  uint32 item_id = 2; // optional when uid not provided
+  uint32 count = 3;
+  uint32 target_avatar_id = 4;
+}
+
+message UseItemScRsp {
+  int32 retcode = 1;
+  uint64 uid = 2;
+  uint32 used_count = 3;
+  UseItemEffects effects = 4;
+}
+
+message EquipItemCsReq {
+  uint64 uid = 1;
+  uint32 avatar_id = 2;
+}
+
+message EquipItemScRsp {
+  int32 retcode = 1;
+  uint64 uid = 2;
+  uint32 avatar_id = 3;
+  bytes avatar_attributes = 4; // json bytes placeholder
+}
+
+message UnequipItemCsReq {
+  uint64 uid = 1;
+}
+
+message UnequipItemScRsp {
+  int32 retcode = 1;
+  uint64 uid = 2;
+  uint32 avatar_id = 3;
+  bytes avatar_attributes = 4;
+}
+
+message EnhanceItemCsReq {
+  uint64 target_uid = 1;
+  repeated uint64 material_uids = 2;
+  bool use_credit = 3;
+}
+
+message EnhanceItemScRsp {
+  int32 retcode = 1;
+  uint64 target_uid = 2;
+  uint32 new_level = 3;
+  uint32 new_exp = 4;
+  repeated uint64 consumed_uids = 5;
+}
+
+message ConsumedItem {
+  uint32 item_id = 1;
+  uint32 count = 2;
+}
+
+message PromoteItemCsReq {
+  uint64 uid = 1;
+}
+
+message PromoteItemScRsp {
+  int32 retcode = 1;
+  uint64 uid = 2;
+  uint32 new_promotion = 3;
+  repeated ConsumedItem consumed_items = 4;
+}
+
+message RankUpItemCsReq {
+  uint64 base_uid = 1;
+  uint64 material_uid = 2;
+}
+
+message RankUpItemScRsp {
+  int32 retcode = 1;
+  uint64 base_uid = 2;
+  uint32 new_rank = 3;
+  uint64 consumed_uid = 4;
+}
+
+message LockItemCsReq {
+  uint64 uid = 1;
+  bool lock = 2;
+}
+
+message LockItemScRsp {
+  int32 retcode = 1;
+  uint64 uid = 2;
+  bool locked = 3;
+}
+
+message DiscardItemCsReq {
+  uint64 uid = 1;
+  uint32 count = 2; // materials can discard partial
+}
+
+message DiscardItemScRsp {
+  int32 retcode = 1;
+  uint64 uid = 2;
+  uint32 remaining_count = 3;
+}
+
+message ItemChangeScNotify {
+  uint32 change_type = 1; // 1-new,2-update,3-delete
+  repeated BagItem items = 2;
+}
+

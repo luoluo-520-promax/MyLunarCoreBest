@@ -1,0 +1,101 @@
+syntax = "proto3";
+
+package cn.itcast.demo.mylunarcore.proto;
+
+option java_package = "cn.itcast.demo.mylunarcore.protocol";
+option java_outer_classname = "GachaSystemProto";
+
+message GetGachaInfoCsReq {
+}
+
+message PlayerPityInfo {
+  uint32 pity_5 = 1;
+  uint32 pity_4 = 2;
+  uint32 failed_up_count = 3;
+  bool guarantee_5 = 4;
+}
+
+message CeilingInfo {
+  uint32 ceiling_num = 1;
+  bool ceiling_claimed = 2;
+}
+
+message GachaBannerInfo {
+  uint32 banner_type = 1;  // 1-新手,2-常驻,11-角色UP,12-武器UP
+  uint32 banner_id = 2;    // 配置ID
+  string name = 3;
+  uint64 begin_time = 4;
+  uint64 end_time = 5;
+  uint32 cost_item_id = 6;
+  uint32 cost_count = 7;
+  repeated uint32 rate_up_items_5 = 8;
+  repeated uint32 rate_up_items_4 = 9;
+  uint32 event_chance = 10; // 50/50 获胜概率(百分比)
+  PlayerPityInfo player_pity = 11;
+}
+
+message GetGachaInfoScRsp {
+  int32 retcode = 1;
+  repeated GachaBannerInfo banners = 2;
+  CeilingInfo ceiling_info = 3; // 仅常驻池有效，没数据时返回默认(0,false)
+}
+
+message DoGachaCsReq {
+  uint32 banner_type = 1;
+  uint32 times = 2; // 1 or 10
+}
+
+message GachaItem {
+  uint32 item_id = 1;
+  uint32 count = 2;
+  bool is_new = 3;
+}
+
+message ExtraReward {
+  uint32 item_id = 1;
+  uint32 count = 2;
+}
+
+message DoGachaScRsp {
+  int32 retcode = 1;
+  uint32 banner_type = 2;
+  repeated GachaItem items = 3;
+  repeated ExtraReward extra_rewards = 4;
+  PlayerPityInfo updated_pity = 5;
+  CeilingInfo updated_ceiling = 6;
+}
+
+message ExchangeGachaCeilingCsReq {
+  uint32 target_avatar_id = 1;
+}
+
+message ExchangeGachaCeilingScRsp {
+  int32 retcode = 1;
+  GachaItem reward_item = 2;
+  CeilingInfo updated_ceiling = 3;
+}
+
+message GetGachaHistoryCsReq {
+  uint32 banner_type = 1; // 0=all
+  uint32 page = 2;
+  uint32 page_size = 3;
+}
+
+message GachaHistoryRecord {
+  uint64 timestamp = 1;
+  uint32 banner_type = 2;
+  uint32 item_id = 3;
+  uint32 count = 4;
+  bool is_new = 5;
+}
+
+message GetGachaHistoryScRsp {
+  int32 retcode = 1;
+  uint32 total_count = 2;
+  repeated GachaHistoryRecord records = 3;
+}
+
+message GachaBannerUpdateScNotify {
+  repeated GachaBannerInfo updated_banners = 1;
+}
+

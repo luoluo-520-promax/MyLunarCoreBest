@@ -1,0 +1,115 @@
+syntax = "proto3";
+
+package cn.itcast.demo.mylunarcore.proto;
+
+option java_package = "cn.itcast.demo.mylunarcore.protocol";
+option java_outer_classname = "PlayerSessionProto";
+
+message PlayerLoginCsReq {
+  string username = 1;
+  string password = 2;
+  string client_version = 3;
+  string device_info = 4;
+  /** 非空时优先按令牌登录（免密），用于断线重连或携带令牌进入其它子服务；与 username/password 二选一 */
+  string session_token = 5;
+}
+
+message PlayerLoginScRsp {
+  int32 retcode = 1;
+  PlayerInfo player_info = 2;
+  uint64 server_time = 3;
+  SceneInfo scene_info = 4;
+  /** 登录成功后下发的会话令牌，后续请求可携带此字段识别身份 */
+  string session_token = 5;
+}
+
+message PlayerInfo {
+  uint32 uid = 1;
+  string nickname = 2;
+  uint32 level = 3;
+  uint32 exp = 4;
+  uint32 world_level = 5;
+  uint32 stamina = 6;
+  map<uint32, uint32> currency = 7;
+}
+
+message SceneInfo {
+  uint32 scene_id = 1;
+  float pos_x = 2;
+  float pos_y = 3;
+  float pos_z = 4;
+}
+
+message PlayerHeartBeatCsReq {
+  uint64 client_time = 1;
+}
+
+message PlayerHeartBeatScRsp {
+  int32 retcode = 1;
+  uint64 server_time = 2;
+}
+
+message PlayerLogoutCsReq {
+  uint32 reason = 1;
+}
+
+message PlayerLogoutScRsp {
+  int32 retcode = 1;
+}
+
+message PlayerSyncScNotify {
+  uint32 level = 1;
+  uint32 exp = 2;
+  uint32 stamina = 3;
+  map<uint32, uint32> currency = 4;
+  string nickname = 5;
+}
+
+/** 全量/增量统一同步体：各 {@code Syncable} 模块写入各自字段，由服务端组装后下发。 */
+message PlayerUnifiedSyncScNotify {
+  /** 0=登录 1=数据变更 2=定时 */
+  uint32 sync_reason = 1;
+  uint64 server_time = 2;
+  uint32 level = 3;
+  uint32 exp = 4;
+  uint32 stamina = 5;
+  map<uint32, uint32> currency = 6;
+  string nickname = 7;
+  uint32 world_level = 8;
+  repeated AvatarSyncEntry avatars = 10;
+  repeated LineupSyncEntry lineups = 11;
+  UnlockSyncData unlock = 12;
+}
+
+message AvatarSyncEntry {
+  uint64 id = 1;
+  uint32 avatar_id = 2;
+  uint32 level = 3;
+  uint64 exp = 4;
+  uint32 promotion = 5;
+  uint32 rank = 6;
+  bool locked = 7;
+}
+
+message LineupSyncEntry {
+  uint32 id = 1;
+  string name = 2;
+  bool active = 3;
+  string avatars_json = 4;
+}
+
+/** 解锁类数据（如挑战进度等），与业务表对齐的可扩展结构 */
+message UnlockSyncData {
+  repeated uint32 completed_challenge_ids = 1;
+}
+
+message GetSessionInfoCsReq {
+}
+
+message GetSessionInfoScRsp {
+  int32 retcode = 1;
+  uint32 uid = 2;
+  string nickname = 3;
+  uint32 level = 4;
+}
+

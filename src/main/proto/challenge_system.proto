@@ -1,0 +1,127 @@
+syntax = "proto3";
+
+package cn.itcast.demo.mylunarcore.proto;
+
+option java_package = "cn.itcast.demo.mylunarcore.protocol";
+option java_outer_classname = "ChallengeSystemProto";
+
+import "battle_system.proto";
+
+message StartChallengeCsReq {
+  uint32 challenge_type = 1; // 1-记忆，2-故事，3-Boss
+  uint32 challenge_id = 2;
+  uint32 lineup_id = 3;
+}
+
+message ChallengeStageInfo {
+  uint32 stage_id = 1;
+  uint32 wave_count = 2;
+  uint32 rounds_left = 3; // 记忆挑战专用
+}
+
+message StartChallengeScRsp {
+  int32 retcode = 1;
+  uint64 challenge_uid = 2;
+  uint32 challenge_type = 3;
+  uint32 challenge_id = 4;
+  ChallengeStageInfo stage_info = 5;
+  repeated EnemyInfo enemy_info = 6;
+  uint64 start_time = 7;
+}
+
+message GetChallengeInfoCsReq {
+  uint64 challenge_uid = 1;
+}
+
+message GetChallengeInfoScRsp {
+  int32 retcode = 1;
+  uint64 challenge_uid = 2;
+  uint32 status = 3; // 1-进行中，2-已完成，3-失败
+  uint32 current_stage = 4;
+  uint32 rounds_used = 5;
+  uint32 current_score = 6;
+  uint32 current_stars = 7;
+  repeated EnemyInfo enemy_info = 8;
+}
+
+message ReportChallengeResultCsReq {
+  uint64 challenge_uid = 1;
+  bool is_win = 2;
+  uint32 final_score = 3;
+  uint32 final_stars = 4;
+  uint32 rounds_used = 5;
+  BattleStatistics statistics = 6;
+}
+
+message ReportChallengeResultScRsp {
+  int32 retcode = 1;
+  uint64 challenge_uid = 2;
+  bool is_new_record = 3;
+  uint32 best_stars = 4;
+  uint32 best_score = 5;
+  repeated RewardItem rewards = 6;
+}
+
+message ClaimChallengeGroupRewardCsReq {
+  uint32 group_id = 1;
+  uint32 star_count = 2;
+}
+
+message ClaimChallengeGroupRewardScRsp {
+  int32 retcode = 1;
+  uint32 group_id = 2;
+  uint32 star_count = 3;
+  repeated RewardItem rewards = 4;
+  uint32 updated_taken_stars = 5;
+}
+
+message GetChallengeHistoryCsReq {
+  uint32 group_id = 1;     // 0 表示所有
+  uint32 challenge_id = 2; // 0 表示不指定
+  uint32 page = 3;         // 默认 1
+  uint32 page_size = 4;    // 默认 20
+}
+
+message ChallengeHistoryInfo {
+  uint32 challenge_id = 1;
+  uint32 group_id = 2;
+  uint32 stars = 3;
+  uint32 score = 4;
+  uint64 complete_time = 5;
+}
+
+message GetChallengeHistoryScRsp {
+  int32 retcode = 1;
+  uint32 total_count = 2;
+  repeated ChallengeHistoryInfo histories = 3;
+}
+
+message GetChallengeGroupRewardCsReq {
+  uint32 group_id = 1;
+}
+
+message GetChallengeGroupRewardScRsp {
+  int32 retcode = 1;
+  uint32 group_id = 2;
+  uint32 taken_stars_mask = 3;
+  uint32 available_stars = 4;
+}
+
+message ChallengeStageUpdateScNotify {
+  uint64 challenge_uid = 1;
+  uint32 update_type = 2;
+  uint32 current_stage = 3;
+  uint32 rounds_left = 4;
+  uint32 current_score = 5;
+  uint32 new_stars = 6;
+}
+
+message ChallengeSettleScNotify {
+  uint64 challenge_uid = 1;
+  bool is_win = 2;
+  uint32 final_stars = 3;
+  uint32 final_score = 4;
+  repeated RewardItem rewards = 5;
+  bool is_new_record = 6;
+}
+

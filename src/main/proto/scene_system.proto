@@ -1,0 +1,220 @@
+syntax = "proto3";
+
+package cn.itcast.demo.mylunarcore.proto;
+
+option java_package = "cn.itcast.demo.mylunarcore.protocol";
+option java_outer_classname = "SceneSystemProto";
+
+// Shared position (renamed to avoid conflict with battle_system/player_session proto)
+message SceneVec3 {
+  float x = 1;
+  float y = 2;
+  float z = 3;
+}
+
+message SceneLoadInfo {
+  uint32 plane_id = 1;
+  uint32 floor_id = 2;
+  uint32 entry_id = 3;
+  float pos_x = 4;
+  float pos_y = 5;
+  float pos_z = 6;
+}
+
+message MonsterEntity {
+  uint32 entity_id = 1;
+  uint32 monster_id = 2;
+  uint32 level = 3;
+  uint32 hp = 4;
+  uint32 max_hp = 5;
+  SceneVec3 pos = 6;
+  repeated uint32 buffs = 7;
+}
+
+message NpcEntity {
+  uint32 entity_id = 1;
+  uint32 npc_id = 2;
+  SceneVec3 pos = 3;
+  uint32 rogue_event_id = 4;
+}
+
+message PropEntity {
+  uint32 entity_id = 1;
+  uint32 prop_id = 2;
+  uint32 state = 3;
+  SceneVec3 pos = 4;
+}
+
+message EntityList {
+  repeated MonsterEntity monsters = 1;
+  repeated NpcEntity npcs = 2;
+  repeated PropEntity props = 3;
+}
+
+// 2.1 Enter scene
+message EnterSceneCsReq {
+  uint32 plane_id = 1;
+  uint32 floor_id = 2;
+  uint32 entry_id = 3;
+  float pos_x = 4;
+  float pos_y = 5;
+  float pos_z = 6;
+}
+
+message EnterSceneScRsp {
+  int32 retcode = 1;
+  SceneLoadInfo scene_info = 2;
+  EntityList entity_list = 3;
+}
+
+// 2.2 Get current scene
+message GetCurSceneInfoCsReq {}
+
+message GetCurSceneInfoScRsp {
+  int32 retcode = 1;
+  SceneLoadInfo scene_info = 2;
+  EntityList entity_list = 3;
+}
+
+// 3.1 Interact NPC
+message NpcDialogOption {
+  uint32 option_id = 1;
+  string text = 2;
+}
+
+message InteractNpcCsReq {
+  uint32 entity_id = 1;
+  uint32 option = 2;
+  bytes extra_data = 3;
+}
+
+message InteractNpcScRsp {
+  int32 retcode = 1;
+  uint32 entity_id = 2;
+  uint32 dialogue_id = 3;
+  string dialogue_content = 4;
+  repeated NpcDialogOption options = 5;
+  bytes rogue_event_result = 6;
+}
+
+// 3.2 Pickup prop
+message SceneRewardItem {
+  uint32 item_id = 1;
+  uint32 count = 2;
+}
+
+message PickupPropCsReq {
+  uint32 entity_id = 1;
+}
+
+message PickupPropScRsp {
+  int32 retcode = 1;
+  uint32 entity_id = 2;
+  repeated SceneRewardItem reward_items = 3;
+  uint32 prop_state = 4;
+}
+
+// 3.3 Trigger scene event
+message TriggerSceneEventCsReq {
+  uint32 entity_id = 1;
+  uint32 trigger_type = 2;
+  int32 param1 = 3;
+  int32 param2 = 4;
+}
+
+message UpdatedEntityState {
+  uint32 entity_id = 1;
+  uint32 state = 2;
+}
+
+message TriggerSceneEventScRsp {
+  int32 retcode = 1;
+  uint32 entity_id = 2;
+  bytes result_data = 3;
+  repeated UpdatedEntityState updated_entities = 4;
+}
+
+// 4.1 Scene entity sync notify
+message MonsterEntityInfo {
+  uint32 monster_id = 1;
+  uint32 level = 2;
+  uint32 hp = 3;
+  uint32 max_hp = 4;
+  SceneVec3 pos = 5;
+  repeated uint32 buffs = 6;
+}
+
+message NpcEntityInfo {
+  uint32 npc_id = 1;
+  SceneVec3 pos = 2;
+  uint32 rogue_event_id = 3;
+}
+
+message PropEntityInfo {
+  uint32 prop_id = 1;
+  uint32 state = 2;
+  SceneVec3 pos = 3;
+}
+
+message SummonEntityInfo {
+  uint32 summon_config_id = 1;
+  uint32 duration = 2;
+  SceneVec3 pos = 3;
+  uint32 attached_entity_id = 4;
+  uint32 hp = 5;
+  uint32 max_hp = 6;
+}
+
+message SceneEntityInfo {
+  oneof kind {
+    MonsterEntityInfo monster = 1;
+    NpcEntityInfo npc = 2;
+    PropEntityInfo prop = 3;
+    SummonEntityInfo summon = 4;
+  }
+}
+
+message SceneEntityData {
+  uint32 entity_id = 1;
+  uint32 entity_type = 2; // 1-monster,2-npc,3-prop,4-summon
+  SceneEntityInfo entity_info = 3;
+}
+
+message SceneEntitySyncScNotify {
+  uint32 sync_type = 1; // 1-add,2-remove,3-update
+  repeated SceneEntityData entity_data = 2;
+}
+
+// 5 Summon unit notify
+message SummonUnitCreateScNotify {
+  uint32 caster_uid = 1;
+  uint32 summon_entity_id = 2;
+  uint32 summon_config_id = 3;
+  uint32 duration = 4;
+  SceneVec3 pos = 5;
+  uint32 attached_entity_id = 6;
+  uint32 hp = 7;
+  uint32 max_hp = 8;
+}
+
+message SummonUnitRemoveScNotify {
+  uint32 summon_entity_id = 1;
+  uint32 reason = 2;
+}
+
+// 6 Healing spring
+message UseHealingSpringCsReq {
+  uint32 entity_id = 1;
+}
+
+message HealEffect {
+  uint32 hp_recovered = 1;
+}
+
+message UseHealingSpringScRsp {
+  int32 retcode = 1;
+  uint32 entity_id = 2;
+  HealEffect heal_effect = 3;
+  bool respawn_point_set = 4;
+}
+

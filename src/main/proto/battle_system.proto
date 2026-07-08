@@ -1,0 +1,144 @@
+syntax = "proto3";
+
+package cn.itcast.demo.mylunarcore.proto;
+
+option java_package = "cn.itcast.demo.mylunarcore.protocol";
+option java_outer_classname = "BattleSystemProto";
+
+message FightStartCsReq {
+  uint32 battle_stage_id = 1;
+  uint32 lineup_id = 2;
+  uint32 scene_entity_uid = 3;
+  uint32 skill_id = 4;
+}
+
+message FightStartScRsp {
+  int32 retcode = 1;
+  uint64 battle_id = 2;
+  StageInfo stage_info = 3;
+  repeated EnemyInfo enemy_info = 4;
+  uint64 start_time = 5;
+}
+
+message StageInfo {
+  uint32 id = 1;
+  uint32 wave_count = 2;
+}
+
+message EnemyInfo {
+  uint32 wave_index = 1;
+  repeated MonsterInfo monsters = 2;
+}
+
+message MonsterInfo {
+  uint32 id = 1;
+  uint32 level = 2;
+  uint32 hp = 3;
+  uint32 max_hp = 4;
+  repeated uint32 buffs = 5;
+}
+
+message FightActionCsReq {
+  uint64 battle_id = 1;
+  uint32 action_type = 2; // 1-施放技能，2-使用道具，3-切换目标
+  uint32 skill_id = 3;
+  uint32 item_id = 4;
+  uint32 caster_id = 5;
+  repeated uint32 target_ids = 6;
+  bytes action_data = 7;
+}
+
+message FightActionScRsp {
+  int32 retcode = 1;
+  uint64 battle_id = 2;
+  repeated ActionResult action_results = 3;
+  CurrentState current_state = 4;
+}
+
+message ActionResult {
+  uint32 target_id = 1;
+  int32 hp_change = 2;
+  int32 mp_change = 3;
+  repeated uint32 added_buffs = 4;
+  repeated uint32 removed_buffs = 5;
+}
+
+message CurrentState {
+  uint32 turn = 1;
+  uint32 current_wave = 2;
+  repeated EntityState entities = 3;
+}
+
+message EntityState {
+  uint32 id = 1;
+  uint32 hp = 2;
+  repeated uint32 buffs = 3;
+  bool dead = 4;
+}
+
+message FightResultCsReq {
+  uint64 battle_id = 1;
+  uint32 end_status = 2; // 1-胜利，2-失败，3-主动退出
+  uint32 duration = 3;
+  BattleStatistics statistics = 4;
+}
+
+message BattleStatistics {
+  uint32 damage_dealt = 1;
+  uint32 damage_taken = 2;
+  uint32 turn_count = 3;
+  uint32 kill_count = 4;
+  string extra_data_json = 5;
+}
+
+message FightResultScRsp {
+  int32 retcode = 1;
+  uint64 battle_id = 2;
+  repeated RewardItem reward_items = 3;
+  uint32 player_exp = 4;
+  map<uint32, uint32> avatar_exp_map = 5;
+  string additional_data_json = 6;
+}
+
+message RewardItem {
+  uint32 item_id = 1;
+  uint32 count = 2;
+}
+
+message FightQuitCsReq {
+  uint64 battle_id = 1;
+  uint32 quit_reason = 2; // 1-主动退出，2-网络断开
+}
+
+message FightQuitScRsp {
+  int32 retcode = 1;
+  uint64 battle_id = 2;
+  uint32 teleport_scene_id = 3;
+  Vec3 teleport_pos = 4;
+}
+
+message Vec3 {
+  float x = 1;
+  float y = 2;
+  float z = 3;
+}
+
+message FightStateScNotify {
+  uint64 battle_id = 1;
+  uint32 update_type = 2; // 1-回合开始，2-角色死亡，3-波次切换，4-buff变化，5-强制状态修正
+  CurrentState state_snapshot = 3;
+  string extra_data_json = 4;
+}
+
+message GetBattleInfoCsReq {
+  uint64 battle_id = 1;
+}
+
+message GetBattleInfoScRsp {
+  int32 retcode = 1;
+  uint64 battle_id = 2;
+  StageInfo stage_info = 3;
+  CurrentState current_state = 4;
+  uint64 start_time = 5;
+}
+

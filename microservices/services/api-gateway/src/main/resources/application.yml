@@ -1,0 +1,58 @@
+server:
+  port: ${GATEWAY_HTTPS_PORT:18443}
+  ssl:
+    enabled: true
+    key-store: classpath:certs/gateway-dev.p12
+    key-store-type: PKCS12
+    key-store-password: ${GATEWAY_SSL_STORE_PASSWORD:changeit}
+    key-password: ${GATEWAY_SSL_KEY_PASSWORD:changeit}
+    key-alias: ${GATEWAY_SSL_KEY_ALIAS:gateway-dev}
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    nacos:
+      server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+      discovery:
+        namespace: ${NACOS_NAMESPACE:public}
+      config:
+        namespace: ${NACOS_NAMESPACE:public}
+        file-extension: yaml
+    gateway:
+      discovery:
+        locator:
+          enabled: true
+          lower-case-service-id: true
+      routes:
+        - id: auth-service-route
+          uri: lb://auth-service
+          predicates:
+            - Path=/auth/**
+        - id: player-service-route
+          uri: lb://player-service
+          predicates:
+            - Path=/players/**
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,gateway
+
+mylunarcore:
+  gateway:
+    auth:
+      enabled: true
+      exclude-paths:
+        - /auth/**
+        - /actuator/**
+      jwt-secret: "change-me-to-a-secure-32-byte-secret!"
+      jwt-issuer: "mylunarcore-auth-service"
+    ratelimit:
+      enabled: true
+      global-qps: 300
+      user-qps: 30
+      exclude-paths:
+        - /auth/**
+        - /actuator/**
