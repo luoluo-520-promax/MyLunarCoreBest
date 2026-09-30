@@ -1,0 +1,47 @@
+{
+  "presets": [
+    {
+      "id": "low",
+      "shadowQuality": 0,
+      "particleBudget": 50,
+      "viewDistance": 0.6,
+      "forceDisableShadow": true,
+      "forceDisableParticles": true,
+      "targetFps": 30
+    },
+    {
+      "id": "medium",
+      "shadowQuality": 1,
+      "particleBudget": 150,
+      "viewDistance": 0.85,
+      "forceDisableShadow": false,
+      "forceDisableParticles": false,
+      "targetFps": 45
+    },
+    {
+      "id": "high",
+      "shadowQuality": 2,
+      "particleBudget": 400,
+      "viewDistance": 1.0,
+      "forceDisableShadow": false,
+      "forceDisableParticles": false,
+      "targetFps": 60
+    },
+    {
+      "id": "ultra",
+      "shadowQuality": 3,
+      "particleBudget": 800,
+      "viewDistance": 1.2,
+      "forceDisableShadow": false,
+      "forceDisableParticles": false,
+      "targetFps": 60
+    }
+  ],
+  "rules": [
+    { "matchCpuContains": "helio", "maxRamMb": 4096, "presetId": "low" },
+    { "matchCpuContains": "snapdragon 6", "maxRamMb": 4096, "presetId": "low" },
+    { "matchCpuContains": "snapdragon 8", "maxRamMb": 0, "presetId": "high" },
+    { "matchCpuContains": "a15", "maxRamMb": 0, "presetId": "ultra" },
+    { "matchCpuContains": "a16", "maxRamMb": 0, "presetId": "ultra" }
+  ]
+}

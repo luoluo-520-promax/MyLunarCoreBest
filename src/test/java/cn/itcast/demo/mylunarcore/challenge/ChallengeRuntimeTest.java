@@ -8,6 +8,12 @@ import org.slf4j.LoggerFactory;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+/**
+ * ChallengeRuntime 挑战运行时状态测试。
+ * <p>
+ * 针对相关生产代码的单元/切片测试类 {@code ChallengeRuntimeTest}：
+ * 通过 fixture、mock 与断言覆盖关键成功路径、失败码与状态边界。
+ */
 @DisplayName("ChallengeRuntime 挑战运行时状态测试")
 class ChallengeRuntimeTest {
 
@@ -27,6 +33,18 @@ class ChallengeRuntimeTest {
                 runtime.getGroupId(), runtime.getStageId(), runtime.getStatus(), runtime.getWaveCount());
     }
 
+    /**
+     * 验证点：构造后应处于进行中且得分与星级为 0。
+     * <p>测试方法 {@code constructorShouldInitializeDefaults}：
+     * <ul>
+     *   <li>{@code assertEquals(1, runtime.getStatus());}</li>
+     *   <li>{@code assertEquals(1, runtime.getCurrentStage());}</li>
+     *   <li>{@code assertEquals(0, runtime.getRoundsUsed());}</li>
+     *   <li>{@code assertEquals(0, runtime.getCurrentScore());}</li>
+     *   <li>{@code assertEquals(0, runtime.getCurrentStarsMask());}</li>
+     *   <li>{@code assertEquals(2, runtime.getEnemyInfo().size());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("构造后应处于进行中且得分与星级为 0")
     void constructorShouldInitializeDefaults() {
@@ -43,6 +61,16 @@ class ChallengeRuntimeTest {
         assertEquals(2500, runtime.getStageId());
     }
 
+    /**
+     * 验证点：markSettled 胜利应写入分数、星级与状态 2。
+     * <p>测试方法 {@code markSettledWinShouldUpdateFields}：
+     * <ul>
+     *   <li>{@code assertEquals(2, runtime.getStatus());}</li>
+     *   <li>{@code assertEquals(3200, runtime.getCurrentScore());}</li>
+     *   <li>{@code assertEquals(0b111, runtime.getCurrentStarsMask());}</li>
+     *   <li>{@code assertEquals(8, runtime.getRoundsUsed());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("markSettled 胜利应写入分数、星级与状态 2")
     void markSettledWinShouldUpdateFields() {
@@ -55,6 +83,16 @@ class ChallengeRuntimeTest {
         assertEquals(8, runtime.getRoundsUsed());
     }
 
+    /**
+     * 验证点：markSettled 失败应写入状态 3 且分数不低于 0。
+     * <p>测试方法 {@code markSettledLossShouldClampScore}：
+     * <ul>
+     *   <li>{@code assertEquals(3, runtime.getStatus());}</li>
+     *   <li>{@code assertEquals(0, runtime.getCurrentScore());}</li>
+     *   <li>{@code assertEquals(0, runtime.getCurrentStarsMask());}</li>
+     *   <li>{@code assertEquals(0, runtime.getRoundsUsed());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("markSettled 失败应写入状态 3 且分数不低于 0")
     void markSettledLossShouldClampScore() {

@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "scripts": {
+    "perf_intro_climax": {
+      "estimatedDurationMs": 5200,
+      "beats": [
+        {"type": "CAMERA_SHOT", "startMs": 0, "payload": {"shot": "close_up", "target": "speaker"}},
+        {"type": "PLAY_EMOTION", "startMs": 80, "payload": {"emotionId": "surprised", "blendMs": 200}},
+        {"type": "PLAY_VOICE", "startMs": 120, "payload": {"lineKey": "tree_1001_n1"}},
+        {"type": "PLAY_GESTURE", "startMs": 200, "payload": {"gesture": "raise_hand", "loop": false}},
+        {"type": "SCREEN_EFFECT", "startMs": 1800, "payload": {"fx": "flash_white", "intensity": 0.4}},
+        {"type": "WAIT", "startMs": 4800, "payload": {"holdMs": 400}}
+      ]
+    },
+    "perf_affinity_ack": {
+      "estimatedDurationMs": 1800,
+      "beats": [
+        {"type": "PLAY_EMOTION", "startMs": 0, "payload": {"emotionId": "happy", "blendMs": 150}},
+        {"type": "PLAY_GESTURE", "startMs": 100, "payload": {"gesture": "nod_smile", "loop": false}},
+        {"type": "WAIT", "startMs": 1600, "payload": {"holdMs": 200}}
+      ]
+    }
+  }
+}

@@ -1,6 +1,7 @@
 // 场景运行时上下文所在包
 package cn.itcast.demo.mylunarcore.scene;
 
+import cn.itcast.demo.mylunarcore.center.SceneRegistry;
 // 主循环可 tick 接口
 import cn.itcast.demo.mylunarcore.common.Tickable;
 // 场景系统 Protobuf 消息
@@ -24,49 +25,122 @@ import java.util.Map;
 /**
  * 单玩家当前场景运行时：怪物/NPC/道具状态与玩家坐标，实现 {@link Tickable} 供主循环驱动。
  */
-@Getter // Lombok：为字段生成 getter
 public class SceneContext implements Tickable { // 场景上下文，参与游戏主循环 tick
+
+    /** 场景 Buff 默认 TTL（毫秒）；无单独时长配置时使用。 */
+    public static final long DEFAULT_BUFF_TTL_MS = 30_000L;
 
     private final long playerUid; // 玩家登录 uid（Channel 绑定）
 
     private final int planeId; // 位面 ID
     private final int floorId; // 楼层 ID
     private final int entryId; // 入口点 ID
+    private final int zoneId; // 共享 Zone ID
     private final ScenePos playerPos; // 玩家当前三维坐标
 
     private final Map<Integer, MonsterState> monsters = new HashMap<>(); // entityId → 怪物运行时状态
     private final Map<Integer, NpcState> npcs = new HashMap<>(); // entityId → NPC 运行时状态
     private final Map<Integer, PropState> props = new HashMap<>(); // entityId → 道具运行时状态
 
-    @Setter // Lombok：为 initialized 生成 setter
     private boolean initialized; // 场景实体是否已完成初始化加载
+    /** 上一拍移动状态，供落地/攀爬反馈对比。 */
+    private volatile int lastMoveState = 1;
 
     /**
-     * 创建未初始化的场景上下文。
+     * 创建未初始化的场景上下文（默认 line=0）。
      */
     public SceneContext(long playerUid,
                          int planeId,
                          int floorId,
                          int entryId,
-                         ScenePos playerPos) { // 构造场景上下文
-        this.playerUid = playerUid; // 保存玩家 uid
-        this.planeId = planeId; // 保存位面 ID
-        this.floorId = floorId; // 保存楼层 ID
-        this.entryId = entryId; // 保存入口 ID
-        this.playerPos = playerPos; // 保存玩家坐标
-        this.initialized = false; // 初始未加载实体
+                         ScenePos playerPos) {
+        this(playerUid, planeId, floorId, entryId, playerPos, SceneRegistry.zoneId(planeId, floorId));
     }
 
     /**
-     * 游戏主循环每帧回调：可在此处理怪物 Buff 过期等（当前为占位）。
+     * 创建未初始化的场景上下文，可指定动态分线后的 zoneId。
+     */
+    public SceneContext(long playerUid,
+                         int planeId,
+                         int floorId,
+                         int entryId,
+                         ScenePos playerPos,
+                         int zoneId) {
+        this.playerUid = playerUid;
+        this.planeId = planeId;
+        this.floorId = floorId;
+        this.entryId = entryId;
+        this.zoneId = zoneId;
+        this.playerPos = playerPos;
+        this.initialized = false;
+    }
+
+    /**
+     * 游戏主循环每帧回调：递减怪物 Buff TTL 并移除过期项。
      */
     @Override
     public void onTick(long nowMillis, long deltaMillis) { // 主循环 tick 回调
-        for (MonsterState m : monsters.values()) { // 遍历场景内所有怪物
-            if (!m.getBuffs().isEmpty() && deltaMillis > 0) { // 有 Buff 且时间推进
-                // Buff 过期 / AI tick 钩子可在此扩展，当前为占位
-            }
+        if (deltaMillis <= 0) {
+            return;
         }
+        for (MonsterState m : monsters.values()) {
+            m.tickBuffs(deltaMillis);
+        }
+    }
+
+    public long getPlayerUid() {
+        return playerUid;
+    }
+
+    public int getPlaneId() {
+        return planeId;
+    }
+
+    public int getFloorId() {
+        return floorId;
+    }
+
+    public int getEntryId() {
+        return entryId;
+    }
+
+    public int getZoneId() {
+        return zoneId;
+    }
+
+    public ScenePos getPlayerPos() {
+        return playerPos;
+    }
+
+    public boolean isInitialized() {
+        return initialized;
+    }
+
+    public void setInitialized(boolean initialized) {
+        this.initialized = initialized;
+    }
+
+    public int getLastMoveState() {
+        return lastMoveState;
+    }
+
+    public void setLastMoveState(int lastMoveState) {
+        this.lastMoveState = lastMoveState;
+    }
+
+    /** 不可变怪物表快照。 */
+    public Map<Integer, MonsterState> getMonsters() {
+        return Collections.unmodifiableMap(monsters);
+    }
+
+    /** 不可变 NPC 表快照。 */
+    public Map<Integer, NpcState> getNpcs() {
+        return Collections.unmodifiableMap(npcs);
+    }
+
+    /** 不可变道具表快照。 */
+    public Map<Integer, PropState> getProps() {
+        return Collections.unmodifiableMap(props);
     }
 
     /** 按 entityId 获取怪物状态；不存在返回 null。 */
@@ -89,15 +163,85 @@ public class SceneContext implements Tickable { // 场景上下文，参与游�
         monsters.put(s.entityId, s); // 以 entityId 为键存入
     }
 
+    /**
+     * 从场景移除怪物（战后击杀掉落闭环）。
+     *
+     * @return 被移除的怪物状态；不存在则 null
+     */
+    public MonsterState removeMonster(int entityId) {
+        return monsters.remove(entityId);
+    }
+
+    /** 最近一次已广播的 XZ，用于移动采样节流。 */
+    private float lastBroadcastX;
+    private float lastBroadcastZ;
+    private boolean hasBroadcastPos;
+
+    /**
+     * 判断本次移动是否需要广播：跨 AOI 格或位移超过阈值。
+     */
+    public boolean shouldBroadcastMove(float x, float z, float cellSize, float distanceThreshold) {
+        if (!hasBroadcastPos) {
+            lastBroadcastX = x;
+            lastBroadcastZ = z;
+            hasBroadcastPos = true;
+            return true;
+        }
+        int oldCx = (int) Math.floor(lastBroadcastX / cellSize);
+        int oldCz = (int) Math.floor(lastBroadcastZ / cellSize);
+        int newCx = (int) Math.floor(x / cellSize);
+        int newCz = (int) Math.floor(z / cellSize);
+        if (oldCx != newCx || oldCz != newCz) {
+            lastBroadcastX = x;
+            lastBroadcastZ = z;
+            return true;
+        }
+        float dx = x - lastBroadcastX;
+        float dz = z - lastBroadcastZ;
+        if (dx * dx + dz * dz >= distanceThreshold * distanceThreshold) {
+            lastBroadcastX = x;
+            lastBroadcastZ = z;
+            return true;
+        }
+        return false;
+    }
+
     /** 注册 NPC 到场景索引。 */
     public void addNpc(NpcState s) { // 添加 NPC
         npcs.put(s.entityId, s); // 以 entityId 为键存入
+    }
+
+    /** 从场景索引移除 NPC（夜间 DESPAWN 等）。 */
+    public NpcState removeNpc(int entityId) {
+        return npcs.remove(entityId);
     }
 
     /** 注册道具到场景索引。 */
     public void addProp(PropState s) { // 添加道具
         props.put(s.entityId, s); // 以 entityId 为键存入
     }
+
+    /** 清空世界实体投影（再从 Zone 重投影前调用）。 */
+    public void clearWorldEntities() {
+        monsters.clear();
+        npcs.clear();
+        props.clear();
+    }
+
+    /** 遭遇开战冷却截止时间（毫秒），避免 tick 连触发。 */
+    @Setter
+    @Getter
+    private long encounterCooldownUntilMillis;
+
+    /** 最近一次被服务器接受的移动时间戳；0 表示尚未移动过（反作弊基准）。 */
+    @Setter
+    @Getter
+    private long lastMoveAcceptedMillis;
+
+    /** 最近一次自动遭遇的实体 ID。 */
+    @Setter
+    @Getter
+    private int lastAutoEncounterEntityId;
 
     /**
      * 组装「进入场景」下行响应：场景信息 + 实体列表。
@@ -240,6 +384,8 @@ public class SceneContext implements Tickable { // 场景上下文，参与游�
         private int maxHp; // 最大生命值
         private final ScenePos pos; // 场景坐标
         private final List<Integer> buffs; // 当前 Buff ID 列表
+        /** 与 buffs 下标对齐的剩余毫秒；缺省 DEFAULT_BUFF_TTL_MS。 */
+        private final List<Long> buffRemainingMs;
 
         public MonsterState(int entityId,
                               int monsterId,
@@ -254,7 +400,32 @@ public class SceneContext implements Tickable { // 场景上下文，参与游�
             this.hp = hp; // 保存当前 HP
             this.maxHp = maxHp; // 保存最大 HP
             this.pos = pos; // 保存坐标
-            this.buffs = buffs == null ? Collections.<Integer>emptyList() : buffs; // null 时降级为空列表
+            if (buffs == null || buffs.isEmpty()) {
+                this.buffs = new ArrayList<>();
+                this.buffRemainingMs = new ArrayList<>();
+            } else {
+                this.buffs = new ArrayList<>(buffs);
+                this.buffRemainingMs = new ArrayList<>(buffs.size());
+                for (int i = 0; i < buffs.size(); i++) {
+                    this.buffRemainingMs.add(DEFAULT_BUFF_TTL_MS);
+                }
+            }
+        }
+
+        /** 递减 TTL，移除过期 Buff。 */
+        public void tickBuffs(long deltaMillis) {
+            if (buffs.isEmpty() || deltaMillis <= 0) {
+                return;
+            }
+            for (int i = buffs.size() - 1; i >= 0; i--) {
+                long remain = buffRemainingMs.get(i) - deltaMillis;
+                if (remain <= 0) {
+                    buffs.remove(i);
+                    buffRemainingMs.remove(i);
+                } else {
+                    buffRemainingMs.set(i, remain);
+                }
+            }
         }
     }
 

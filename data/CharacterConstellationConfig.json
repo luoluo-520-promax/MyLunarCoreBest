@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "characters": {
+    "1211": {
+      "maxLayer": 6,
+      "layers": [
+        {
+          "layer": 1,
+          "desc": "战技伤害提升20%",
+          "effectType": "STAT_BOOST",
+          "modifiers": [{"stat": "SKILL_DMG", "value": 20, "skillSlot": 1}]
+        },
+        {
+          "layer": 2,
+          "desc": "初始获得1层护盾",
+          "effectType": "START_STATE",
+          "modifiers": [{"stat": "START_SHIELD", "value": 10}]
+        },
+        {
+          "layer": 3,
+          "desc": "战技额外恢复1点战技点",
+          "effectType": "MECHANIC",
+          "modifiers": [{"stat": "SKILL_POINT_RESTORE", "value": 1, "skillSlot": 1}]
+        },
+        {
+          "layer": 4,
+          "desc": "终结技伤害提升15%",
+          "effectType": "STAT_BOOST",
+          "modifiers": [{"stat": "ULT_DMG", "value": 15, "skillSlot": 3}]
+        },
+        {
+          "layer": 5,
+          "desc": "天赋持续回合+1",
+          "effectType": "TALENT_UPGRADE",
+          "modifiers": [{"stat": "TALENT_DURATION", "value": 1, "targetSkillId": 121101}]
+        },
+        {
+          "layer": 6,
+          "desc": "普攻伤害提升25%",
+          "effectType": "STAT_BOOST",
+          "modifiers": [{"stat": "BASIC_DMG", "value": 25, "skillSlot": 0}]
+        }
+      ]
+    },
+    "1001": {
+      "maxLayer": 6,
+      "layers": [
+        {
+          "layer": 1,
+          "desc": "攻击力提升8%",
+          "effectType": "STAT_BOOST",
+          "modifiers": [{"stat": "ATK_PCT", "value": 8}]
+        },
+        {
+          "layer": 2,
+          "desc": "入场获得护盾",
+          "effectType": "START_STATE",
+          "modifiers": [{"stat": "START_SHIELD", "value": 8}]
+        }
+      ]
+    }
+  }
+}

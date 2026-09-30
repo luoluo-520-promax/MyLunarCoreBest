@@ -9,6 +9,10 @@ import org.slf4j.LoggerFactory;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
+/**
+ * {@link BattleManager} 内存战局表：put/get 同引用、remove 后清空、缺失 id 返回 null。
+ * SnapshotService 仅 mock，本类不测持久化。
+ */
 @DisplayName("BattleManager 战局管理器测试")
 class BattleManagerTest {
 
@@ -18,9 +22,10 @@ class BattleManagerTest {
 
     @BeforeEach
     void setUp() {
-        battleManager = new BattleManager();
+        battleManager = new BattleManager(org.mockito.Mockito.mock(BattleSnapshotService.class));
     }
 
+    /** put(1001) 后 get(1001) 必须是同一 {@link BattleContext} 实例。 */
     @Test
     @DisplayName("put 后 get 应返回同一战局上下文")
     void putAndGetShouldReturnSameContext() {
@@ -33,6 +38,7 @@ class BattleManagerTest {
         assertSame(context, found);
     }
 
+    /** remove 后同一 battleId 再 get 为 null。 */
     @Test
     @DisplayName("remove 后 get 应返回 null")
     void removeShouldClearBattle() {
@@ -45,6 +51,7 @@ class BattleManagerTest {
         assertNull(found);
     }
 
+    /** 从未 put 过的 id 直接 get → null。 */
     @Test
     @DisplayName("查询不存在的 battleId 应返回 null")
     void getMissingBattleShouldReturnNull() {

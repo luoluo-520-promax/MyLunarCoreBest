@@ -1,0 +1,94 @@
+{
+  "version": "1.1.0",
+  "enabled": true,
+  "maxResults": 3,
+  "gameSearchPrefix": "崩坏星穹铁道",
+  "allowedHosts": [
+    "www.bilibili.com",
+    "bilibili.com",
+    "m.bilibili.com",
+    "search.bilibili.com",
+    "www.douyin.com",
+    "douyin.com",
+    "m.douyin.com",
+    "v.douyin.com",
+    "www.iesdouyin.com",
+    "sr.mihoyo.com",
+    "www.mihoyo.com",
+    "mihoyo.com",
+    "bbs.mihoyo.com",
+    "hsr.hoyoverse.com",
+    "www.hoyoverse.com"
+  ],
+  "guideIntentKeywords": [
+    "攻略", "怎么打", "怎么过", "通关", "打法", "教程", "视频",
+    "walkthrough", "guide", "怎么玩", "配队攻略", "boss怎么", "深渊",
+    "忘却之庭", "世界boss", "b站", "bilibili", "抖音", "douyin", "官方", "官网"
+  ],
+  "platforms": [
+    {
+      "id": "bilibili",
+      "displayName": "哔哩哔哩",
+      "searchUrlTemplate": "https://search.bilibili.com/all?keyword={query}",
+      "enabled": true
+    },
+    {
+      "id": "douyin",
+      "displayName": "抖音",
+      "searchUrlTemplate": "https://www.douyin.com/search/{query}",
+      "enabled": true
+    },
+    {
+      "id": "official",
+      "displayName": "官方网站",
+      "searchUrlTemplate": "https://sr.mihoyo.com/",
+      "enabled": true
+    }
+  ],
+  "guides": [
+    {
+      "id": "eg_newbie_bili",
+      "title": "B站：新手入门攻略检索",
+      "platform": "bilibili",
+      "mediaType": "search",
+      "url": "https://search.bilibili.com/all?keyword=%E5%B4%A9%E5%9D%8F%E6%98%9F%E7%A9%B9%E9%93%81%E9%81%93+%E6%96%B0%E6%89%8B+%E6%94%BB%E7%95%A5",
+      "scene": "newbie",
+      "keywords": ["新手", "入门", "怎么玩", "日常", "攻略", "b站"],
+      "priority": 20,
+      "official": false
+    },
+    {
+      "id": "eg_abyss_douyin",
+      "title": "抖音：深渊/忘却之庭打法检索",
+      "platform": "douyin",
+      "mediaType": "video",
+      "url": "https://www.douyin.com/search/%E5%B4%A9%E5%9D%8F%E6%98%9F%E7%A9%B9%E9%93%81%E9%81%93%20%E5%BF%98%E5%8D%B4%E4%B9%8B%E5%BA%AD%20%E6%94%BB%E7%95%A5",
+      "scene": "abyss",
+      "keywords": ["深渊", "忘却之庭", "配队", "通关", "攻略", "抖音"],
+      "priority": 18,
+      "official": false
+    },
+    {
+      "id": "eg_world_boss_bili",
+      "title": "B站：世界 BOSS 打法检索",
+      "platform": "bilibili",
+      "mediaType": "video",
+      "url": "https://search.bilibili.com/all?keyword=%E5%B4%A9%E5%9D%8F%E6%98%9F%E7%A9%B9%E9%93%81%E9%81%93+%E4%B8%96%E7%95%8CBOSS+%E6%94%BB%E7%95%A5",
+      "scene": "boss",
+      "keywords": ["世界boss", "世界BOSS", "boss打法", "怎么打"],
+      "priority": 16,
+      "official": false
+    },
+    {
+      "id": "eg_official_home",
+      "title": "崩坏：星穹铁道官网",
+      "platform": "official",
+      "mediaType": "article",
+      "url": "https://sr.mihoyo.com/",
+      "scene": "meta",
+      "keywords": ["官方", "官网", "官方网站", "公告", "活动"],
+      "priority": 22,
+      "official": true
+    }
+  ]
+}

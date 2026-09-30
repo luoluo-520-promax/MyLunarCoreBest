@@ -1,0 +1,63 @@
+# 由脚本读取以生成协议/配置文档，避免人工漂移
+version: "1.0"
+generated_docs:
+  - docs/protocol-docs.md
+  - docs/error-codes.md
+  - docs/planner-config-guide.md
+
+config_files:
+  - name: Banners.json
+    owner: gacha
+    hot_reload: true
+  - name: EquipmentAffixPool.json
+    owner: equipment
+    hot_reload: true
+  - name: RelicSetConfigs.json
+    owner: equipment
+    hot_reload: true
+  - name: WorldBossConfigs.json
+    owner: worldboss
+    hot_reload: true
+  - name: AbyssSeasonConfigs.json
+    owner: abyss
+    hot_reload: true
+  - name: RogueMapGen.json
+    owner: rogue
+    hot_reload: true
+  - name: ActivityTypeCatalog.json
+    owner: activity
+    hot_reload: true
+  - name: DialogueTrees.json
+    owner: dialogue
+    hot_reload: true
+  - name: DeviceHapticsConfig.json
+    owner: settings
+    hot_reload: true
+  - name: DailyMissionConfigs.json
+    owner: quest
+    hot_reload: true
+
+cmd_ranges:
+  - range: [120, 129]
+    module: party
+  - range: [400, 450]
+    module: item
+  - range: [860, 868]
+    module: dialogue
+  - range: [950, 954]
+    module: achievement
+  - range: [984, 989]
+    module: guild_war
+  - range: [990, 995]
+    module: battle_pass
+  - range: [996, 1008]
+    module: daily_loop
+  - range: [1009, 1009]
+    module: battle_pass_notify
+  - range: [1020, 1069]
+    module: experience_loop_fill
+  - range: [1070, 1097]
+    module: experience_immersion_v3
+
+error_code_source: docs/error-codes.md
+admin_error_api: /api/admin/error-codes

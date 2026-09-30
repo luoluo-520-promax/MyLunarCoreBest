@@ -21,8 +21,7 @@ import io.netty.channel.Channel;
 import cn.itcast.demo.mylunarcore.common.AppLogger;
 // 日志分类
 import cn.itcast.demo.mylunarcore.common.LogCategory;
-// Channel 自定义属性键
-import io.netty.util.AttributeKey;
+import cn.itcast.demo.mylunarcore.player.PlayerContextResolver;
 // SLF4J 日志接口
 import org.slf4j.Logger;
 // Spring @Service 业务 Bean
@@ -44,25 +43,19 @@ public class RogueNettyService {
     // 本类日志记录器（Rogue 业务分类）
     private static final Logger log = AppLogger.logger(LogCategory.BUSINESS_ROGUE, RogueNettyService.class); // 绑定 Rogue 业务分类 SLF4J 日志
 
-    // Channel 上绑定玩家 uid 的属性键
-    private static final AttributeKey<Long> UID_KEY = AttributeKey.valueOf("playerUid"); // 定义 Channel 属性键名 playerUid
+    private final RogueManager rogueManager;
+    private final RoguePlayerDataRepository playerDataRepository;
+    private final RogueTalentRepository talentRepository;
+    private final PlayerContextResolver contextResolver;
 
-    // 运行时索引：playerId ↔ RogueRuntime
-    private final RogueManager rogueManager; // Rogue 运行时索引 playerId→状态
-    // 玩家 Rogue 全局数据持久化
-    private final RoguePlayerDataRepository playerDataRepository; // 玩家 Rogue 全局数据仓储
-    // Rogue 天赋持久化
-    private final RogueTalentRepository talentRepository; // Rogue 天赋等级与激活状态仓储
-
-    /**
-     * 构造器注入 Rogue 相关依赖。
-     */
     public RogueNettyService(RogueManager rogueManager,
                              RoguePlayerDataRepository playerDataRepository,
-                             RogueTalentRepository talentRepository) {
-        this.rogueManager = rogueManager; // 保存运行时管理器引用
-        this.playerDataRepository = playerDataRepository; // 保存玩家全局数据仓储引用
-        this.talentRepository = talentRepository; // 保存天赋仓储引用
+                             RogueTalentRepository talentRepository,
+                             PlayerContextResolver contextResolver) {
+        this.rogueManager = rogueManager;
+        this.playerDataRepository = playerDataRepository;
+        this.talentRepository = talentRepository;
+        this.contextResolver = contextResolver;
     }
 
     /**
@@ -559,11 +552,8 @@ public class RogueNettyService {
     /**
      * 从 Channel 读取当前玩家 ID；未登录返回 null。
      */
-    private Integer getPlayerId(Channel channel) { // 解析 Channel 绑定的玩家 ID
-        Long uid = channel.attr(UID_KEY).get(); // 从 Channel 属性读取登录 uid
-        if (uid == null) { // uid 为空表示未登录
-            return null; // 未登录时返回 null
-        }
-        return (int) (uid.longValue() & 0xffffffffL); // uid 低 32 位映射为 playerId
+    private Integer getPlayerId(Channel channel) {
+        int playerId = contextResolver.resolvePlayerId(channel);
+        return playerId <= 0 ? null : playerId;
     }
 }

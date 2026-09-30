@@ -16,6 +16,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 
+/**
+ * ChallengeHistoryRepository 挑战历史仓储测试。
+ * <p>
+ * 针对相关生产代码的单元/切片测试类 {@code ChallengeHistoryRepositoryTest}：
+ * 通过 fixture、mock 与断言覆盖关键成功路径、失败码与状态边界。
+ */
 @DisplayName("ChallengeHistoryRepository 挑战历史仓储测试")
 class ChallengeHistoryRepositoryTest {
 
@@ -31,6 +37,16 @@ class ChallengeHistoryRepositoryTest {
         log.info("仓储初始化: repository={}", repository.getClass().getSimpleName());
     }
 
+    /**
+     * 验证点：findByPlayerAndChallenge 应返回历史最佳记录。
+     * <p>测试方法 {@code findByPlayerAndChallengeShouldReturnEntity}：
+     * <ul>
+     *   <li>{@code assertTrue(opt.isPresent());}</li>
+     *   <li>{@code assertEquals(7, entity.getStars());}</li>
+     *   <li>{@code assertEquals(9500, entity.getScore());}</li>
+     *   <li>{@code assertEquals(3, entity.getTakenReward());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("findByPlayerAndChallenge 应返回历史最佳记录")
     void findByPlayerAndChallengeShouldReturnEntity() {
@@ -55,6 +71,13 @@ class ChallengeHistoryRepositoryTest {
         assertEquals(3, entity.getTakenReward());
     }
 
+    /**
+     * 验证点：findByPlayerAndChallenge 无记录时应返回 empty。
+     * <p>测试方法 {@code findByPlayerAndChallengeShouldReturnEmptyWhenMissing}：
+     * <ul>
+     *   <li>{@code assertTrue(opt.isEmpty());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("findByPlayerAndChallenge 无记录时应返回 empty")
     void findByPlayerAndChallengeShouldReturnEmptyWhenMissing() {
@@ -66,6 +89,13 @@ class ChallengeHistoryRepositoryTest {
         assertTrue(opt.isEmpty());
     }
 
+    /**
+     * 验证点：countHistory 应统计满足筛选条件的历史条数。
+     * <p>测试方法 {@code countHistoryShouldReturnCount}：
+     * <ul>
+     *   <li>{@code assertEquals(3, count);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("countHistory 应统计满足筛选条件的历史条数")
     void countHistoryShouldReturnCount() {
@@ -77,6 +107,14 @@ class ChallengeHistoryRepositoryTest {
         assertEquals(3, count);
     }
 
+    /**
+     * 验证点：listHistory 应分页返回历史列表。
+     * <p>测试方法 {@code listHistoryShouldReturnPagedList}：
+     * <ul>
+     *   <li>{@code assertEquals(1, list.size());}</li>
+     *   <li>{@code assertEquals(1002, list.get(0).getChallengeId());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("listHistory 应分页返回历史列表")
     void listHistoryShouldReturnPagedList() {
@@ -98,6 +136,11 @@ class ChallengeHistoryRepositoryTest {
         assertEquals(1002, list.get(0).getChallengeId());
     }
 
+    /**
+     * 验证点：upsertBestResult 应执行合并更新。
+     * <p>测试方法 {@code upsertBestResultShouldUpsert}：
+     * 按用例准备数据后断言返回值或协作对象调用是否符合预期。
+     */
     @Test
     @DisplayName("upsertBestResult 应执行合并更新")
     void upsertBestResultShouldUpsert() {

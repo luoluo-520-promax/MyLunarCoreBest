@@ -21,6 +21,12 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 
+/**
+ * PlayerDataRepository 玩家数据仓储测试。
+ * <p>
+ * 针对相关生产代码的单元/切片测试类 {@code PlayerDataRepositoryTest}：
+ * 通过 fixture、mock 与断言覆盖关键成功路径、失败码与状态边界。
+ */
 @DisplayName("PlayerDataRepository 玩家数据仓储测试")
 class PlayerDataRepositoryTest {
 
@@ -36,6 +42,15 @@ class PlayerDataRepositoryTest {
         log.info("仓储初始化: repository={}", repository.getClass().getSimpleName());
     }
 
+    /**
+     * 验证点：findAccountByUsername 应返回账号实体。
+     * <p>测试方法 {@code findAccountByUsernameShouldReturnAccount}：
+     * <ul>
+     *   <li>{@code assertEquals("traveler", account.getUsername());}</li>
+     *   <li>{@code assertEquals("1001", account.getId());}</li>
+     *   <li>{@code assertEquals(1, account.getStatus());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("findAccountByUsername 应返回账号实体")
     void findAccountByUsernameShouldReturnAccount() {
@@ -54,6 +69,16 @@ class PlayerDataRepositoryTest {
         assertEquals(1, account.getStatus());
     }
 
+    /**
+     * 验证点：loadPlayerByUid 应返回玩家核心字段。
+     * <p>测试方法 {@code loadPlayerByUidShouldReturnPlayer}：
+     * <ul>
+     *   <li>{@code assertEquals(77L, player.getUid());}</li>
+     *   <li>{@code assertEquals("开拓者", player.getNickname());}</li>
+     *   <li>{@code assertEquals(60, player.getLevel());}</li>
+     *   <li>{@code assertEquals(1001, player.getSceneId());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("loadPlayerByUid 应返回玩家核心字段")
     void loadPlayerByUidShouldReturnPlayer() {
@@ -81,6 +106,16 @@ class PlayerDataRepositoryTest {
         assertEquals(1001, player.getSceneId());
     }
 
+    /**
+     * 验证点：loadCoreData 应加载玩家并初始化空子表集合。
+     * <p>测试方法 {@code loadCoreDataShouldInitializeEmptyCollections}：
+     * <ul>
+     *   <li>{@code assertNotNull(data.getPlayer());}</li>
+     *   <li>{@code assertTrue(data.getAvatars().isEmpty());}</li>
+     *   <li>{@code assertTrue(data.getItems().isEmpty());}</li>
+     *   <li>{@code assertTrue(data.getLineups().isEmpty());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("loadCoreData 应加载玩家并初始化空子表集合")
     void loadCoreDataShouldInitializeEmptyCollections() {
@@ -108,6 +143,14 @@ class PlayerDataRepositoryTest {
         assertTrue(data.getLineups().isEmpty());
     }
 
+    /**
+     * 验证点：persistPlayerSnapshot 无效实体应返回 0。
+     * <p>测试方法 {@code persistPlayerSnapshotShouldRejectInvalidEntity}：
+     * <ul>
+     *   <li>{@code assertEquals(0, affectedNull);}</li>
+     *   <li>{@code assertEquals(0, affectedZeroUid);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("persistPlayerSnapshot 无效实体应返回 0")
     void persistPlayerSnapshotShouldRejectInvalidEntity() {
@@ -121,6 +164,13 @@ class PlayerDataRepositoryTest {
         assertEquals(0, affectedZeroUid);
     }
 
+    /**
+     * 验证点：createDefaultPlayerForAccount 非法 account.id 应抛异常。
+     * <p>测试方法 {@code createDefaultPlayerShouldRejectInvalidAccountId}：
+     * <ul>
+     *   <li>{@code assertThrows(IllegalArgumentException.class,}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("createDefaultPlayerForAccount 非法 account.id 应抛异常")
     void createDefaultPlayerShouldRejectInvalidAccountId() {
@@ -132,6 +182,13 @@ class PlayerDataRepositoryTest {
                 () -> repository.createDefaultPlayerForAccount(account));
     }
 
+    /**
+     * 验证点：findAccountByUsername 不存在时应返回 null。
+     * <p>测试方法 {@code findAccountByUsernameShouldReturnNullWhenMissing}：
+     * <ul>
+     *   <li>{@code assertNull(account);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("findAccountByUsername 不存在时应返回 null")
     void findAccountByUsernameShouldReturnNullWhenMissing() {

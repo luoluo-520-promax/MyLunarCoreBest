@@ -8,11 +8,26 @@ import org.slf4j.LoggerFactory;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+/**
+ * HotfixData 热修复数据测试。
+ * <p>
+ * 针对相关生产代码的单元/切片测试类 {@code HotfixDataTest}：
+ * 通过 fixture、mock 与断言覆盖关键成功路径、失败码与状态边界。
+ */
 @DisplayName("HotfixData 热修复数据测试")
 class HotfixDataTest {
 
     private static final Logger log = LoggerFactory.getLogger(HotfixDataTest.class);
 
+    /**
+     * 验证点：empty 应返回全默认值。
+     * <p>测试方法 {@code emptyShouldReturnDefaultValues}：
+     * <ul>
+     *   <li>{@code assertEquals("", data.getClientResourceBaseUrl());}</li>
+     *   <li>{@code assertEquals("0.0.0", data.getHotfixVersion());}</li>
+     *   <li>{@code assertEquals(0L, data.getPatchVersion());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("empty 应返回全默认值")
     void emptyShouldReturnDefaultValues() {
@@ -25,6 +40,15 @@ class HotfixDataTest {
         assertEquals(0L, data.getPatchVersion());
     }
 
+    /**
+     * 验证点：setter 应正确保存字段。
+     * <p>测试方法 {@code settersShouldPersistValues}：
+     * <ul>
+     *   <li>{@code assertEquals("https://cdn.test.com/", data.getClientResourceBaseUrl());}</li>
+     *   <li>{@code assertEquals("2.1.0", data.getHotfixVersion());}</li>
+     *   <li>{@code assertEquals(42L, data.getPatchVersion());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("setter 应正确保存字段")
     void settersShouldPersistValues() {

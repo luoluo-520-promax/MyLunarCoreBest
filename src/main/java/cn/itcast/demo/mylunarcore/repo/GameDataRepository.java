@@ -48,4 +48,20 @@ public class GameDataRepository {
         }, dataKey); // 绑定 dataKey 参数
         return list.isEmpty() ? null : list.get(0); // 无行返回 null，否则取首行
     }
+
+    /**
+     * 插入或更新一条 game_data 记录。
+     *
+     * @param dataKey      业务唯一键
+     * @param payloadJson  JSON 正文
+     * @return 受影响行数
+     */
+    public int upsert(String dataKey, String payloadJson) {
+        String sql = """
+                INSERT INTO game_data (data_key, payload_json)
+                VALUES (?, ?)
+                ON DUPLICATE KEY UPDATE payload_json = VALUES(payload_json)
+                """;
+        return jdbcTemplate.update(sql, dataKey, payloadJson);
+    }
 }

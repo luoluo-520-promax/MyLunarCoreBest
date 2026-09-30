@@ -1,0 +1,41 @@
+{
+  "activities": [
+    {
+      "versionActivityId": 5001,
+      "title": "启程庆典",
+      "tokenItemId": 9001,
+      "openAt": "2026-01-01T00:00:00+08:00",
+      "closeAt": "2026-12-31T23:59:59+08:00",
+      "nodes": [
+        {
+          "nodeId": "story",
+          "type": "story_stage",
+          "title": "庆典剧情",
+          "children": ["challenge", "signin"]
+        },
+        {
+          "nodeId": "challenge",
+          "type": "challenge_stage",
+          "title": "限时挑战",
+          "children": ["shop"],
+          "tokenReward": 100
+        },
+        {
+          "nodeId": "signin",
+          "type": "signin",
+          "title": "七日签到",
+          "children": [],
+          "tokenReward": 20
+        },
+        {
+          "nodeId": "shop",
+          "type": "exchange_shop",
+          "title": "庆典兑换",
+          "children": [],
+          "tokenCost": 50
+        }
+      ],
+      "rootNodeIds": ["story"]
+    }
+  ]
+}

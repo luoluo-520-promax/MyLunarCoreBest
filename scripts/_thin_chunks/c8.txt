@@ -1,0 +1,10 @@
+﻿C:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\matchmaking\ChallengeMatchCoordinatorTest.java
+C:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\matchmaking\MatchCompatibilityScorerTest.java
+C:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\matchmaking\MatchmakingServiceTest.java
+C:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\matchmaking\MatchmakingTestFixtures.java
+C:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\matchmaking\MatchNettyServiceTest.java
+C:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\matchmaking\MatchQueueTest.java
+C:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\matchmaking\RoomServiceTest.java
+C:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\net\ClientFeatureFlagsTest.java
+C:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\net\GamePacketDispatcherTest.java
+C:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\net\GamePacketTest.java

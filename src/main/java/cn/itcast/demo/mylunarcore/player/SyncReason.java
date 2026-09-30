@@ -18,7 +18,10 @@ public enum SyncReason {
     DATA_CHANGE(1),
 
     /** 定时被动全量同步：OnlinePlayer Tick 周期触发 */
-    TIMER(2);
+    TIMER(2),
+
+    /** 断连/登出时触发落盘（内部使用，不写入客户端 sync_reason） */
+    LOGOUT(3);
 
     /** 写入 Protobuf sync_reason 字段时使用的整型编码 */
     private final int code;

@@ -3,12 +3,6 @@ package cn.itcast.demo.mylunarcore.net;
 
 // 全局配置（端口、KCP 参数等）
 import cn.itcast.demo.mylunarcore.config.LunarCoreProperties;
-// 入站解码：字节 → GamePacket
-import cn.itcast.demo.mylunarcore.net.LunarFrameDecoder;
-// 出站编码：GamePacket → 字节
-import cn.itcast.demo.mylunarcore.net.LunarFrameEncoder;
-// 幂等 handler：短时间重复请求回放响应
-import cn.itcast.demo.mylunarcore.net.PacketIdempotencyHandler;
 // KCP 生命周期回调实现（投递业务线程）
 import cn.itcast.demo.mylunarcore.net.GameServerKcpListener;
 // Pipeline 末尾桥接到 KcpListener
@@ -17,6 +11,8 @@ import cn.itcast.demo.mylunarcore.net.KcpListenerBridgeHandler;
 import io.jpower.kcp.netty.ChannelOptionHelper;
 // KCP 子通道类型
 import io.jpower.kcp.netty.UkcpChannel;
+// Netty Channel 选项
+import io.netty.channel.ChannelOption;
 // UkcpChannel 专有选项（如 MTU）
 import io.jpower.kcp.netty.UkcpChannelOption;
 // UDP KCP 服务端 Channel 类型
@@ -33,8 +29,6 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 // Bean 就绪回调
 import jakarta.annotation.PostConstruct;
-// Bean 销毁回调
-import jakarta.annotation.PreDestroy;
 // 统一日志门面
 import cn.itcast.demo.mylunarcore.common.AppLogger;
 // 日志分类
@@ -45,9 +39,6 @@ import org.slf4j.Logger;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 // Spring 组件注解
 import org.springframework.stereotype.Component;
-// 幂等 TTL
-import java.time.Duration;
-
 /**
  * UDP KCP 游戏服：使用与 TCP 相同的 Lunar 帧编解码，KCP 参数参考 LunarCore 风格。
  */
@@ -59,6 +50,9 @@ public class GameKcpServer {
 
     private final LunarCoreProperties properties; // 注入：端口与 KCP 配置
     private final GameServerKcpListener kcpListener; // 注入：收包回调实现
+    private final ConnectionPacketRateLimiterHandler packetRateLimiterHandler;
+    private final NettyBackpressureHandler backpressureHandler;
+    private final NetTraceContextHandler traceContextHandler;
 
     private EventLoopGroup group; // KCP 与 UDP 共用的 EventLoop
     private ChannelFuture bindFuture; // bind 结果句柄
@@ -66,9 +60,16 @@ public class GameKcpServer {
     /**
      * 构造器注入配置与 KCP 监听器。
      */
-    public GameKcpServer(LunarCoreProperties properties, GameServerKcpListener kcpListener) {
-        this.properties = properties; // 保存配置
-        this.kcpListener = kcpListener; // 保存监听器
+    public GameKcpServer(LunarCoreProperties properties,
+                         GameServerKcpListener kcpListener,
+                         ConnectionPacketRateLimiterHandler packetRateLimiterHandler,
+                         NettyBackpressureHandler backpressureHandler,
+                         NetTraceContextHandler traceContextHandler) {
+        this.properties = properties;
+        this.kcpListener = kcpListener;
+        this.packetRateLimiterHandler = packetRateLimiterHandler;
+        this.backpressureHandler = backpressureHandler;
+        this.traceContextHandler = traceContextHandler;
     }
 
     /**
@@ -87,26 +88,33 @@ public class GameKcpServer {
                 .childHandler(new ChannelInitializer<UkcpChannel>() { // 每个 Ukcp 连接初始化 pipeline
                     @Override
                     protected void initChannel(UkcpChannel ch) { // 装配 handler 链
-                        ch.pipeline()
-                                .addLast(new LunarFrameDecoder()) // 解码出一帧 GamePacket
-                                .addLast(new LunarFrameEncoder()) // 编码下行帧
-                                .addLast("idempotency", new PacketIdempotencyHandler(Duration.ofSeconds(10), 2048)) // 幂等窗口
-                                .addLast(new KcpListenerBridgeHandler(kcpListener)); // KCP 无 TLS，末尾桥接 Listener
+                        GamePipelineConfigurer.configureCommonHandlers(
+                                ch.pipeline(), backpressureHandler, packetRateLimiterHandler, traceContextHandler);
+                        if (properties.getProtocolHmac().isEnabled()) {
+                            ch.pipeline().addFirst("protocol-hmac", new ProtocolHmacCodec(properties));
+                        }
+                        if (properties.getKcpCrypto().isEnabled()) {
+                            ch.pipeline().addFirst("kcp-crypto", new KcpSessionCryptoCodec(properties));
+                        }
+                        ch.pipeline().addLast(new KcpListenerBridgeHandler(kcpListener));
                     }
                 });
-        // nodelay、interval 等参考 LunarCore KCP 调参
-        ChannelOptionHelper.nodelay(b, true, interval, 2, true) // 开启 nodelay 等快速响应参数
-                .childOption(UkcpChannelOption.UKCP_MTU, mtu); // 设置单包 MTU
+        ChannelOptionHelper.nodelay(b, true, interval, 2, true) // 默认 nodelay；运行时由 AdaptiveKcp 按 RTT 调 interval
+                .childOption(UkcpChannelOption.UKCP_MTU, mtu)
+                .childOption(ChannelOption.WRITE_BUFFER_WATER_MARK, NettyChannelOptions.WRITE_BUFFER_WATER_MARK);
 
         bindFuture = b.bind(port).sync(); // 同步等待绑定完成
-        log.info("GameKcpServer started (UDP/KCP) on port={}, interval={}, mtu={}", port, interval, mtu); // 启动日志
-        log.info("UDP/KCP 未走 TLS；生产若需与 HTTPS 同级传输保护，可考虑 DTLS、专线或优先使用 TCP+TLS。"); // 安全提示
+        var retransmit = properties.getKcp().getRetransmit();
+        log.info("GameKcpServer started (UDP/KCP) on port={}, interval={}, mtu={}, algo={}, fastAck={}, appCrypto={}",
+                port, interval, mtu, retransmit.getAlgo(), retransmit.isFastAck(), properties.getKcpCrypto().isEnabled());
+        if (!properties.getKcpCrypto().isEnabled()) {
+            log.info("UDP/KCP 未启用应用层加密；生产请开启 lunarcore.kcp-crypto.enabled 或改用 TCP+TLS。");
+        }
     }
 
     /**
      * 关闭 KCP 监听并退出事件循环。
      */
-    @PreDestroy // Spring 关闭阶段调用
     public void stop() {
         try {
             if (bindFuture != null) { // 已启动才关闭 channel

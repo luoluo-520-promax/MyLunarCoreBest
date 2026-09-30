@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "skins": [
+    {
+      "skinId": 8001001,
+      "avatarId": 1001,
+      "itemId": 8101001,
+      "name": "默认外观",
+      "rarity": 3,
+      "isDefault": true,
+      "resourceKey": "avatar/1001/skin_default",
+      "previewIcon": "ui/skin/8001001",
+      "tags": ["DEFAULT"],
+      "enabled": true
+    },
+    {
+      "skinId": 8001002,
+      "avatarId": 1001,
+      "itemId": 8101002,
+      "name": "星海礼赞",
+      "rarity": 5,
+      "isDefault": false,
+      "resourceKey": "avatar/1001/skin_star_ocean",
+      "previewIcon": "ui/skin/8001002",
+      "tags": ["LIMITED", "FESTIVAL"],
+      "obtainTips": "皮肤商店 / 限时礼包",
+      "enabled": true
+    }
+  ]
+}

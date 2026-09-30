@@ -10,6 +10,10 @@ message FightStartCsReq {
   uint32 lineup_id = 2;
   uint32 scene_entity_uid = 3;
   uint32 skill_id = 4;
+  /** 好友助战：好友玩家 uid；0=不使用助战 */
+  uint32 support_friend_uid = 5;
+  /** 是否消耗体力（材料本/深渊等）；场景遭遇默认 false */
+  bool consume_stamina = 6;
 }
 
 message FightStartScRsp {
@@ -46,6 +50,10 @@ message FightActionCsReq {
   uint32 caster_id = 5;
   repeated uint32 target_ids = 6;
   bytes action_data = 7;
+  /** 客户端上报上一拍顿帧结束墙钟时间戳（毫秒）；0=无顿帧校验 */
+  uint64 client_hit_stop_end_ms = 8;
+  /** 客户端预测执行墙钟时间（毫秒）；服务端对齐后做确定性结算，偏差过大则 BattleCorrectionScNotify */
+  uint64 client_estimated_time_ms = 9;
 }
 
 message FightActionScRsp {
@@ -130,6 +138,74 @@ message FightStateScNotify {
   string extra_data_json = 4;
 }
 
+/**
+ * 打击感元数据：服务器权威数值校验后下发，客户端严格按此播特效。
+ * 保证「手感到位」且「数值绝对权威」。
+ */
+message BattleFxMeta {
+  bool critical = 1;
+  bool weakness = 2;
+  bool kill = 3;
+  uint32 camera_shake = 4; // 0无 1轻 2中 3重
+  float time_scale = 5; // 慢放系数，1.0=正常，0.3=大招特写
+  string damage_popup_style = 6; // small | normal | large | crit_burst
+  int32 display_damage = 7; // 与服务器结算一致的跳字数值
+  uint32 target_entity_id = 8;
+  /** 镜头 FOV 冲击幅度（度），0=无；客户端按此做短暂 FOV punch */
+  float camera_fov_impact = 9;
+  /** 镜头震动强度细化（0.0–1.0），与 camera_shake 档位互补 */
+  float camera_shake_intensity = 10;
+}
+
+/** 服务端权威顿帧（Hit-stop）：多人共战必须同源下发，禁止客户端本地估算 */
+message HitStopFrame {
+  /** 相对本技能起手的触发帧（逻辑帧，约 60fps） */
+  uint32 trigger_frame = 1;
+  /** 冻结时长（毫秒） */
+  uint32 duration_ms = 2;
+}
+
+message BattleFxScNotify {
+  uint64 battle_id = 1;
+  uint32 skill_id = 2;
+  uint32 caster_id = 3;
+  repeated BattleFxMeta fx = 4;
+  /** 0低 1中 2高：按当前 RTT/丢包动态降级粒子 */
+  uint32 fx_quality_level = 5;
+  uint32 rtt_ms = 6;
+  uint32 packet_loss_bp = 7;
+  /** 触觉强度 0-100；客户端按设备映射到震动波形 */
+  uint32 haptic_intensity = 8;
+  /** DeviceHapticsConfig 波形 ID：反击/暴击/击杀等 */
+  uint32 waveform_id = 9;
+  /** 服务端精确下发的 Hit-stop 序列 */
+  repeated HitStopFrame hit_stop_frames = 10;
+  /** 权威顿帧总时长（毫秒），便于客户端对齐；= sum(duration_ms) 的有效冻结窗 */
+  uint32 hit_stop_total_ms = 11;
+  /** 服务端期望的顿帧结束墙钟时间戳（毫秒），供防外挂校验 */
+  uint64 expected_hit_stop_end_ms = 12;
+}
+
+/** 断线重连快照回放：最近若干行动增量，客户端按时间戳强制回放 */
+message BattleDeltaRecord {
+  uint64 action_id = 1;
+  uint64 timestamp_ms = 2;
+  uint32 caster_id = 3;
+  uint32 skill_id = 4;
+  uint32 target_id = 5;
+  int32 damage = 6;
+  bool critical = 7;
+  bool kill = 8;
+  int32 hp_after = 9;
+}
+
+message BattleReplayDeltaScNotify {
+  uint64 battle_id = 1;
+  repeated BattleDeltaRecord deltas = 2;
+  CurrentState final_state = 3;
+  uint64 reconnect_at_ms = 4;
+}
+
 message GetBattleInfoCsReq {
   uint64 battle_id = 1;
 }
@@ -140,5 +216,82 @@ message GetBattleInfoScRsp {
   StageInfo stage_info = 3;
   CurrentState current_state = 4;
   uint64 start_time = 5;
+  uint32 speed_multiplier = 6; // 1/2/3
+  bool auto_enabled = 7;
+}
+
+/** Auto 策略权重：优先战技 / 优先普攻 / 攒能量 */
+enum BattleAutoStrategy {
+  AUTO_STRATEGY_UNSPECIFIED = 0;
+  PRIORITY_SKILL = 1;
+  PRIORITY_BASIC = 2;
+  SAVE_ENERGY = 3;
+}
+
+/** Auto 目标锁定：默认 / 集火精英 / 优先破盾 */
+enum BattleAutoTargetFocus {
+  TARGET_FOCUS_DEFAULT = 0;
+  TARGET_FOCUS_ELITE = 1;
+  TARGET_FOCUS_BREAK_SHIELD = 2;
+}
+
+/** 开启/关闭自动战斗：服务端按 HeuristicBattleAssistPolicy 代操作 */
+message SetBattleAutoCsReq {
+  uint64 battle_id = 1;
+  bool enabled = 2;
+  BattleAutoStrategy auto_strategy = 3;
+  BattleAutoTargetFocus target_focus = 4;
+}
+
+message SetBattleAutoScRsp {
+  int32 retcode = 1; // 0成功 1未登录 2战局不存在 3非参与者 4已结束 5策略非法
+  uint64 battle_id = 2;
+  bool auto_enabled = 3;
+  BattleAutoStrategy auto_strategy = 4;
+  BattleAutoTargetFocus target_focus = 5;
+}
+
+/** 服务端主动代打指令：客户端仅播表现，决策权威在服务端 */
+message BattleAutoScNotify {
+  uint64 battle_id = 1;
+  uint32 skill_id = 2;
+  uint32 caster_id = 3;
+  repeated uint32 target_ids = 4;
+  string reason = 5;
+  uint32 speed_multiplier = 6;
+  uint32 next_wait_ms = 7;
+  BattleAutoStrategy auto_strategy = 8;
+  bool manual_override = 9;
+}
+
+/** Auto 中手动大招覆盖：暂停本轮 AI，优先执行玩家指令后恢复 Auto */
+message BattleManualUltCsReq {
+  uint64 battle_id = 1;
+  uint32 skill_id = 2; // 默认 3=大招
+  uint32 caster_id = 3;
+  repeated uint32 target_ids = 4;
+}
+
+message BattleManualUltScRsp {
+  int32 retcode = 1; // 0成功 1未登录 2战局不存在 3非参与者 4未开 Auto 5已结束
+  uint64 battle_id = 2;
+  uint32 skill_id = 3;
+  bool auto_resumed = 4;
+  /** 预估施法时长（毫秒），客户端可据此提前播蓄力动画 */
+  uint32 estimated_cast_time_ms = 5;
+  /** 允许客户端在回包前预表现的闪屏时长（毫秒），默认 200 */
+  uint32 client_pre_fx_ms = 6;
+}
+
+/** 战斗倍速：服务端压缩等待，客户端加速播放 */
+message SetBattleSpeedCsReq {
+  uint64 battle_id = 1;
+  uint32 speed_multiplier = 2; // 仅允许 1/2/3
+}
+
+message SetBattleSpeedScRsp {
+  int32 retcode = 1; // 0成功 1未登录 2战局不存在 3倍率非法
+  uint64 battle_id = 2;
+  uint32 speed_multiplier = 3;
 }
 

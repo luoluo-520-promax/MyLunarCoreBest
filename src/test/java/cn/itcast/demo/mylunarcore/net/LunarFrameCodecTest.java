@@ -19,11 +19,26 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+/**
+ * LunarFrame 编解码测试。
+ * <p>
+ * 针对相关生产代码的单元/切片测试类 {@code LunarFrameCodecTest}：
+ * 通过 fixture、mock 与断言覆盖关键成功路径、失败码与状态边界。
+ */
 @DisplayName("LunarFrame 编解码测试")
 class LunarFrameCodecTest {
 
     private static final Logger log = LoggerFactory.getLogger(LunarFrameCodecTest.class);
 
+    /**
+     * 验证点：编码后再解码应还原 cmdId 与 payload。
+     * <p>测试方法 {@code encodeDecodeRoundTripShouldPreservePacket}：
+     * <ul>
+     *   <li>{@code assertFalse(channel.finish());}</li>
+     *   <li>{@code assertEquals(cmdId, decoded.getCmdId());}</li>
+     *   <li>{@code assertArrayEquals(payload, decoded.getPayload());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("编码后再解码应还原 cmdId 与 payload")
     void encodeDecodeRoundTripShouldPreservePacket() {
@@ -46,6 +61,14 @@ class LunarFrameCodecTest {
         assertArrayEquals(payload, decoded.getPayload());
     }
 
+    /**
+     * 验证点：半包应等待更多字节且不产出 GamePacket。
+     * <p>测试方法 {@code incompleteFrameShouldWaitForMoreBytes}：
+     * <ul>
+     *   <li>{@code assertNull(decoded);}</li>
+     *   <li>{@code assertTrue(channel.isOpen());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("半包应等待更多字节且不产出 GamePacket")
     void incompleteFrameShouldWaitForMoreBytes() {
@@ -65,6 +88,14 @@ class LunarFrameCodecTest {
         full.release();
     }
 
+    /**
+     * 验证点：错误帧头魔数应关闭连接。
+     * <p>测试方法 {@code invalidHeaderMagicShouldCloseChannel}：
+     * <ul>
+     *   <li>{@code assertNull(channel.readInbound());}</li>
+     *   <li>{@code assertFalse(channel.isOpen());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("错误帧头魔数应关闭连接")
     void invalidHeaderMagicShouldCloseChannel() {
@@ -81,6 +112,14 @@ class LunarFrameCodecTest {
         assertFalse(channel.isOpen());
     }
 
+    /**
+     * 验证点：错误帧尾魔数应关闭连接。
+     * <p>测试方法 {@code invalidFooterMagicShouldCloseChannel}：
+     * <ul>
+     *   <li>{@code assertNull(channel.readInbound());}</li>
+     *   <li>{@code assertFalse(channel.isOpen());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("错误帧尾魔数应关闭连接")
     void invalidFooterMagicShouldCloseChannel() {
@@ -97,6 +136,14 @@ class LunarFrameCodecTest {
         assertFalse(channel.isOpen());
     }
 
+    /**
+     * 验证点：负载长度超过上限应关闭连接。
+     * <p>测试方法 {@code oversizedPayloadLengthShouldCloseChannel}：
+     * <ul>
+     *   <li>{@code assertNull(channel.readInbound());}</li>
+     *   <li>{@code assertFalse(channel.isOpen());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("负载长度超过上限应关闭连接")
     void oversizedPayloadLengthShouldCloseChannel() {
@@ -118,6 +165,14 @@ class LunarFrameCodecTest {
         assertFalse(channel.isOpen());
     }
 
+    /**
+     * 验证点：cmdId 超出 16 位应拒绝编码。
+     * <p>测试方法 {@code cmdIdBeyond16BitsShouldRejectEncode}：
+     * <ul>
+     *   <li>{@code assertTrue(ex.getCause() instanceof IllegalArgumentException);}</li>
+     *   <li>{@code assertTrue(ex.getCause().getMessage().contains("16 bits"));}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("cmdId 超出 16 位应拒绝编码")
     void cmdIdBeyond16BitsShouldRejectEncode() {

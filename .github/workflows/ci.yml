@@ -1,0 +1,141 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+  schedule:
+    # 每夜 UTC 16:00 ≈ 北京时间次日 00:00
+    - cron: "0 16 * * *"
+
+jobs:
+  build-and-protocol:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      - name: Setup buf
+        uses: bufbuild/buf-setup-action@v1
+        with:
+          version: "1.34.0"
+
+      - name: buf lint
+        run: buf lint
+        working-directory: .
+
+      - name: buf breaking against main
+        id: buf_breaking
+        continue-on-error: true
+        run: |
+          if git rev-parse --verify origin/main >/dev/null 2>&1; then
+            buf breaking --against '.git#branch=origin/main'
+          elif git rev-parse --verify origin/master >/dev/null 2>&1; then
+            buf breaking --against '.git#branch=origin/master'
+          else
+            echo "No origin/main or origin/master; skip breaking check"
+            echo "skipped=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Require wire_version bump on breaking change
+        if: steps.buf_breaking.outcome == 'failure'
+        run: |
+          echo "buf breaking detected incompatible proto change."
+          echo "You must bump CmdIds.PROTOCOL_WIRE_VERSION and update docs/protocol-migration-guide.md"
+          # 强制跑守卫测试；若未升版本则失败
+          mvn -B -Dtest=WireVersionGuardTest test
+          # 仍要求修复兼容性或明确升版本后调整 against 基线；此处直接失败阻断
+          exit 1
+
+      - name: Unit tests + protocol guards
+        run: mvn -B -Dtest=CmdIdUniquenessTest,CmdIdProtoCompletenessTest,WireVersionGuardTest,ClientProtocolIntegrationTest,ExperienceGapFillFlowTest,ExperienceGapE2EFlowTest,TenGapsOptimizationFlowTest,TenGapsBusinessE2EFlowTest,HomeBaseServiceTest,PartyServiceTest,DialogueCutsceneFlowTest,GuildServiceFlowTest,ProductionSecretsValidatorTest,GuildWarServiceTest,GuildWarFlowIntegrationTest,PlayerMigrationServiceTest,PacketIntegrityGuardTest,StaminaServiceTest,GachaDrawEngineTest,MatchmakingServiceTest,BattleDeterministicValidatorTest,HotReloadCoordinatorTest,PublishDrillTest,StabilityEnhancementFlowTest test
+
+      - name: Testcontainers smoke (gated)
+        if: github.event_name == 'push' || github.event_name == 'pull_request'
+        run: mvn -B -Dtest=MysqlRedisSmokeIT,CoreLoopContainersIT test
+        env:
+          RUN_TESTCONTAINERS: "true"
+        continue-on-error: true
+
+      - name: Publish drill smoke
+        shell: bash
+        run: |
+          if command -v pwsh >/dev/null 2>&1; then
+            pwsh -File scripts/publish_drill.ps1 -SkipTests
+          else
+            mvn -B -DskipTests compile
+          fi
+
+      - name: Protocol docs sync check
+        shell: bash
+        run: |
+          if command -v python3 >/dev/null 2>&1 && python3 -c "import yaml" 2>/dev/null; then
+            python3 scripts/generate_docs_from_meta.py --check
+          elif command -v python >/dev/null 2>&1 && python -c "import yaml" 2>/dev/null; then
+            python scripts/generate_docs_from_meta.py --check
+          else
+            echo "PyYAML not available; skip protocol docs check"
+          fi
+        continue-on-error: true
+
+      - name: Scan log masking
+        shell: bash
+        run: |
+          if command -v pwsh >/dev/null 2>&1; then
+            pwsh -File scripts/scan_log_masking.ps1
+          else
+            echo "pwsh not available; skip masking scan"
+          fi
+
+  pr-perf-regression:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup k6
+        uses: grafana/setup-k6-action@v1
+      - name: k6 PR regression smoke
+        run: |
+          set -e
+          k6 run --vus 5 --duration 20s -e PROFILE=dev -e SCENARIO=health \
+            --summary-export=/tmp/k6-pr-summary.json \
+            scripts/load/k6_baseline.js
+          python3 - <<'PY'
+          import json, sys
+          try:
+              with open("/tmp/k6-pr-summary.json") as f:
+                  s = json.load(f)
+              p95 = s.get("metrics", {}).get("http_req_duration", {}).get("values", {}).get("p(95)")
+              # 基线门禁：无服务时可能失败；有值则相对 800ms 硬阈（docs/load-test-baseline.md）
+              if p95 is not None and p95 > 800:
+                  print(f"FAIL: p95={p95}ms exceeds gate 800ms")
+                  sys.exit(1)
+              print(f"OK: p95={p95}")
+          except FileNotFoundError:
+              print("summary missing; skip numeric gate")
+          PY
+        continue-on-error: true
+        env:
+          BASE_URL: http://127.0.0.1:8080
+
+  nightly-load:
+    if: github.event_name == 'schedule' || contains(github.event.head_commit.message, '[loadtest]')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup k6
+        uses: grafana/setup-k6-action@v1
+      - name: k6 smoke baseline
+        run: k6 run --vus 5 --duration 30s -e PROFILE=dev -e SCENARIO=health scripts/load/k6_baseline.js
+        continue-on-error: true
+        env:
+          BASE_URL: http://127.0.0.1:8080
+          # 目标机正式压测：PROFILE=prod VUS_MULT=1.5，回填 docs/load-test-baseline.md §6 后收紧阈值

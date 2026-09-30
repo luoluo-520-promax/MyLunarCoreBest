@@ -1,6 +1,7 @@
 package cn.itcast.demo.mylunarcore.repo;
 
 import cn.itcast.demo.mylunarcore.model.GameItemEntity;
+import cn.itcast.demo.mylunarcore.net.mapper.ItemProtoMapper;
 import cn.itcast.demo.mylunarcore.protocol.ItemSystemProto;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -17,6 +18,12 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 
+/**
+ * ItemRepository 道具仓储测试。
+ * <p>
+ * 针对相关生产代码的单元/切片测试类 {@code ItemRepositoryTest}：
+ * 通过 fixture、mock 与断言覆盖关键成功路径、失败码与状态边界。
+ */
 @DisplayName("ItemRepository 道具仓储测试")
 class ItemRepositoryTest {
 
@@ -32,6 +39,13 @@ class ItemRepositoryTest {
         log.info("仓储初始化: repository={}", repository.getClass().getSimpleName());
     }
 
+    /**
+     * 验证点：countBagItems 应统计未丢弃道具数量。
+     * <p>测试方法 {@code countBagItemsShouldReturnCount}：
+     * <ul>
+     *   <li>{@code assertEquals(5L, count);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("countBagItems 应统计未丢弃道具数量")
     void countBagItemsShouldReturnCount() {
@@ -43,9 +57,20 @@ class ItemRepositoryTest {
         assertEquals(5L, count);
     }
 
+    /**
+     * 验证点：ItemProtoMapper 应将实体映射为 Proto。
+     * <p>测试方法 {@code itemProtoMapperShouldMapEntityToProto}：
+     * <ul>
+     *   <li>{@code assertEquals(10001L, bagItem.getUid());}</li>
+     *   <li>{@code assertEquals(2001, bagItem.getItemId());}</li>
+     *   <li>{@code assertEquals(99, bagItem.getCount());}</li>
+     *   <li>{@code assertTrue(bagItem.getLocked());}</li>
+     *   <li>{@code assertEquals(11, bagItem.getMainAffixId());}</li>
+     * </ul>
+     */
     @Test
-    @DisplayName("toBagItem 应将实体映射为 Proto")
-    void toBagItemShouldMapEntityToProto() {
+    @DisplayName("ItemProtoMapper 应将实体映射为 Proto")
+    void itemProtoMapperShouldMapEntityToProto() {
         GameItemEntity entity = new GameItemEntity();
         entity.setId(10001L);
         entity.setItemId(2001);
@@ -60,7 +85,7 @@ class ItemRepositoryTest {
         entity.setEquipAvatarId(77);
         entity.setSubAffixesJson("[]");
 
-        ItemSystemProto.BagItem bagItem = repository.toBagItem(entity);
+        ItemSystemProto.BagItem bagItem = new ItemProtoMapper().toBagItem(entity);
 
         assertEquals(10001L, bagItem.getUid());
         log.info("Proto 映射: uid={}, itemId={}, type={}, count={}, level={}, locked={}, mainAffixId={}",
@@ -72,6 +97,13 @@ class ItemRepositoryTest {
         assertEquals(11, bagItem.getMainAffixId());
     }
 
+    /**
+     * 验证点：existsActiveItemByItemId 应判断是否存在有效道具。
+     * <p>测试方法 {@code existsActiveItemByItemIdShouldDetectActiveItem}：
+     * <ul>
+     *   <li>{@code assertTrue(exists);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("existsActiveItemByItemId 应判断是否存在有效道具")
     void existsActiveItemByItemIdShouldDetectActiveItem() {
@@ -83,6 +115,13 @@ class ItemRepositoryTest {
         assertTrue(exists);
     }
 
+    /**
+     * 验证点：updateItemCountAndDiscard 丢弃应返回受影响行数。
+     * <p>测试方法 {@code updateItemCountAndDiscardShouldDiscardItem}：
+     * <ul>
+     *   <li>{@code assertEquals(1, affected);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("updateItemCountAndDiscard 丢弃应返回受影响行数")
     void updateItemCountAndDiscardShouldDiscardItem() {
@@ -94,6 +133,13 @@ class ItemRepositoryTest {
         assertEquals(1, affected);
     }
 
+    /**
+     * 验证点：findItemByUid 不存在时应返回 null。
+     * <p>测试方法 {@code findItemByUidShouldReturnNullWhenMissing}：
+     * <ul>
+     *   <li>{@code assertEquals(null, item);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("findItemByUid 不存在时应返回 null")
     void findItemByUidShouldReturnNullWhenMissing() {
@@ -105,6 +151,15 @@ class ItemRepositoryTest {
         assertEquals(null, item);
     }
 
+    /**
+     * 验证点：listBagItems 应返回分页背包 Proto 列表。
+     * <p>测试方法 {@code listBagItemsShouldReturnPagedBagItems}：
+     * <ul>
+     *   <li>{@code assertEquals(1, items.size());}</li>
+     *   <li>{@code assertEquals(10001L, items.get(0).getId());}</li>
+     *   <li>{@code assertEquals(10L, items.get(0).getCount());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("listBagItems 应返回分页背包 Proto 列表")
     void listBagItemsShouldReturnPagedBagItems() {
@@ -120,15 +175,22 @@ class ItemRepositoryTest {
                         .objectCol("equip_avatar_id", null))
         ));
 
-        List<ItemSystemProto.BagItem> items = repository.listBagItems(77, 0, 1, 20);
+        List<GameItemEntity> items = repository.listBagItems(77, 0, 1, 20);
 
         assertEquals(1, items.size());
         log.info("背包分页查询: playerId=77, page=1, pageSize=20, itemCount={}, firstUid={}, firstCount={}",
-                items.size(), items.get(0).getUid(), items.get(0).getCount());
-        assertEquals(10001L, items.get(0).getUid());
-        assertEquals(10, items.get(0).getCount());
+                items.size(), items.get(0).getId(), items.get(0).getCount());
+        assertEquals(10001L, items.get(0).getId());
+        assertEquals(10L, items.get(0).getCount());
     }
 
+    /**
+     * 验证点：existsActiveItemByItemId 无记录时应返回 false。
+     * <p>测试方法 {@code existsActiveItemByItemIdShouldReturnFalseWhenMissing}：
+     * <ul>
+     *   <li>{@code assertFalse(exists);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("existsActiveItemByItemId 无记录时应返回 false")
     void existsActiveItemByItemIdShouldReturnFalseWhenMissing() {

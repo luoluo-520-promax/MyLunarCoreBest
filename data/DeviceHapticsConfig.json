@@ -1,0 +1,100 @@
+{
+  "waveforms": [
+    {
+      "waveformId": 100,
+      "deviceFamily": "ps5",
+      "name": "light_hit",
+      "amplitudes": [0.2, 0.4, 0.2],
+      "durationMs": 40,
+      "triggerForce": 0.2
+    },
+    {
+      "waveformId": 101,
+      "deviceFamily": "ps5",
+      "name": "counter_trigger",
+      "amplitudes": [0.6, 0.9, 0.5],
+      "durationMs": 80,
+      "triggerForce": 0.85
+    },
+    {
+      "waveformId": 102,
+      "deviceFamily": "ps5",
+      "name": "crit",
+      "amplitudes": [0.5, 0.8, 0.6],
+      "durationMs": 60,
+      "triggerForce": 0.5
+    },
+    {
+      "waveformId": 103,
+      "deviceFamily": "ps5",
+      "name": "kill",
+      "amplitudes": [0.9, 1.0, 0.7],
+      "durationMs": 120,
+      "triggerForce": 1.0
+    },
+    {
+      "waveformId": 100,
+      "deviceFamily": "mobile",
+      "name": "tap",
+      "amplitudes": [0.3],
+      "durationMs": 20,
+      "triggerForce": 0
+    },
+    {
+      "waveformId": 101,
+      "deviceFamily": "mobile",
+      "name": "counter_tick",
+      "amplitudes": [0.5, 0.2],
+      "durationMs": 40,
+      "triggerForce": 0
+    },
+    {
+      "waveformId": 102,
+      "deviceFamily": "mobile",
+      "name": "crit_buzz",
+      "amplitudes": [0.6],
+      "durationMs": 35,
+      "triggerForce": 0
+    },
+    {
+      "waveformId": 103,
+      "deviceFamily": "mobile",
+      "name": "kill_pulse",
+      "amplitudes": [0.8, 0.4, 0.8],
+      "durationMs": 90,
+      "triggerForce": 0
+    },
+    {
+      "waveformId": 100,
+      "deviceFamily": "xbox",
+      "name": "light_hit",
+      "amplitudes": [0.2, 0.35],
+      "durationMs": 35,
+      "triggerForce": 0
+    },
+    {
+      "waveformId": 101,
+      "deviceFamily": "xbox",
+      "name": "counter",
+      "amplitudes": [0.7, 0.5],
+      "durationMs": 70,
+      "triggerForce": 0
+    },
+    {
+      "waveformId": 102,
+      "deviceFamily": "xbox",
+      "name": "crit",
+      "amplitudes": [0.6, 0.8],
+      "durationMs": 55,
+      "triggerForce": 0
+    },
+    {
+      "waveformId": 103,
+      "deviceFamily": "xbox",
+      "name": "kill",
+      "amplitudes": [1.0, 0.8],
+      "durationMs": 100,
+      "triggerForce": 0
+    }
+  ]
+}

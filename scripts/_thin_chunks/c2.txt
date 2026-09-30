@@ -1,0 +1,10 @@
+﻿C:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\character\AttributeCalculatorGearTest.java
+C:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\character\AttributeCalculatorTest.java
+C:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\character\CharacterCreationApplicationServiceTest.java
+C:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\character\CharacterNettyServiceTest.java
+C:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\character\CharacterProgressionApplicationServiceTest.java
+C:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\character\CharacterTestFixtures.java
+C:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\character\TalentApplicationServiceTest.java
+C:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\common\AccountPasswordServiceTest.java
+C:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\common\ActivityConfigServiceTest.java
+C:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\common\ActivityImportServiceTest.java

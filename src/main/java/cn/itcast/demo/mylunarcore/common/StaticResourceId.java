@@ -20,7 +20,7 @@ public enum StaticResourceId {
 
     @ResourceType("item_config")
 
-    ITEM_CONFIG("classpath:data/items_config.csv"); // 示例：物品配置表
+    ITEM_CONFIG("file:data/items_config.csv"); // 运营导入落盘；Excel 另存 CSV
 
     /**
      * -- GETTER --

@@ -1,0 +1,29 @@
+[
+  {
+    "facilityId": 1,
+    "name": "休息室",
+    "maxLevel": 5,
+    "staminaPerHour": 20,
+    "slotCount": 2,
+    "produceItemId": 2001,
+    "producePerHour": 2
+  },
+  {
+    "facilityId": 2,
+    "name": "合成台",
+    "maxLevel": 3,
+    "staminaPerHour": 5,
+    "slotCount": 1,
+    "produceItemId": 2002,
+    "producePerHour": 1
+  },
+  {
+    "facilityId": 3,
+    "name": "训练室",
+    "maxLevel": 5,
+    "staminaPerHour": 10,
+    "slotCount": 3,
+    "produceItemId": 2003,
+    "producePerHour": 3
+  }
+]

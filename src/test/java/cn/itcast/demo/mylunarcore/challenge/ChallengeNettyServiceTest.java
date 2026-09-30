@@ -5,7 +5,11 @@ import cn.itcast.demo.mylunarcore.protocol.ChallengeSystemProto;
 import cn.itcast.demo.mylunarcore.repo.BattleMonsterWaveRepository;
 import cn.itcast.demo.mylunarcore.repo.ChallengeGroupRewardRepository;
 import cn.itcast.demo.mylunarcore.repo.ChallengeHistoryRepository;
+import cn.itcast.demo.mylunarcore.matchmaking.ChallengeMatchCoordinator;
+import cn.itcast.demo.mylunarcore.player.PlayerContextResolver;
+import cn.itcast.demo.mylunarcore.economy.RewardDistributor;
 import io.netty.channel.Channel;
+import java.util.OptionalLong;
 import io.netty.util.Attribute;
 import io.netty.util.AttributeKey;
 import org.junit.jupiter.api.BeforeEach;
@@ -22,13 +26,22 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * ChallengeNettyService 挑战协议服务测试。
+ * <p>
+ * 针对相关生产代码的单元/切片测试类 {@code ChallengeNettyServiceTest}：
+ * 通过 fixture、mock 与断言覆盖关键成功路径、失败码与状态边界。
+ */
 @DisplayName("ChallengeNettyService 挑战协议服务测试")
 class ChallengeNettyServiceTest {
 
@@ -47,6 +60,7 @@ class ChallengeNettyServiceTest {
     private BattleMonsterWaveRepository waveRepository;
     private ChallengeHistoryRepository historyRepository;
     private ChallengeGroupRewardRepository groupRewardRepository;
+    private PlayerContextResolver contextResolver;
     private ChallengeNettyService service;
 
     @BeforeEach
@@ -55,12 +69,38 @@ class ChallengeNettyServiceTest {
         waveRepository = mock(BattleMonsterWaveRepository.class);
         historyRepository = mock(ChallengeHistoryRepository.class);
         groupRewardRepository = mock(ChallengeGroupRewardRepository.class);
+        contextResolver = mock(PlayerContextResolver.class);
+        ChallengeMatchCoordinator challengeMatchCoordinator = mock(ChallengeMatchCoordinator.class);
+        when(challengeMatchCoordinator.ensureReadyForChallenge(anyInt(), any(Boolean.class), anyLong()))
+                .thenReturn(new ChallengeMatchCoordinator.MatchGateResult(true, 0, 0));
+        RewardDistributor rewardDistributor = mock(RewardDistributor.class);
+        when(rewardDistributor.grantBattleRewards(anyInt(), any(), anyInt(), anyString()))
+                .thenReturn(List.of());
         service = new ChallengeNettyService(
-                challengeManager, waveRepository, historyRepository, groupRewardRepository);
+                challengeManager, waveRepository, historyRepository, groupRewardRepository,
+                contextResolver, challengeMatchCoordinator,
+                mock(cn.itcast.demo.mylunarcore.matchmaking.RoomService.class),
+                new cn.itcast.demo.mylunarcore.battle.BattleManager(
+                        org.mockito.Mockito.mock(cn.itcast.demo.mylunarcore.battle.BattleSnapshotService.class)),
+                new cn.itcast.demo.mylunarcore.battle.BattleSceneFactory(),
+                mock(cn.itcast.demo.mylunarcore.repo.BattleRepository.class),
+                rewardDistributor);
         log.info("挑战服务初始化: playerId={}, challengeId={}, stageId={}, groupId={}",
                 PLAYER_ID, CHALLENGE_ID, STAGE_ID, GROUP_ID);
     }
 
+    /**
+     * 验证点：开始挑战成功应注册运行时并返回波次信息。
+     * <p>测试方法 {@code startChallengeSuccessShouldRegisterRuntime}：
+     * <ul>
+     *   <li>{@code when(waveRepository.loadWavesByStageId(STAGE_ID)).thenReturn(ChallengeTestFixtures.wavesForChallenge(CHALLENGE_ID));}</li>
+     *   <li>{@code assertNotNull(runtime);}</li>
+     *   <li>{@code assertEquals(0, rsp.getRetcode());}</li>
+     *   <li>{@code assertEquals(CHALLENGE_TYPE, rsp.getChallengeType());}</li>
+     *   <li>{@code assertEquals(CHALLENGE_ID, rsp.getChallengeId());}</li>
+     *   <li>{@code assertEquals(2, rsp.getStageInfo().getWaveCount());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("开始挑战成功应注册运行时并返回波次信息")
     void startChallengeSuccessShouldRegisterRuntime() throws Exception {
@@ -92,13 +132,21 @@ class ChallengeNettyServiceTest {
         assertEquals(PLAYER_ID, runtime.getPlayerId());
     }
 
+    /**
+     * 验证点：未登录开始挑战应返回 retcode=1。
+     * <p>测试方法 {@code startChallengeWithoutLoginShouldFail}：
+     * <ul>
+     *   <li>{@code when(contextResolver.resolvePlayerId(channel)).thenReturn(0);}</li>
+     *   <li>{@code when(contextResolver.resolveUid(channel)).thenReturn(OptionalLong.empty());}</li>
+     *   <li>{@code assertEquals(1, rsp.getRetcode());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("未登录开始挑战应返回 retcode=1")
     void startChallengeWithoutLoginShouldFail() {
         Channel channel = mock(Channel.class);
-        Attribute<Long> uidAttr = mock(Attribute.class);
-        when(channel.attr(UID_KEY)).thenReturn(uidAttr);
-        when(uidAttr.get()).thenReturn(null);
+        when(contextResolver.resolvePlayerId(channel)).thenReturn(0);
+        when(contextResolver.resolveUid(channel)).thenReturn(OptionalLong.empty());
 
         ChallengeSystemProto.StartChallengeScRsp rsp = service.handleStartChallenge(
                 ChallengeSystemProto.StartChallengeCsReq.newBuilder()
@@ -111,6 +159,13 @@ class ChallengeNettyServiceTest {
         assertEquals(1, rsp.getRetcode());
     }
 
+    /**
+     * 验证点：非法参数开始挑战应返回 retcode=2。
+     * <p>测试方法 {@code startChallengeWithInvalidParamsShouldFail}：
+     * <ul>
+     *   <li>{@code assertEquals(2, rsp.getRetcode());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("非法参数开始挑战应返回 retcode=2")
     void startChallengeWithInvalidParamsShouldFail() {
@@ -127,6 +182,16 @@ class ChallengeNettyServiceTest {
         assertEquals(2, rsp.getRetcode());
     }
 
+    /**
+     * 验证点：波次加载失败仍应创建挑战实例。
+     * <p>测试方法 {@code startChallengeWaveLoadFailedShouldStillCreateRuntime}：
+     * <ul>
+     *   <li>{@code when(waveRepository.loadWavesByStageId(STAGE_ID)).thenThrow(new RuntimeException("db down"));}</li>
+     *   <li>{@code assertEquals(0, rsp.getRetcode());}</li>
+     *   <li>{@code assertEquals(0, rsp.getStageInfo().getWaveCount());}</li>
+     *   <li>{@code assertNotNull(runtime);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("波次加载失败仍应创建挑战实例")
     void startChallengeWaveLoadFailedShouldStillCreateRuntime() throws Exception {
@@ -150,6 +215,16 @@ class ChallengeNettyServiceTest {
         assertNotNull(runtime);
     }
 
+    /**
+     * 验证点：查询挑战详情成功应返回当前状态。
+     * <p>测试方法 {@code getChallengeInfoSuccessShouldReturnRuntime}：
+     * <ul>
+     *   <li>{@code assertEquals(0, rsp.getRetcode());}</li>
+     *   <li>{@code assertEquals(challengeUid, rsp.getChallengeUid());}</li>
+     *   <li>{@code assertEquals(1, rsp.getStatus());}</li>
+     *   <li>{@code assertEquals(2, rsp.getEnemyInfoCount());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("查询挑战详情成功应返回当前状态")
     void getChallengeInfoSuccessShouldReturnRuntime() {
@@ -170,6 +245,13 @@ class ChallengeNettyServiceTest {
         assertEquals(2, rsp.getEnemyInfoCount());
     }
 
+    /**
+     * 验证点：非本人查询挑战应返回 retcode=2。
+     * <p>测试方法 {@code getChallengeInfoWrongOwnerShouldFail}：
+     * <ul>
+     *   <li>{@code assertEquals(2, rsp.getRetcode());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("非本人查询挑战应返回 retcode=2")
     void getChallengeInfoWrongOwnerShouldFail() {
@@ -185,6 +267,18 @@ class ChallengeNettyServiceTest {
         assertEquals(2, rsp.getRetcode());
     }
 
+    /**
+     * 验证点：胜利上报应刷新纪录并移除运行时。
+     * <p>测试方法 {@code reportResultWinShouldUpsertAndRemoveRuntime}：
+     * <ul>
+     *   <li>{@code when(historyRepository.findByPlayerAndChallenge(PLAYER_ID, CHALLENGE_ID)).thenReturn(Optional.empty());}</li>
+     *   <li>{@code assertEquals(0, rsp.getRetcode());}</li>
+     *   <li>{@code assertTrue(rsp.getIsNewRecord());}</li>
+     *   <li>{@code assertEquals(5000, rsp.getBestScore());}</li>
+     *   <li>{@code assertEquals(0b11, rsp.getBestStars());}</li>
+     *   <li>{@code assertNull(challengeManager.get(challengeUid));}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("胜利上报应刷新纪录并移除运行时")
     void reportResultWinShouldUpsertAndRemoveRuntime() throws Exception {
@@ -212,6 +306,18 @@ class ChallengeNettyServiceTest {
         verify(historyRepository).upsertBestResult(PLAYER_ID, CHALLENGE_ID, GROUP_ID, 0b11, 5000);
     }
 
+    /**
+     * 验证点：胜利上报应合并历史星级与分数。
+     * <p>测试方法 {@code reportResultWinShouldMergeHistory}：
+     * <ul>
+     *   <li>{@code when(historyRepository.findByPlayerAndChallenge(PLAYER_ID, CHALLENGE_ID))}</li>
+     *   <li>{@code assertEquals(0, rsp.getRetcode());}</li>
+     *   <li>{@code assertTrue(rsp.getIsNewRecord());}</li>
+     *   <li>{@code assertEquals(0b11, rsp.getBestStars());}</li>
+     *   <li>{@code assertEquals(4500, rsp.getBestScore());}</li>
+     *   <li>{@code verify(historyRepository).upsertBestResult(PLAYER_ID, CHALLENGE_ID, GROUP_ID, 0b11, 4500);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("胜利上报应合并历史星级与分数")
     void reportResultWinShouldMergeHistory() throws Exception {
@@ -238,6 +344,17 @@ class ChallengeNettyServiceTest {
         verify(historyRepository).upsertBestResult(PLAYER_ID, CHALLENGE_ID, GROUP_ID, 0b11, 4500);
     }
 
+    /**
+     * 验证点：失败上报不应写库但仍移除运行时。
+     * <p>测试方法 {@code reportResultLossShouldSkipUpsert}：
+     * <ul>
+     *   <li>{@code assertEquals(0, rsp.getRetcode());}</li>
+     *   <li>{@code assertFalse(rsp.getIsNewRecord());}</li>
+     *   <li>{@code assertEquals(800, rsp.getBestScore());}</li>
+     *   <li>{@code assertNull(challengeManager.get(challengeUid));}</li>
+     *   <li>{@code verify(historyRepository, never()).upsertBestResult(anyInt(), anyInt(), anyInt(), anyInt(), anyInt());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("失败上报不应写库但仍移除运行时")
     void reportResultLossShouldSkipUpsert() throws Exception {
@@ -263,6 +380,15 @@ class ChallengeNettyServiceTest {
         verify(historyRepository, never()).upsertBestResult(anyInt(), anyInt(), anyInt(), anyInt(), anyInt());
     }
 
+    /**
+     * 验证点：写库失败上报应返回 retcode=3。
+     * <p>测试方法 {@code reportResultUpsertFailedShouldReturnRetcode3}：
+     * <ul>
+     *   <li>{@code when(historyRepository.findByPlayerAndChallenge(PLAYER_ID, CHALLENGE_ID)).thenReturn(Optional.empty());}</li>
+     *   <li>{@code .when(historyRepository).upsertBestResult(anyInt(), anyInt(), anyInt(), anyInt(), anyInt());}</li>
+     *   <li>{@code assertEquals(3, rsp.getRetcode());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("写库失败上报应返回 retcode=3")
     void reportResultUpsertFailedShouldReturnRetcode3() throws Exception {
@@ -285,6 +411,17 @@ class ChallengeNettyServiceTest {
         assertEquals(3, rsp.getRetcode());
     }
 
+    /**
+     * 验证点：领取组奖励成功应更新掩码。
+     * <p>测试方法 {@code claimGroupRewardSuccessShouldUpdateMask}：
+     * <ul>
+     *   <li>{@code when(historyRepository.listAllInGroup(PLAYER_ID, groupId))}</li>
+     *   <li>{@code when(groupRewardRepository.find(PLAYER_ID, groupId))}</li>
+     *   <li>{@code assertEquals(0, rsp.getRetcode());}</li>
+     *   <li>{@code assertEquals(0b11, rsp.getUpdatedTakenStars());}</li>
+     *   <li>{@code verify(groupRewardRepository).updateTakenStars(PLAYER_ID, groupId, 0b11);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("领取组奖励成功应更新掩码")
     void claimGroupRewardSuccessShouldUpdateMask() throws Exception {
@@ -309,6 +446,15 @@ class ChallengeNettyServiceTest {
         verify(groupRewardRepository).updateTakenStars(PLAYER_ID, groupId, 0b11);
     }
 
+    /**
+     * 验证点：可用星不足领取应返回 retcode=3。
+     * <p>测试方法 {@code claimGroupRewardInsufficientStarsShouldFail}：
+     * <ul>
+     *   <li>{@code when(historyRepository.listAllInGroup(PLAYER_ID, groupId))}</li>
+     *   <li>{@code assertEquals(3, rsp.getRetcode());}</li>
+     *   <li>{@code assertEquals(0, rsp.getUpdatedTakenStars());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("可用星不足领取应返回 retcode=3")
     void claimGroupRewardInsufficientStarsShouldFail() throws Exception {
@@ -329,6 +475,16 @@ class ChallengeNettyServiceTest {
         assertEquals(0, rsp.getUpdatedTakenStars());
     }
 
+    /**
+     * 验证点：重复领取组奖励应返回 retcode=4。
+     * <p>测试方法 {@code claimGroupRewardAlreadyTakenShouldFail}：
+     * <ul>
+     *   <li>{@code when(historyRepository.listAllInGroup(PLAYER_ID, groupId))}</li>
+     *   <li>{@code when(groupRewardRepository.find(PLAYER_ID, groupId))}</li>
+     *   <li>{@code assertEquals(4, rsp.getRetcode());}</li>
+     *   <li>{@code assertEquals(0b11, rsp.getUpdatedTakenStars());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("重复领取组奖励应返回 retcode=4")
     void claimGroupRewardAlreadyTakenShouldFail() throws Exception {
@@ -352,6 +508,18 @@ class ChallengeNettyServiceTest {
         assertEquals(0b11, rsp.getUpdatedTakenStars());
     }
 
+    /**
+     * 验证点：查询挑战历史应返回分页结果。
+     * <p>测试方法 {@code getHistoryShouldReturnPagedList}：
+     * <ul>
+     *   <li>{@code when(historyRepository.countHistory(PLAYER_ID, 0, 0)).thenReturn(1);}</li>
+     *   <li>{@code when(historyRepository.listHistory(PLAYER_ID, 0, 0, 0, 20)).thenReturn(List.of(row));}</li>
+     *   <li>{@code assertEquals(0, rsp.getRetcode());}</li>
+     *   <li>{@code assertEquals(1, rsp.getTotalCount());}</li>
+     *   <li>{@code assertEquals(1, rsp.getHistoriesCount());}</li>
+     *   <li>{@code assertEquals(CHALLENGE_ID, rsp.getHistories(0).getChallengeId());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("查询挑战历史应返回分页结果")
     void getHistoryShouldReturnPagedList() throws Exception {
@@ -378,6 +546,17 @@ class ChallengeNettyServiceTest {
         assertEquals(9000, rsp.getHistories(0).getScore());
     }
 
+    /**
+     * 验证点：查询组奖励状态应返回掩码与可用星。
+     * <p>测试方法 {@code getGroupRewardStateShouldReturnMaskAndStars}：
+     * <ul>
+     *   <li>{@code when(groupRewardRepository.find(PLAYER_ID, groupId))}</li>
+     *   <li>{@code when(historyRepository.listAllInGroup(PLAYER_ID, groupId))}</li>
+     *   <li>{@code assertEquals(0, rsp.getRetcode());}</li>
+     *   <li>{@code assertEquals(0b01, rsp.getTakenStarsMask());}</li>
+     *   <li>{@code assertEquals(3, rsp.getAvailableStars());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("查询组奖励状态应返回掩码与可用星")
     void getGroupRewardStateShouldReturnMaskAndStars() throws Exception {
@@ -411,12 +590,10 @@ class ChallengeNettyServiceTest {
         return challengeUid;
     }
 
-    @SuppressWarnings("unchecked")
     private Channel loggedInChannel(long uid) {
         Channel channel = mock(Channel.class);
-        Attribute<Long> uidAttr = mock(Attribute.class);
-        when(channel.attr(UID_KEY)).thenReturn(uidAttr);
-        when(uidAttr.get()).thenReturn(uid);
+        when(contextResolver.resolvePlayerId(channel)).thenReturn((int) (uid & 0xffffffffL));
+        when(contextResolver.resolveUid(channel)).thenReturn(OptionalLong.of(uid));
         log.info("模拟登录 Channel: uid={}, playerId={}", uid, (int) (uid & 0xffffffffL));
         return channel;
     }

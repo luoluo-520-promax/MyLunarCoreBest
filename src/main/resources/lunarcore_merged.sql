@@ -78,6 +78,7 @@ CREATE TABLE `player`  (
   `rot_z` float NOT NULL DEFAULT 0 COMMENT '旋转Z角度',
   `last_login` datetime NULL DEFAULT NULL COMMENT '上次登录时间',
   `last_logout` datetime NULL DEFAULT NULL COMMENT '上次登出时间',
+  `data_version` bigint UNSIGNED NOT NULL DEFAULT 0 COMMENT '乐观锁版本，落盘条件更新',
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`uid`) USING BTREE,
@@ -85,6 +86,21 @@ CREATE TABLE `player`  (
   INDEX `idx_nickname`(`nickname`) USING BTREE,
   INDEX `idx_level`(`level`) USING BTREE
 ) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '玩家基本信息表' ROW_FORMAT = Dynamic;
+
+CREATE TABLE `wallet_ledger` (
+  `id` bigint UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '流水ID',
+  `uid` int UNSIGNED NOT NULL COMMENT '玩家uid',
+  `currency_id` int NOT NULL COMMENT '货币类型',
+  `delta` int NOT NULL COMMENT '变更量（加正减负）',
+  `reason` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL DEFAULT '' COMMENT '业务原因',
+  `balance_before` int NOT NULL COMMENT '变更前余额',
+  `balance_after` int NOT NULL COMMENT '变更后余额',
+  `tx_id` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '事务/幂等键',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  INDEX `idx_wallet_ledger_uid`(`uid`) USING BTREE,
+  INDEX `idx_wallet_ledger_created`(`created_at`) USING BTREE
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '钱包变更流水' ROW_FORMAT = Dynamic;
 
 CREATE TABLE `avatar`  (
   `id` bigint UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '记录ID',
@@ -95,6 +111,7 @@ CREATE TABLE `avatar`  (
   `promotion` tinyint UNSIGNED NOT NULL DEFAULT 0 COMMENT '突破阶段',
   `rank` tinyint UNSIGNED NOT NULL DEFAULT 0 COMMENT '命座等级',
   `locked` tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否锁定',
+  `equipped_skin_id` int UNSIGNED NOT NULL DEFAULT 0 COMMENT '当前穿戴皮肤ID；0表示默认皮肤',
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`) USING BTREE,
@@ -210,6 +227,47 @@ CREATE TABLE `friend`  (
   INDEX `idx_player_id_2`(`player_id_2`) USING BTREE,
   INDEX `idx_status`(`status`) USING BTREE
 ) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '好友关系表' ROW_FORMAT = Dynamic;
+
+CREATE TABLE `mail`  (
+  `id` bigint UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '邮件ID',
+  `player_id` int UNSIGNED NOT NULL COMMENT '收件玩家ID',
+  `title` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '标题',
+  `content` text CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '正文',
+  `status` tinyint UNSIGNED NOT NULL DEFAULT 0 COMMENT '0-未读 1-已读 2-已领取 3-已删除',
+  `attachments_json` json NULL COMMENT '附件JSON',
+  `send_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '发送时间',
+  `expire_time` datetime NULL DEFAULT NULL COMMENT '过期时间',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  INDEX `idx_player_id`(`player_id`) USING BTREE,
+  INDEX `idx_status`(`status`) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '玩家邮件表' ROW_FORMAT = Dynamic;
+
+CREATE TABLE `quest_progress`  (
+  `id` bigint UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '进度ID',
+  `player_id` int UNSIGNED NOT NULL COMMENT '玩家ID',
+  `quest_id` int UNSIGNED NOT NULL COMMENT '任务配置ID',
+  `status` tinyint UNSIGNED NOT NULL DEFAULT 0 COMMENT '0-未接 1-进行中 2-可提交 3-已完成 4-已放弃',
+  `objectives_json` json NULL COMMENT '目标进度JSON',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE INDEX `uk_player_quest`(`player_id`, `quest_id`) USING BTREE,
+  INDEX `idx_player_id`(`player_id`) USING BTREE,
+  INDEX `idx_status`(`status`) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '任务进度表' ROW_FORMAT = Dynamic;
+
+CREATE TABLE `avatar_talent`  (
+  `player_id` int UNSIGNED NOT NULL COMMENT '玩家ID',
+  `avatar_id` int UNSIGNED NOT NULL COMMENT '角色ID',
+  `talent_id` int UNSIGNED NOT NULL COMMENT '天赋ID',
+  `level` int UNSIGNED NOT NULL DEFAULT 0 COMMENT '天赋等级',
+  `activated` tinyint UNSIGNED NOT NULL DEFAULT 0 COMMENT '是否激活',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`player_id`, `avatar_id`, `talent_id`) USING BTREE
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '角色通用天赋表' ROW_FORMAT = Dynamic;
 
 CREATE TABLE `game_item`  (
   `id` bigint UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '物品唯一ID',
@@ -468,14 +526,40 @@ CREATE TABLE `admin_role_permission` (
   CONSTRAINT `fk_arp_perm` FOREIGN KEY (`permission_id`) REFERENCES `admin_permission` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='角色-权限关联';
 
+CREATE TABLE `player_settings` (
+  `player_id` INT UNSIGNED NOT NULL COMMENT '玩家 uid',
+  `display_json` JSON NOT NULL COMMENT '画面设置',
+  `sound_json` JSON NOT NULL COMMENT '声音设置',
+  `keybinds_json` JSON NOT NULL COMMENT '按键绑定列表',
+  `gameplay_json` JSON NOT NULL COMMENT '游戏细节设置',
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`player_id`) USING BTREE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='玩家游戏设置（画面/按键/声音/细节）';
+
+CREATE TABLE `support_ticket` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '工单ID',
+  `player_id` INT UNSIGNED NOT NULL COMMENT '玩家 uid',
+  `category` VARCHAR(32) NOT NULL DEFAULT 'other' COMMENT '分类：display/sound/keybind/gameplay/other',
+  `subject` VARCHAR(128) NOT NULL COMMENT '标题',
+  `content` VARCHAR(2000) NOT NULL COMMENT '正文',
+  `status` TINYINT NOT NULL DEFAULT 0 COMMENT '0待处理 1处理中 2已回复 3已关闭',
+  `admin_reply` VARCHAR(2000) NULL DEFAULT NULL COMMENT '客服回复',
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  KEY `idx_support_player` (`player_id`),
+  KEY `idx_support_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='玩家客服工单';
+
 /* ========================= 关联测试数据（account.id 与 player.account_id 数值对齐） ========================= */
 
 INSERT INTO `account` (`id`, `username`, `password`, `email`, `phone`, `status`, `last_login_at`, `last_login_ip`) VALUES
-('1', 'tester01', 'pass01', 't01@lunar.test', '13800000001', 1, '2026-03-28 10:00:00', '127.0.0.1'),
-('2', 'tester02', 'pass02', 't02@lunar.test', '13800000002', 1, '2026-03-28 10:01:00', '127.0.0.1'),
-('3', 'tester03', 'pass03', 't03@lunar.test', '13800000003', 1, '2026-03-28 10:02:00', '127.0.0.1'),
-('4', 'tester04', 'pass04', 't04@lunar.test', '13800000004', 1, '2026-03-28 10:03:00', '127.0.0.1'),
-('5', 'tester05', 'pass05', 't05@lunar.test', '13800000005', 1, '2026-03-28 10:04:00', '127.0.0.1');
+('1', 'tester01', '{bcrypt}$2a$10$dLZJFYbuXBvZcBv.M7BJe.nCttuZp/5cs0c2KjL0XpFYd6OHbXsL6', 't01@lunar.test', '13800000001', 1, '2026-03-28 10:00:00', '127.0.0.1'),
+('2', 'tester02', '{bcrypt}$2a$10$n1EuIT7zYwJRIJUAVpqOlORYz0AAEfSZy84wCYEXzX7hNxiUV1cru', 't02@lunar.test', '13800000002', 1, '2026-03-28 10:01:00', '127.0.0.1'),
+('3', 'tester03', '{bcrypt}$2a$10$4hcA6FmWuIWqG8t5VO3aQe9CERvnaoCleYPK01nM6DL6gxgRww7g2', 't03@lunar.test', '13800000003', 1, '2026-03-28 10:02:00', '127.0.0.1'),
+('4', 'tester04', '{bcrypt}$2a$10$ggI8U/.o7IKG3TQB8MIeguc0FHGCAJ0C8I3Zhazamy9qoROFdzFUO', 't04@lunar.test', '13800000004', 1, '2026-03-28 10:03:00', '127.0.0.1'),
+('5', 'tester05', '{bcrypt}$2a$10$eS/jME3qGrlsrFpMO33/AuqA.7rDhdax0/w5xibIobEwz0nmSEwHy', 't05@lunar.test', '13800000005', 1, '2026-03-28 10:04:00', '127.0.0.1');
 
 INSERT INTO `player` (`uid`, `account_id`, `nickname`, `level`, `exp`, `world_level`, `stamina`, `currency`, `scene_id`, `pos_x`, `pos_y`, `pos_z`, `rot_x`, `rot_y`, `rot_z`, `last_login`, `last_logout`) VALUES
 (1, 1, '旅人一号', 40, 120000, 6, 180, JSON_OBJECT('2', 50000, '3', 120), 10001, 10.5, 0.0, 20.0, 0, 0, 0, '2026-03-28 09:00:00', '2026-03-27 22:00:00'),
@@ -646,11 +730,11 @@ INSERT INTO `game_data` (`data_key`, `payload_json`) VALUES
 ('balance.patch', JSON_OBJECT('crit', 1.5, 'heal', 1.0));
 
 INSERT INTO `admin_user` (`id`, `username`, `password_hash`, `status`) VALUES
-(1, 'admin', '{noop}admin123', 1),
-(2, 'ops01', '{noop}ops123', 1),
-(3, 'support01', '{noop}sup123', 1),
-(4, 'auditor01', '{noop}aud123', 1),
-(5, 'viewer01', '{noop}view123', 1);
+(1, 'admin', '{bcrypt}$2a$10$Xw7zafBJtoSPT69fXriEEug.pNUXGqmNFBf7WONUnlwD9ETPbFOny', 1),
+(2, 'ops01', '{bcrypt}$2a$10$bu9d60nQWdOXveygaSj.buRdnWD0Iqe2/2/mpY0JnvuM5Xyzm4..y', 1),
+(3, 'support01', '{bcrypt}$2a$10$FPnaI3GAVOZUPG4jhbTr7ORBl54ngxxSgeZaophnBl76D533leZBi', 1),
+(4, 'auditor01', '{bcrypt}$2a$10$XnSVz6P6ijzFdBBBviv3eOIBOepgXRNtMQKr4IHlNv4F/o8DbKcTC', 1),
+(5, 'viewer01', '{bcrypt}$2a$10$WAM.MVMmWOJSdlI/mI8LVen4d0VpH08/FZqujZl4H.zIaLZrpras.', 1);
 
 INSERT INTO `admin_role` (`id`, `role_code`, `role_name`, `description`) VALUES
 (1, 'SUPER_ADMIN', '超级管理员', '全权限'),
@@ -680,4 +764,66 @@ INSERT INTO `admin_role_permission` (`role_id`, `permission_id`) VALUES
 (4, 5),
 (5, 3);
 
+/* ========== IAP 充值订单 / 发货 / 限购 / 权益（P0 内存实现，表结构预留落库） ========== */
+CREATE TABLE IF NOT EXISTS `iap_order` (
+  `order_id` varchar(64) NOT NULL COMMENT '订单号',
+  `player_id` int UNSIGNED NOT NULL COMMENT '玩家ID',
+  `shop_id` int UNSIGNED NOT NULL COMMENT '商店ID',
+  `shop_item_id` int UNSIGNED NOT NULL COMMENT '商品槽位ID',
+  `sku_id` varchar(128) NOT NULL COMMENT '渠道SKU',
+  `amount_cents` int UNSIGNED NOT NULL DEFAULT 0 COMMENT '金额(分)',
+  `status` varchar(32) NOT NULL COMMENT 'CREATED/PAYING/PAID/GRANTED/...',
+  `channel` varchar(64) NULL DEFAULT NULL COMMENT '支付渠道',
+  `channel_tx_id` varchar(128) NULL DEFAULT NULL COMMENT '渠道交易号',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `paid_at` datetime NULL DEFAULT NULL,
+  `granted_at` datetime NULL DEFAULT NULL,
+  PRIMARY KEY (`order_id`),
+  INDEX `idx_iap_order_player`(`player_id`),
+  INDEX `idx_iap_order_status`(`status`)
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = 'IAP充值订单';
+
+CREATE TABLE IF NOT EXISTS `iap_grant_log` (
+  `order_id` varchar(64) NOT NULL COMMENT '订单号（幂等键）',
+  `rewards_json` text NOT NULL COMMENT '发货内容JSON',
+  `granted_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`order_id`)
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = 'IAP发货流水';
+
+CREATE TABLE IF NOT EXISTS `iap_purchase_limit` (
+  `player_id` int UNSIGNED NOT NULL,
+  `shop_item_id` int UNSIGNED NOT NULL,
+  `period_key` varchar(64) NOT NULL COMMENT 'DAY/WEEK/MONTH/LIFETIME键',
+  `count` int UNSIGNED NOT NULL DEFAULT 0,
+  PRIMARY KEY (`player_id`, `shop_item_id`, `period_key`)
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = 'IAP限购计数';
+
+CREATE TABLE IF NOT EXISTS `iap_entitlement` (
+  `player_id` int UNSIGNED NOT NULL,
+  `pack_kind` varchar(64) NOT NULL COMMENT 'MONTHLY_CARD/STARTER/...',
+  `expire_at` datetime NOT NULL,
+  `claim_bitmap` varbinary(64) NULL DEFAULT NULL COMMENT '日领位图',
+  `daily_currency_id` int NULL DEFAULT NULL,
+  `daily_amount` int NULL DEFAULT NULL,
+  `total_days` int NULL DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`player_id`, `pack_kind`)
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = 'IAP月卡/基金权益';
+
 SET FOREIGN_KEY_CHECKS = 1;
+
+CREATE TABLE IF NOT EXISTS `gacha_draw_history` (
+  `id` bigint UNSIGNED NOT NULL AUTO_INCREMENT,
+  `uid` int UNSIGNED NOT NULL,
+  `banner_type` int NOT NULL,
+  `item_id` int NOT NULL,
+  `count` int NOT NULL DEFAULT 1,
+  `is_new` tinyint(1) NOT NULL DEFAULT 0,
+  `cost_currency_id` int NOT NULL DEFAULT 0,
+  `cost_amount` int NOT NULL DEFAULT 0,
+  `tx_id` varchar(64) NULL DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  INDEX `idx_gacha_hist_uid_created`(`uid`, `created_at`),
+  INDEX `idx_gacha_hist_uid_banner`(`uid`, `banner_type`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='�鿨��ʷ�����';

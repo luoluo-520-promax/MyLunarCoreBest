@@ -18,6 +18,12 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * GameSession 在线会话测试。
+ * <p>
+ * 针对相关生产代码的单元/切片测试类 {@code GameSessionTest}：
+ * 通过 fixture、mock 与断言覆盖关键成功路径、失败码与状态边界。
+ */
 @DisplayName("GameSession 在线会话测试")
 class GameSessionTest {
 
@@ -35,6 +41,14 @@ class GameSessionTest {
                 session.getUid(), session.getUkcp() != null);
     }
 
+    /**
+     * 验证点：构造后应绑定 uid 与 Channel。
+     * <p>测试方法 {@code constructorShouldBindUidAndChannel}：
+     * <ul>
+     *   <li>{@code assertEquals(PlayerTestFixtures.PLAYER_UID, session.getUid());}</li>
+     *   <li>{@code assertEquals(channel, session.getChannel());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("构造后应绑定 uid 与 Channel")
     void constructorShouldBindUidAndChannel() {
@@ -44,6 +58,16 @@ class GameSessionTest {
                 session.getUid(), session.getChannel() == channel, session.getUkcp() == null);
     }
 
+    /**
+     * 验证点：nextDataLoadVersion 应原子递增。
+     * <p>测试方法 {@code nextDataLoadVersionShouldIncrement}：
+     * <ul>
+     *   <li>{@code assertEquals(1L, v1);}</li>
+     *   <li>{@code assertEquals(2L, v2);}</li>
+     *   <li>{@code assertFalse(currentV1);}</li>
+     *   <li>{@code assertTrue(currentV2);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("nextDataLoadVersion 应原子递增")
     void nextDataLoadVersionShouldIncrement() {
@@ -59,6 +83,13 @@ class GameSessionTest {
         assertTrue(currentV2);
     }
 
+    /**
+     * 验证点：send 应通过 Channel 写出 GamePacket。
+     * <p>测试方法 {@code sendShouldWritePacketToChannel}：
+     * <ul>
+     *   <li>{@code verify(channel).writeAndFlush(packet);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("send 应通过 Channel 写出 GamePacket")
     void sendShouldWritePacketToChannel() {
@@ -69,6 +100,17 @@ class GameSessionTest {
         verify(channel).writeAndFlush(packet);
     }
 
+    /**
+     * 验证点：会话快照字段应可读写。
+     * <p>测试方法 {@code sessionSnapshotFieldsShouldBeMutable}：
+     * <ul>
+     *   <li>{@code assertEquals(PlayerTestFixtures.NICKNAME, session.getNickname());}</li>
+     *   <li>{@code assertEquals(45, session.getLevel());}</li>
+     *   <li>{@code assertEquals("token-abc", session.getSessionToken());}</li>
+     *   <li>{@code assertEquals(1_700_000_000L, session.getLastActiveMillis());}</li>
+     *   <li>{@code assertEquals(PlayerTestFixtures.PLAYER_UID, session.getPlayerData().getPlayer().getUid());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("会话快照字段应可读写")
     void sessionSnapshotFieldsShouldBeMutable() {

@@ -13,6 +13,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 
+/**
+ * MazeSkillActionRepository 迷宫技能行为仓储测试。
+ * <p>
+ * 针对相关生产代码的单元/切片测试类 {@code MazeSkillActionRepositoryTest}：
+ * 通过 fixture、mock 与断言覆盖关键成功路径、失败码与状态边界。
+ */
 @DisplayName("MazeSkillActionRepository 迷宫技能行为仓储测试")
 class MazeSkillActionRepositoryTest {
 
@@ -28,6 +34,16 @@ class MazeSkillActionRepositoryTest {
         log.info("仓储初始化: repository={}", repository.getClass().getSimpleName());
     }
 
+    /**
+     * 验证点：findBySkillId 应按 action_order 返回有序行为链。
+     * <p>测试方法 {@code findBySkillIdShouldReturnOrderedActions}：
+     * <ul>
+     *   <li>{@code assertEquals(2, actions.size());}</li>
+     *   <li>{@code assertEquals(1, actions.get(0).getActionOrder());}</li>
+     *   <li>{@code assertEquals("{\"hp_change\":-150}", actions.get(0).getParamsJson());}</li>
+     *   <li>{@code assertEquals(2, actions.get(1).getActionOrder());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("findBySkillId 应按 action_order 返回有序行为链")
     void findBySkillIdShouldReturnOrderedActions() {
@@ -53,6 +69,13 @@ class MazeSkillActionRepositoryTest {
         assertEquals(2, actions.get(1).getActionOrder());
     }
 
+    /**
+     * 验证点：查库异常时应返回空列表。
+     * <p>测试方法 {@code findBySkillIdShouldReturnEmptyOnException}：
+     * <ul>
+     *   <li>{@code assertTrue(actions.isEmpty());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("查库异常时应返回空列表")
     void findBySkillIdShouldReturnEmptyOnException() {

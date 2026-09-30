@@ -1,0 +1,24 @@
+{
+  "regions": [
+    {
+      "planeId": 10001,
+      "floorId": 1,
+      "collectables": [
+        { "collectId": "chest_1", "kind": "chest", "name": "路边宝箱" },
+        { "collectId": "chest_2", "kind": "chest", "name": "山崖宝箱" },
+        { "collectId": "puzzle_1", "kind": "puzzle", "name": "石碑解密" },
+        { "collectId": "view_1", "kind": "viewpoint", "name": "观景台" },
+        { "collectId": "book_1", "kind": "book", "name": "旧书页" }
+      ]
+    },
+    {
+      "planeId": 10002,
+      "floorId": 1,
+      "collectables": [
+        { "collectId": "chest_a", "kind": "chest", "name": "码头木箱" },
+        { "collectId": "puzzle_a", "kind": "puzzle", "name": "潮汐机关" },
+        { "collectId": "view_a", "kind": "viewpoint", "name": "灯塔瞭望" }
+      ]
+    }
+  ]
+}

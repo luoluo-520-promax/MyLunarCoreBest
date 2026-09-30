@@ -1,0 +1,48 @@
+{
+  "version": 2,
+  "defaultAggroRadius": 5.0,
+  "encounters": [
+    {
+      "monsterId": 101,
+      "battleStageId": 100,
+      "playerExp": 50,
+      "refreshSeconds": 0,
+      "aggressive": true,
+      "aggroRadius": 5.0,
+      "drops": [
+        { "itemId": 10001, "count": 1 },
+        { "itemId": 10002, "count": 2 }
+      ]
+    },
+    {
+      "monsterId": 102,
+      "battleStageId": 100,
+      "playerExp": 40,
+      "refreshSeconds": 30,
+      "aggressive": true,
+      "aggroRadius": 6.0,
+      "drops": [
+        { "itemId": 10001, "count": 1 }
+      ]
+    },
+    {
+      "monsterId": 201,
+      "battleStageId": 200,
+      "playerExp": 80,
+      "refreshSeconds": 60,
+      "aggressive": true,
+      "aggroRadius": 8.0,
+      "drops": [
+        { "itemId": 10003, "count": 1 },
+        { "currencyId": 1, "amount": 100 }
+      ]
+    }
+  ],
+  "defaultDrops": [
+    { "itemId": 10001, "count": 1 }
+  ],
+  "defaultPlayerExp": 20,
+  "propPickupItemId": 20001,
+  "propPickupCount": 1,
+  "healingSpringHp": 500
+}

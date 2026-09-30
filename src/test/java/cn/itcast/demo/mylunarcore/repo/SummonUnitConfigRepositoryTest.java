@@ -11,6 +11,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.mock;
 
+/**
+ * SummonUnitConfigRepository 召唤物配置仓储测试。
+ * <p>
+ * 针对相关生产代码的单元/切片测试类 {@code SummonUnitConfigRepositoryTest}：
+ * 通过 fixture、mock 与断言覆盖关键成功路径、失败码与状态边界。
+ */
 @DisplayName("SummonUnitConfigRepository 召唤物配置仓储测试")
 class SummonUnitConfigRepositoryTest {
 
@@ -26,6 +32,15 @@ class SummonUnitConfigRepositoryTest {
         log.info("仓储初始化: repository={}", repository.getClass().getSimpleName());
     }
 
+    /**
+     * 验证点：findById 应返回召唤物配置。
+     * <p>测试方法 {@code findByIdShouldReturnSummonUnitRow}：
+     * <ul>
+     *   <li>{@code assertEquals(6001, row.getSummonConfigId());}</li>
+     *   <li>{@code assertEquals(3, row.getDuration());}</li>
+     *   <li>{@code assertEquals(500, row.getHp());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("findById 应返回召唤物配置")
     void findByIdShouldReturnSummonUnitRow() {
@@ -43,6 +58,13 @@ class SummonUnitConfigRepositoryTest {
         assertEquals(500, row.getHp());
     }
 
+    /**
+     * 验证点：HP 为 NULL 时应默认 0。
+     * <p>测试方法 {@code findByIdShouldDefaultHpToZero}：
+     * <ul>
+     *   <li>{@code assertEquals(0, row.getHp());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("HP 为 NULL 时应默认 0")
     void findByIdShouldDefaultHpToZero() {
@@ -58,6 +80,13 @@ class SummonUnitConfigRepositoryTest {
         assertEquals(0, row.getHp());
     }
 
+    /**
+     * 验证点：不存在时应返回 null。
+     * <p>测试方法 {@code findByIdShouldReturnNullWhenMissing}：
+     * <ul>
+     *   <li>{@code assertNull(row);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("不存在时应返回 null")
     void findByIdShouldReturnNullWhenMissing() {

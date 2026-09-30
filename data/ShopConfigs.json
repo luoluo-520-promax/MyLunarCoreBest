@@ -1,0 +1,235 @@
+[
+  {
+    "shopId": 1,
+    "shopName": "兑换商店",
+    "tabs": ["CURRENCY"],
+    "items": [
+      {"shopItemId": 1001, "itemId": 101, "itemCount": 1, "currencyId": 1, "price": 100, "dailyLimit": 10},
+      {"shopItemId": 1002, "itemId": 23001, "itemCount": 1, "currencyId": 1, "price": 500, "dailyLimit": 5}
+    ]
+  },
+  {
+    "shopId": 2,
+    "shopName": "氪金商城",
+    "tabs": ["TOPUP", "DISCOUNT", "PACK"],
+    "items": [
+      {
+        "shopItemId": 2001,
+        "productCategory": "DIRECT_TOPUP",
+        "payType": "IAP",
+        "skuId": "com.mylunarcore.crystal.60",
+        "displayName": "60晶石",
+        "priceCents": 600,
+        "currencyCode": "CNY",
+        "rewards": [{"type": "CURRENCY", "currencyId": 2, "amount": 60}],
+        "firstPurchaseBonus": [{"type": "CURRENCY", "currencyId": 2, "amount": 60}],
+        "dailyLimit": 0,
+        "totalLimit": 0,
+        "sortOrder": 10,
+        "enabled": true
+      },
+      {
+        "shopItemId": 2002,
+        "productCategory": "DIRECT_TOPUP",
+        "payType": "IAP",
+        "skuId": "com.mylunarcore.crystal.300",
+        "displayName": "300晶石",
+        "priceCents": 3000,
+        "currencyCode": "CNY",
+        "rewards": [{"type": "CURRENCY", "currencyId": 2, "amount": 300}],
+        "firstPurchaseBonus": [{"type": "CURRENCY", "currencyId": 2, "amount": 300}],
+        "sortOrder": 11,
+        "enabled": true
+      },
+      {
+        "shopItemId": 2003,
+        "productCategory": "DIRECT_TOPUP",
+        "payType": "IAP",
+        "skuId": "com.mylunarcore.crystal.680",
+        "displayName": "680晶石",
+        "priceCents": 6800,
+        "currencyCode": "CNY",
+        "rewards": [{"type": "CURRENCY", "currencyId": 2, "amount": 680}],
+        "firstPurchaseBonus": [{"type": "CURRENCY", "currencyId": 2, "amount": 680}],
+        "sortOrder": 12,
+        "enabled": true
+      },
+      {
+        "shopItemId": 2004,
+        "productCategory": "DIRECT_TOPUP",
+        "payType": "IAP",
+        "skuId": "com.mylunarcore.crystal.1280",
+        "displayName": "1280晶石",
+        "priceCents": 12800,
+        "currencyCode": "CNY",
+        "rewards": [{"type": "CURRENCY", "currencyId": 2, "amount": 1280}],
+        "firstPurchaseBonus": [{"type": "CURRENCY", "currencyId": 2, "amount": 1280}],
+        "sortOrder": 13,
+        "enabled": true
+      },
+      {
+        "shopItemId": 2005,
+        "productCategory": "DIRECT_TOPUP",
+        "payType": "IAP",
+        "skuId": "com.mylunarcore.crystal.3280",
+        "displayName": "3280晶石",
+        "priceCents": 32800,
+        "currencyCode": "CNY",
+        "rewards": [{"type": "CURRENCY", "currencyId": 2, "amount": 3280}],
+        "firstPurchaseBonus": [{"type": "CURRENCY", "currencyId": 2, "amount": 3280}],
+        "sortOrder": 14,
+        "enabled": true
+      },
+      {
+        "shopItemId": 2006,
+        "productCategory": "DIRECT_TOPUP",
+        "payType": "IAP",
+        "skuId": "com.mylunarcore.crystal.6480",
+        "displayName": "6480晶石",
+        "priceCents": 64800,
+        "currencyCode": "CNY",
+        "rewards": [{"type": "CURRENCY", "currencyId": 2, "amount": 6480}],
+        "firstPurchaseBonus": [{"type": "CURRENCY", "currencyId": 2, "amount": 6480}],
+        "sortOrder": 15,
+        "enabled": true
+      },
+      {
+        "shopItemId": 2101,
+        "productCategory": "DISCOUNT_PACK",
+        "payType": "IAP",
+        "skuId": "com.mylunarcore.pack.starter.6",
+        "displayName": "新手特惠三件套",
+        "priceCents": 600,
+        "originalPriceCents": 3000,
+        "discountRate": 20,
+        "saleStartAt": "2026-08-01T00:00:00+08:00",
+        "saleEndAt": "2027-12-31T23:59:59+08:00",
+        "rewards": [
+          {"type": "CURRENCY", "currencyId": 2, "amount": 60},
+          {"type": "ITEM", "itemId": 23001, "count": 10},
+          {"type": "ITEM", "itemId": 101, "count": 5}
+        ],
+        "dailyLimit": 1,
+        "totalLimit": 3,
+        "limitPeriod": "LIFETIME",
+        "sortOrder": 20,
+        "enabled": true
+      },
+      {
+        "shopItemId": 2102,
+        "productCategory": "DISCOUNT_PACK",
+        "payType": "IAP",
+        "skuId": "com.mylunarcore.pack.weekend.68",
+        "displayName": "周末补给包",
+        "priceCents": 6800,
+        "originalPriceCents": 12800,
+        "discountRate": 53,
+        "saleStartAt": "2026-08-01T00:00:00+08:00",
+        "saleEndAt": "2027-12-31T23:59:59+08:00",
+        "rewards": [
+          {"type": "CURRENCY", "currencyId": 2, "amount": 680},
+          {"type": "ITEM", "itemId": 23001, "count": 10},
+          {"type": "ITEM", "itemId": 101, "count": 5}
+        ],
+        "dailyLimit": 1,
+        "totalLimit": 3,
+        "sortOrder": 21,
+        "enabled": true
+      },
+      {
+        "shopItemId": 2201,
+        "productCategory": "PAID_PACK",
+        "payType": "IAP",
+        "skuId": "com.mylunarcore.pack.monthly",
+        "displayName": "月卡",
+        "priceCents": 3000,
+        "packKind": "MONTHLY_CARD",
+        "rewards": [
+          {"type": "CURRENCY", "currencyId": 2, "amount": 300},
+          {"type": "DAILY_CLAIM", "currencyId": 2, "amount": 90, "days": 30}
+        ],
+        "totalLimit": 1,
+        "limitPeriod": "MONTH",
+        "sortOrder": 30,
+        "enabled": true
+      },
+      {
+        "shopItemId": 2202,
+        "productCategory": "PAID_PACK",
+        "payType": "IAP",
+        "skuId": "com.mylunarcore.pack.starter",
+        "displayName": "启程礼包",
+        "priceCents": 1800,
+        "packKind": "STARTER",
+        "rewards": [
+          {"type": "CURRENCY", "currencyId": 2, "amount": 180},
+          {"type": "ITEM", "itemId": 101, "count": 20}
+        ],
+        "totalLimit": 1,
+        "limitPeriod": "LIFETIME",
+        "sortOrder": 31,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "shopId": 3,
+    "shopName": "皮肤商店",
+    "tabs": ["SKIN", "SKIN_PACK"],
+    "items": [
+      {
+        "shopItemId": 3001,
+        "productCategory": "SKIN_SHOP",
+        "payType": "CURRENCY",
+        "itemId": 8101002,
+        "itemCount": 1,
+        "currencyId": 2,
+        "price": 1680,
+        "displayName": "星海礼赞",
+        "dailyLimit": 0,
+        "totalLimit": 1,
+        "limitPeriod": "LIFETIME",
+        "sortOrder": 10,
+        "enabled": true
+      },
+      {
+        "shopItemId": 3101,
+        "productCategory": "SKIN",
+        "payType": "IAP",
+        "skuId": "com.mylunarcore.skin.8001002",
+        "displayName": "星海礼赞",
+        "priceCents": 6800,
+        "currencyCode": "CNY",
+        "rewards": [
+          {"type": "ITEM", "itemId": 8101002, "count": 1}
+        ],
+        "totalLimit": 1,
+        "limitPeriod": "LIFETIME",
+        "sortOrder": 10,
+        "enabled": true
+      },
+      {
+        "shopItemId": 3201,
+        "productCategory": "SKIN_PACK",
+        "payType": "IAP",
+        "skuId": "com.mylunarcore.skinpack.star_ocean.68",
+        "displayName": "星海礼赞礼包",
+        "priceCents": 6800,
+        "originalPriceCents": 12800,
+        "discountRate": 53,
+        "saleStartAt": "2026-08-01T00:00:00+08:00",
+        "saleEndAt": "2026-08-31T23:59:59+08:00",
+        "packKind": "SKIN_PACK",
+        "rewards": [
+          {"type": "ITEM", "itemId": 8101002, "count": 1},
+          {"type": "CURRENCY", "currencyId": 2, "amount": 300},
+          {"type": "ITEM", "itemId": 101, "count": 5}
+        ],
+        "totalLimit": 1,
+        "limitPeriod": "LIFETIME",
+        "sortOrder": 20,
+        "enabled": true
+      }
+    ]
+  }
+]

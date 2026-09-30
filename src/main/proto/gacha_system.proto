@@ -43,12 +43,18 @@ message GetGachaInfoScRsp {
 message DoGachaCsReq {
   uint32 banner_type = 1;
   uint32 times = 2; // 1 or 10
+  /** 客户端幂等 nonce；与 GachaStart 三次握手共用 */
+  string client_nonce = 3;
 }
 
 message GachaItem {
   uint32 item_id = 1;
   uint32 count = 2;
   bool is_new = 3;
+  /** 本次是否解锁了新的命座层 */
+  bool is_new_constellation = 4;
+  /** 当前命座层（0=基础，上限6） */
+  int32 current_layer = 5;
 }
 
 message ExtraReward {
@@ -63,6 +69,56 @@ message DoGachaScRsp {
   repeated ExtraReward extra_rewards = 4;
   PlayerPityInfo updated_pity = 5;
   CeilingInfo updated_ceiling = 6;
+  /** 表现会话 ID：客户端播完动画后回 GachaResultAck */
+  string presentation_session_id = 7;
+  /** 下发客户端表演参数（特效/镜头/文案占位） */
+  ClientUiParams client_ui = 8;
+  /** 抽卡返利积分增量 */
+  uint32 rebate_points_gained = 9;
+  uint32 rebate_points_balance = 10;
+}
+
+/** 抽卡结果推送（可选）：含命座层变化，便于客户端即时点亮星星 */
+message GachaResultScNotify {
+  uint32 banner_type = 1;
+  repeated GachaItem items = 2;
+}
+
+/**
+ * 表现层状态机 — 开始：客户端在播放抽卡动画前发送，服务端预扣费校验并返回 session。
+ * 状态流转：START → DRAWING → ACK(ENDED)
+ */
+message GachaStartCsReq {
+  uint32 banner_type = 1;
+  uint32 times = 2;
+  string client_nonce = 3;
+}
+
+message GachaStartScRsp {
+  int32 retcode = 1;
+  string presentation_session_id = 2;
+  ClientUiParams client_ui = 3;
+  uint32 estimated_cost = 4;
+}
+
+/** 表现层状态机 — 结束确认：动画播完后客户端回执，服务端关闭会话并允许下一抽 */
+message GachaResultAckCsReq {
+  string presentation_session_id = 1;
+  bool skipped = 2;
+}
+
+message GachaResultAckScRsp {
+  int32 retcode = 1;
+  string presentation_session_id = 2;
+}
+
+/** 客户端表现参数：特效 ID、镜头、文本占位符 */
+message ClientUiParams {
+  string fx_id = 1;
+  string camera_preset = 2;
+  map<string, string> text_placeholders = 3;
+  string sfx_id = 4;
+  string timeline_id = 5;
 }
 
 message ExchangeGachaCeilingCsReq {

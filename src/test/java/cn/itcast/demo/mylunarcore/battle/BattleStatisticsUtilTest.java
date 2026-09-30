@@ -9,11 +9,15 @@ import org.slf4j.LoggerFactory;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+/**
+ * {@link BattleStatisticsUtil#toJson}：把 Protobuf 战斗统计转成下划线字段 JSON。
+ */
 @DisplayName("BattleStatisticsUtil 战斗统计工具测试")
 class BattleStatisticsUtilTest {
 
     private static final Logger log = LoggerFactory.getLogger(BattleStatisticsUtilTest.class);
 
+    /** null 输入应得到 "{}"，避免 NPE。 */
     @Test
     @DisplayName("null 统计应返回空 JSON 对象")
     void nullStatisticsShouldReturnEmptyJson() {
@@ -22,6 +26,10 @@ class BattleStatisticsUtilTest {
         assertEquals("{}", json);
     }
 
+    /**
+     * 填充 damage/turn/kill/extra 后，JSON 应含 snake_case 键；
+     * extra_data 内嵌 JSON 需转义引号。
+     */
     @Test
     @DisplayName("应正确序列化战斗统计字段")
     void shouldSerializeStatisticsFields() {

@@ -15,6 +15,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 
+/**
+ * ChallengeGroupRewardRepository 挑战组奖励仓储测试。
+ * <p>
+ * 针对相关生产代码的单元/切片测试类 {@code ChallengeGroupRewardRepositoryTest}：
+ * 通过 fixture、mock 与断言覆盖关键成功路径、失败码与状态边界。
+ */
 @DisplayName("ChallengeGroupRewardRepository 挑战组奖励仓储测试")
 class ChallengeGroupRewardRepositoryTest {
 
@@ -30,6 +36,14 @@ class ChallengeGroupRewardRepositoryTest {
         log.info("仓储初始化: repository={}", repository.getClass().getSimpleName());
     }
 
+    /**
+     * 验证点：find 应确保行存在并返回领奖进度。
+     * <p>测试方法 {@code findShouldReturnRewardEntity}：
+     * <ul>
+     *   <li>{@code assertTrue(opt.isPresent());}</li>
+     *   <li>{@code assertEquals(6, entity.getTakenStars());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("find 应确保行存在并返回领奖进度")
     void findShouldReturnRewardEntity() {
@@ -50,6 +64,13 @@ class ChallengeGroupRewardRepositoryTest {
         assertEquals(6, entity.getTakenStars());
     }
 
+    /**
+     * 验证点：updateTakenStars 应更新已领星级掩码。
+     * <p>测试方法 {@code updateTakenStarsShouldUpdateMask}：
+     * <ul>
+     *   <li>{@code assertEquals(1, affected);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("updateTakenStars 应更新已领星级掩码")
     void updateTakenStarsShouldUpdateMask() {
@@ -61,6 +82,11 @@ class ChallengeGroupRewardRepositoryTest {
         assertEquals(1, affected);
     }
 
+    /**
+     * 验证点：ensureRow 应幂等插入默认行。
+     * <p>测试方法 {@code ensureRowShouldInsertDefaultRow}：
+     * 按用例准备数据后断言返回值或协作对象调用是否符合预期。
+     */
     @Test
     @DisplayName("ensureRow 应幂等插入默认行")
     void ensureRowShouldInsertDefaultRow() {

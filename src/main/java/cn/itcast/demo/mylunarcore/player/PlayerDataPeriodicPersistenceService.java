@@ -1,171 +1,241 @@
-// 定时或 Tick 触发将会话内玩家核心快照异步写回数据库
+// 定时或断连时将会话内玩家核心快照异步写回数据库
 package cn.itcast.demo.mylunarcore.player;
 
-// 全局配置：周期持久化开关与间隔
 import cn.itcast.demo.mylunarcore.config.LunarCoreProperties;
-
-// 玩家领域聚合根
 import cn.itcast.demo.mylunarcore.model.PlayerData;
-
-// 玩家主实体，周期持久化的快照载体
 import cn.itcast.demo.mylunarcore.model.PlayerEntity;
-
-// 统一日志门面
 import cn.itcast.demo.mylunarcore.common.AppLogger;
-
-// 日志分类
 import cn.itcast.demo.mylunarcore.common.LogCategory;
-
-// 持久化仓储，执行 persistPlayerSnapshot
 import cn.itcast.demo.mylunarcore.repo.PlayerDataRepository;
-
-// 单用户在线会话
-import cn.itcast.demo.mylunarcore.player.GameSession;
-
-// 全局会话管理器
-import cn.itcast.demo.mylunarcore.player.GameSessionManager;
-
-// Bean 销毁钩子
-import jakarta.annotation.PreDestroy;
-
-// SLF4J 日志
 import org.slf4j.Logger;
-
-// Spring 服务组件
 import org.springframework.stereotype.Service;
 
-// 并发 Set 接口，标记正在持久化的 uid
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
-
-// 有界阻塞队列
 import java.util.concurrent.ArrayBlockingQueue;
-
-// 线程安全 Set 实现
 import java.util.concurrent.ConcurrentHashMap;
-
-// 线程池
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
-
-// 时间单位
 import java.util.concurrent.TimeUnit;
 
 /**
  * 玩家数据周期持久化服务。
  * <p>
- * 由 {@link cn.itcast.demo.mylunarcore.common.OnlinePlayer} Tick 周期调用 {@link #persistAsync(long)}，
- * 将会话内存中的 {@link PlayerEntity} 核心快照异步 UPDATE 回数据库，减少登出时一次性写库压力。
- * </p>
+ * OnlinePlayer Tick 或断连时触发：在 {@link PlayerSessionLockService} 内 deepCopy 玩家主实体快照，
+ * 再提交到 player-data-persist 线程池异步 UPDATE（乐观锁），避免业务线程与 IO 线程直接写库造成竞态。
+ * 拒绝策略为 CallerRuns，禁止静默 Abort。
  */
-@Service // 注册为 Spring Bean
+@Service
 public class PlayerDataPeriodicPersistenceService {
 
-    /** 本类专用日志，分类 BUSINESS_DATA */
     private static final Logger log = AppLogger.logger(LogCategory.BUSINESS_DATA, PlayerDataPeriodicPersistenceService.class);
 
-    /** 写库仓储 */
     private final PlayerDataRepository repository;
-
-    /** 按 uid 获取在线会话 */
     private final GameSessionManager sessionManager;
-
-    /** 读取周期持久化开关与间隔配置 */
+    private final PlayerSessionLockService sessionLockService;
     private final LunarCoreProperties properties;
-
-    /** 异步持久化专用线程池 */
+    private final PlayerDataMetrics metrics;
     private final ThreadPoolExecutor executor;
 
-    /** 正在持久化中的 uid 集合，防止同一玩家并发重复刷库 */
+    /** 正在持久化中的 uid 集合，add 失败表示已有任务在途，跳过重复提交 */
     private final Set<Long> persisting = ConcurrentHashMap.newKeySet();
 
-    /**
-     * 初始化依赖与持久化线程池（参数可与异步加载共用配置键）。
-     *
-     * @param repository      数据仓储
-     * @param sessionManager  会话管理器
-     * @param properties      全局配置
-     */
     public PlayerDataPeriodicPersistenceService(PlayerDataRepository repository,
                                                 GameSessionManager sessionManager,
-                                                LunarCoreProperties properties) {
-        this.repository = repository; // 保存仓储
-        this.sessionManager = sessionManager; // 保存会话管理器
-        this.properties = properties; // 保存配置
-        int cpu = Runtime.getRuntime().availableProcessors(); // CPU 核心数
-        int configuredThreads = properties.getSync().getAsyncLoadThreads(); // 复用 asyncLoad 线程数配置
-        int threads = configuredThreads > 0 ? configuredThreads : Math.max(2, cpu / 2); // 持久化默认比全量加载更保守
-        int configuredQueue = properties.getSync().getAsyncLoadQueueCapacity(); // 复用队列容量配置
-        int queueCapacity = configuredQueue > 0 ? configuredQueue : 1024; // 默认 1024
+                                                PlayerSessionLockService sessionLockService,
+                                                LunarCoreProperties properties,
+                                                PlayerDataMetrics metrics) {
+        this.repository = repository;
+        this.sessionManager = sessionManager;
+        this.sessionLockService = sessionLockService;
+        this.properties = properties;
+        this.metrics = metrics;
+        int cpu = Runtime.getRuntime().availableProcessors();
+        int configuredThreads = properties.getSync().getAsyncLoadThreads();
+        int threads = configuredThreads > 0 ? configuredThreads : Math.max(2, cpu / 2);
+        int configuredQueue = properties.getSync().getAsyncLoadQueueCapacity();
+        int queueCapacity = configuredQueue > 0 ? configuredQueue : 1024;
         this.executor = new ThreadPoolExecutor(
-                threads, // 核心线程数
-                threads, // 最大线程数
-                30L, // 空闲存活时间
+                threads,
+                threads,
+                30L,
                 TimeUnit.SECONDS,
-                new ArrayBlockingQueue<>(queueCapacity), // 有界队列
-                r -> { // 线程工厂
-                    Thread t = new Thread(r, "player-data-persist"); // 持久化线程命名
-                    t.setDaemon(true); // 守护线程
+                new ArrayBlockingQueue<>(queueCapacity),
+                r -> {
+                    Thread t = new Thread(r, "player-data-persist");
+                    t.setDaemon(true);
                     return t;
                 },
-                new ThreadPoolExecutor.CallerRunsPolicy() // 队列满时调用方线程执行
+                new ThreadPoolExecutor.CallerRunsPolicy()
         );
     }
 
-    /**
-     * 获取配置的持久化间隔（毫秒）。
-     *
-     * @return 启用时返回间隔毫秒数；功能关闭时返回 0
-     */
     public long intervalMs() {
-        if (!properties.getSync().isPeriodicPersistenceEnabled()) { // 配置关闭周期持久化
-            return 0L; // OnlinePlayer Tick 据此跳过持久化逻辑
+        if (!properties.getSync().isPeriodicPersistenceEnabled()) {
+            return 0L;
         }
-        return Math.max(0L, properties.getSync().getPeriodicPersistenceIntervalMs()); // 读取间隔，负值钳制为 0
+        return Math.max(0L, properties.getSync().getPeriodicPersistenceIntervalMs());
     }
 
-    /**
-     * 异步触发单个玩家的核心快照持久化（同一 uid 并发去重）。
-     *
-     * @param uid 目标玩家 uid
-     */
     public void persistAsync(long uid) {
-        if (uid <= 0 || !persisting.add(uid)) { // 无效 uid 或该 uid 已在持久化中则跳过
+        persistAsync(uid, SyncReason.TIMER);
+    }
+
+    public void persistAsync(long uid, SyncReason reason) {
+        if (uid <= 0 || !persisting.add(uid)) {
             return;
         }
-        executor.execute(() -> doPersist(uid)); // 提交异步写库任务
+        boolean requireDirty = reason == SyncReason.TIMER;
+        PersistSnapshot snapshot = sessionLockService.withLock(uid, () -> {
+            GameSession session = sessionManager.getOrNull(uid);
+            if (session == null) {
+                return null;
+            }
+            if (requireDirty && !session.isDirty()) {
+                return null;
+            }
+            PlayerData data = session.getPlayerData();
+            if (data == null || data.getPlayer() == null) {
+                return null;
+            }
+            // LOGOUT 等强制落盘：若尚未标记 dirty，补一次世代以便成功后清脏
+            long dirtyGen = session.isDirty() ? session.currentDirtyGeneration() : session.markDirty();
+            PlayerEntity player = data.deepCopy().getPlayer();
+            player.setDataVersion(session.getDataVersion());
+            return new PersistSnapshot(player, dirtyGen);
+        });
+        if (snapshot == null) {
+            persisting.remove(uid);
+            return;
+        }
+        try {
+            executor.execute(() -> doPersist(uid, reason, snapshot));
+        } catch (RejectedExecutionException e) {
+            metrics.recordPersistReject();
+            log.warn("persist rejected, uid={}, reason={}", uid, reason, e);
+            persisting.remove(uid);
+        }
     }
 
-    /**
-     * 实际写库：从会话取出 PlayerEntity 并调用仓储 persistPlayerSnapshot。
-     *
-     * @param uid 玩家 uid
-     */
-    private void doPersist(long uid) {
+    private void doPersist(long uid, SyncReason reason, PersistSnapshot snapshot) {
         try {
-            GameSession session = sessionManager.getOrNull(uid); // 获取在线会话
-            if (session == null) { // 玩家已离线
+            int updated = repository.persistPlayerSnapshot(snapshot.player());
+            if (updated <= 0) {
+                metrics.recordVersionConflict();
+                log.warn("persist version conflict, uid={}, reason={}, expectedVersion={}",
+                        uid, reason, snapshot.player().getDataVersion());
                 return;
             }
-            PlayerData data = session.getPlayerData(); // 会话内聚合根
-            PlayerEntity player = data == null ? null : data.getPlayer(); // 核心快照载体
-            if (player == null) { // 主实体尚未加载到会话
-                return;
-            }
-            int updated = repository.persistPlayerSnapshot(player); // 执行 UPDATE，返回受影响行数
-            if (updated <= 0 && log.isDebugEnabled()) { // 无行更新（可能数据未变）
-                log.debug("periodic persist skipped, uid={}", uid);
-            }
+            sessionLockService.withLock(uid, () -> {
+                GameSession session = sessionManager.getOrNull(uid);
+                if (session == null) {
+                    return;
+                }
+                long expected = snapshot.player().getDataVersion() - 1;
+                session.onPersistVersionAdvanced(expected, snapshot.player().getDataVersion());
+                session.markPersisted(snapshot.dirtyGeneration());
+            });
         } catch (Exception e) {
-            log.warn("periodic persist failed, uid={}", uid, e); // 记录异常，不向上抛出
+            metrics.recordPersistFail();
+            log.error("persist failed, uid={}, reason={}", uid, reason, e);
         } finally {
-            persisting.remove(uid); // 无论成功失败都释放进行中标记，允许下次 Tick 再次触发
+            persisting.remove(uid);
         }
     }
 
     /**
-     * 应用关闭时立即停止持久化线程池。
+     * 优雅关闭时同步落盘所有在线脏玩家，带总超时；返回失败/超时 uid 列表。
      */
-    @PreDestroy
-    public void shutdown() {
-        executor.shutdownNow(); // 中断排队与执行中的持久化任务
+    public ShutdownPersistResult persistAllOnlineSync(long timeoutMs) {
+        long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(Math.max(1L, timeoutMs));
+        List<GameSession> sessions = new ArrayList<>(sessionManager.snapshotSessions());
+        List<Long> failed = new ArrayList<>();
+        List<Long> timedOut = new ArrayList<>();
+        int succeeded = 0;
+        for (GameSession session : sessions) {
+            if (System.nanoTime() >= deadline) {
+                timedOut.add(session.getUid());
+                continue;
+            }
+            boolean ok = persistSync(session.getUid());
+            if (ok) {
+                succeeded++;
+            } else if (sessionManager.getOrNull(session.getUid()) != null
+                    && sessionManager.getOrNull(session.getUid()).isDirty()) {
+                failed.add(session.getUid());
+            } else {
+                succeeded++;
+            }
+        }
+        if (!failed.isEmpty() || !timedOut.isEmpty()) {
+            log.error("shutdown persist summary: online={}, succeeded={}, failedUids={}, timedOutUids={}",
+                    sessions.size(), succeeded, failed, timedOut);
+        } else {
+            log.info("shutdown persist summary: online={}, succeeded={}", sessions.size(), succeeded);
+        }
+        return new ShutdownPersistResult(sessions.size(), succeeded, List.copyOf(failed), List.copyOf(timedOut));
+    }
+
+    /**
+     * @return true 表示无需落盘或落盘成功；false 表示失败
+     */
+    private boolean persistSync(long uid) {
+        PersistSnapshot snapshot = sessionLockService.withLock(uid, () -> {
+            GameSession session = sessionManager.getOrNull(uid);
+            if (session == null || !session.isDirty()) {
+                return null;
+            }
+            PlayerData data = session.getPlayerData();
+            if (data == null || data.getPlayer() == null) {
+                return null;
+            }
+            PlayerEntity player = data.deepCopy().getPlayer();
+            player.setDataVersion(session.getDataVersion());
+            return new PersistSnapshot(player, session.currentDirtyGeneration());
+        });
+        if (snapshot == null) {
+            return true;
+        }
+        try {
+            int updated = repository.persistPlayerSnapshot(snapshot.player());
+            if (updated <= 0) {
+                metrics.recordVersionConflict();
+                metrics.recordPersistFail();
+                log.error("shutdown persist version conflict, uid={}, expectedVersion={}",
+                        uid, snapshot.player().getDataVersion());
+                return false;
+            }
+            sessionLockService.withLock(uid, () -> {
+                GameSession session = sessionManager.getOrNull(uid);
+                if (session == null) {
+                    return;
+                }
+                long expected = snapshot.player().getDataVersion() - 1;
+                session.onPersistVersionAdvanced(expected, snapshot.player().getDataVersion());
+                session.markPersisted(snapshot.dirtyGeneration());
+            });
+            return true;
+        } catch (Exception e) {
+            metrics.recordPersistFail();
+            log.error("shutdown persist failed, uid={}", uid, e);
+            return false;
+        }
+    }
+
+    public void shutdownGracefully(long timeoutSeconds) {
+        executor.shutdown();
+        try {
+            if (!executor.awaitTermination(timeoutSeconds, TimeUnit.SECONDS)) {
+                executor.shutdownNow();
+                executor.awaitTermination(timeoutSeconds, TimeUnit.SECONDS);
+            }
+        } catch (InterruptedException e) {
+            executor.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private record PersistSnapshot(PlayerEntity player, long dirtyGeneration) {
     }
 }

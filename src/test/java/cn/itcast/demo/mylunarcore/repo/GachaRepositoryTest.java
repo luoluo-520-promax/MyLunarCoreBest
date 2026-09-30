@@ -15,6 +15,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.Mockito.mock;
 
+/**
+ * GachaRepository 抽卡仓储测试。
+ * <p>
+ * 针对相关生产代码的单元/切片测试类 {@code GachaRepositoryTest}：
+ * 通过 fixture、mock 与断言覆盖关键成功路径、失败码与状态边界。
+ */
 @DisplayName("GachaRepository 抽卡仓储测试")
 class GachaRepositoryTest {
 
@@ -30,6 +36,15 @@ class GachaRepositoryTest {
         log.info("仓储初始化: repository={}", repository.getClass().getSimpleName());
     }
 
+    /**
+     * 验证点：loadOrCreateGachaInfo 应确保行存在并返回全局抽卡信息。
+     * <p>测试方法 {@code loadOrCreateGachaInfoShouldReturnEntity}：
+     * <ul>
+     *   <li>{@code assertEquals(77, info.getPlayerId());}</li>
+     *   <li>{@code assertEquals(120, info.getCeilingNum());}</li>
+     *   <li>{@code assertFalse(info.isCeilingClaimed());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("loadOrCreateGachaInfo 应确保行存在并返回全局抽卡信息")
     void loadOrCreateGachaInfoShouldReturnEntity() {
@@ -51,6 +66,16 @@ class GachaRepositoryTest {
         assertFalse(info.isCeilingClaimed());
     }
 
+    /**
+     * 验证点：loadOrCreateBannerInfo 应返回 Banner 保底计数。
+     * <p>测试方法 {@code loadOrCreateBannerInfoShouldReturnBannerEntity}：
+     * <ul>
+     *   <li>{@code assertEquals(1, banner.getBannerType());}</li>
+     *   <li>{@code assertEquals(62, banner.getPity5());}</li>
+     *   <li>{@code assertEquals(8, banner.getPity4());}</li>
+     *   <li>{@code assertEquals(1, banner.getFailedUpCount());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("loadOrCreateBannerInfo 应返回 Banner 保底计数")
     void loadOrCreateBannerInfoShouldReturnBannerEntity() {
@@ -74,6 +99,13 @@ class GachaRepositoryTest {
         assertEquals(1, banner.getFailedUpCount());
     }
 
+    /**
+     * 验证点：updateBannerPity 应更新保底计数。
+     * <p>测试方法 {@code updateBannerPityShouldUpdateRow}：
+     * <ul>
+     *   <li>{@code assertEquals(1, affected);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("updateBannerPity 应更新保底计数")
     void updateBannerPityShouldUpdateRow() {
@@ -86,6 +118,13 @@ class GachaRepositoryTest {
         assertEquals(1, affected);
     }
 
+    /**
+     * 验证点：incrementCeilingNum 应累加 300 抽里程碑。
+     * <p>测试方法 {@code incrementCeilingNumShouldAddCeiling}：
+     * <ul>
+     *   <li>{@code assertEquals(1, affected);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("incrementCeilingNum 应累加 300 抽里程碑")
     void incrementCeilingNumShouldAddCeiling() {

@@ -12,6 +12,12 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
 
+/**
+ * BattleMonsterWaveRepository 战斗波次仓储测试。
+ * <p>
+ * 针对相关生产代码的单元/切片测试类 {@code BattleMonsterWaveRepositoryTest}：
+ * 通过 fixture、mock 与断言覆盖关键成功路径、失败码与状态边界。
+ */
 @DisplayName("BattleMonsterWaveRepository 战斗波次仓储测试")
 class BattleMonsterWaveRepositoryTest {
 
@@ -27,6 +33,16 @@ class BattleMonsterWaveRepositoryTest {
         log.info("仓储初始化: repository={}", repository.getClass().getSimpleName());
     }
 
+    /**
+     * 验证点：loadWavesByStageId 应按 wave_order 返回波次列表。
+     * <p>测试方法 {@code loadWavesByStageIdShouldReturnOrderedWaves}：
+     * <ul>
+     *   <li>{@code assertEquals(2, waves.size());}</li>
+     *   <li>{@code assertEquals(1, waves.get(0).getWaveOrder());}</li>
+     *   <li>{@code assertEquals("[101,102]", waves.get(0).getMonstersJson());}</li>
+     *   <li>{@code assertEquals(2, waves.get(1).getWaveOrder());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("loadWavesByStageId 应按 wave_order 返回波次列表")
     void loadWavesByStageIdShouldReturnOrderedWaves() {

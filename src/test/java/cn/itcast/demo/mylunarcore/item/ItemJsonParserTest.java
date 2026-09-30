@@ -12,6 +12,12 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+/**
+ * ItemJsonParser 副词条 JSON 解析测试。
+ * <p>
+ * 针对相关生产代码的单元/切片测试类 {@code ItemJsonParserTest}：
+ * 通过 fixture、mock 与断言覆盖关键成功路径、失败码与状态边界。
+ */
 @DisplayName("ItemJsonParser 副词条 JSON 解析测试")
 class ItemJsonParserTest {
 
@@ -25,6 +31,17 @@ class ItemJsonParserTest {
         log.info("副词条解析器初始化: parserClass={}", parser.getClass().getSimpleName());
     }
 
+    /**
+     * 验证点：标准 snake_case JSON 应解析为 SubAffix 列表。
+     * <p>测试方法 {@code parseValidSnakeCaseJsonShouldReturnSubAffixes}：
+     * <ul>
+     *   <li>{@code assertEquals(2, result.size());}</li>
+     *   <li>{@code assertEquals(101, result.get(0).getAffixId());}</li>
+     *   <li>{@code assertEquals(2, result.get(0).getCount());}</li>
+     *   <li>{@code assertEquals(3, result.get(0).getStep());}</li>
+     *   <li>{@code assertEquals(202, result.get(1).getAffixId());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("标准 snake_case JSON 应解析为 SubAffix 列表")
     void parseValidSnakeCaseJsonShouldReturnSubAffixes() {
@@ -42,6 +59,16 @@ class ItemJsonParserTest {
         assertEquals(202, result.get(1).getAffixId());
     }
 
+    /**
+     * 验证点：camelCase affixId 与字符串数值应兼容解析。
+     * <p>测试方法 {@code parseCamelCaseAndStringNumbersShouldWork}：
+     * <ul>
+     *   <li>{@code assertEquals(1, result.size());}</li>
+     *   <li>{@code assertEquals(55, result.get(0).getAffixId());}</li>
+     *   <li>{@code assertEquals(0, result.get(0).getCount());}</li>
+     *   <li>{@code assertEquals(1, result.get(0).getStep());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("camelCase affixId 与字符串数值应兼容解析")
     void parseCamelCaseAndStringNumbersShouldWork() {
@@ -57,6 +84,14 @@ class ItemJsonParserTest {
         assertEquals(1, result.get(0).getStep());
     }
 
+    /**
+     * 验证点：空输入或 null 应返回空列表。
+     * <p>测试方法 {@code emptyOrNullInputShouldReturnEmptyList}：
+     * <ul>
+     *   <li>{@code assertTrue(nullResult.isEmpty());}</li>
+     *   <li>{@code assertTrue(blankResult.isEmpty());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("空输入或 null 应返回空列表")
     void emptyOrNullInputShouldReturnEmptyList() {
@@ -68,6 +103,14 @@ class ItemJsonParserTest {
         assertTrue(blankResult.isEmpty());
     }
 
+    /**
+     * 验证点：非法 JSON 或非数组结构应返回空列表。
+     * <p>测试方法 {@code invalidJsonOrNonArrayShouldReturnEmptyList}：
+     * <ul>
+     *   <li>{@code assertTrue(badJson.isEmpty());}</li>
+     *   <li>{@code assertTrue(objectJson.isEmpty());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("非法 JSON 或非数组结构应返回空列表")
     void invalidJsonOrNonArrayShouldReturnEmptyList() {
@@ -79,6 +122,15 @@ class ItemJsonParserTest {
         assertTrue(objectJson.isEmpty());
     }
 
+    /**
+     * 验证点：无效 affixId 条目应被跳过。
+     * <p>测试方法 {@code invalidAffixIdShouldBeSkipped}：
+     * <ul>
+     *   <li>{@code assertEquals(1, result.size());}</li>
+     *   <li>{@code assertEquals(9, result.get(0).getAffixId());}</li>
+     *   <li>{@code assertEquals(3, result.get(0).getCount());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("无效 affixId 条目应被跳过")
     void invalidAffixIdShouldBeSkipped() {

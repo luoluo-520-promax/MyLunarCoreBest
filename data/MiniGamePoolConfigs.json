@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "games": [
+    {
+      "miniGameId": "racing_festival",
+      "type": "RACING",
+      "displayName": "星轨竞速祭",
+      "tutorialAnimUrl": "https://cdn.example/tutorials/racing_festival.mp4",
+      "script": "activity/racing_festival.groovy",
+      "checkpoints": [
+        {"id": "start", "x": 0, "y": 0, "z": 0},
+        {"id": "cp1", "x": 20, "y": 0, "z": 5},
+        {"id": "cp2", "x": 40, "y": 1, "z": 10},
+        {"id": "finish", "x": 60, "y": 0, "z": 0}
+      ]
+    },
+    {
+      "miniGameId": "tower_defense_outpost",
+      "type": "TOWER_DEFENSE",
+      "displayName": "前哨塔防",
+      "tutorialAnimUrl": "https://cdn.example/tutorials/tower_defense.mp4",
+      "script": "activity/tower_defense.groovy",
+      "turretSlots": 4,
+      "waves": 5
+    },
+    {
+      "miniGameId": "fishing_harbor",
+      "type": "FISHING",
+      "displayName": "星港垂钓",
+      "tutorialAnimUrl": "https://cdn.example/tutorials/fishing.mp4",
+      "script": "activity/fishing_harbor.groovy",
+      "baseCatchRate": 0.45
+    }
+  ]
+}

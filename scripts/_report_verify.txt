@@ -1,0 +1,25 @@
+7|Normal|（含技术架构、业务能力、安全运维、微服务迁移、体验缺口补齐、体验闭环、体验沉浸、体验优化二期/三期、AI 助手增强、战斗手感与拥堵防雪崩、性能深化、运营热更七项短板、wire v4 稳定性与体验深化、「十大体验/生产缺口」与 P11 体验/社交缺口，以及「五大
+10|Normal|报告生成日期：2026年09月04日（在 P11 体验/社交缺口 CmdId 1200–1247 基础上，已同步落地「五大内容深度缺口」：DialoguePerformanceService 剧情 Timeline（1248）、命座/星魂 Constellat
+14|Normal|下面先给出章节速览（方便不打开自动目录时也能快速跳读）。其后是 Word 自动目录域：请用 Microsoft Word 或 WPS 打开本文件后，右键点击自动目录区域，选择「更新域 / 更新整个目录」，即可显示带页码的完整目录。第七章已新增 7.31「十大体
+48|List Bullet|报告依据：当前仓库 README、源码包结构、配置文件与已有评估文档快照；此前已写入体验闭环（CmdId 1020–1045）、体验沉浸（1046–1069）、体验优化二期（1070–1076）、三期（1078–1097）、AI 增强（1098–1104）、手
+91|Normal|覆盖创角、成长晋阶、天赋、属性计算，以及皮肤衣柜的拥有与装备。属性计算由 AttributeCalculator 等组件完成，皮肤配置来自 data/SkinConfigs.json。养成计划（DevelopmentPlanService）按目标角色+目标等级
+119|Normal|卡池信息可热更；一次抽卡尽量把「扣费 → 发奖 → pity 更新 → 流水记录」放在同一事务里，避免出现扣了钱没卡、或重复发奖。另有天井兑换与抽卡历史查询。 P11：GetGachaGuaranteeInfo（1244–1245）下发各卡池 pity5/pi
+132|Normal|活动侧有排期与配置查询，支持热更推送，也支持 Excel/JSON 导入。独有计算逻辑（如签到第 7 天多倍、限时挑战特殊积分）可抽到 data/scripts/activity/*.groovy，由 ActivityScriptEngine（Groovy J
+133|List Bullet|活动：ActivityNettyService、ActivityScheduleService、ActivityConfigService、ActivityScriptEngine、ActivityVisibilityService、ActivityCircu
+159|Normal|除了战斗与经济循环，项目还补齐了「讲故事」和「家园养成」能力，方便策划做剧情与轻养成。剧情侧在选项节点写入 SAVEPOINT（savepointNodeId），选项可带 impact_tags（如 +Affinity / UnlockRoute / -Mor
+160|List Bullet|对话树：DialogueTriggerEngine、DialogueProgressService（选项节点 SAVEPOINT，markPlayed/advance 保留 savepointNodeId；选项 impact_tags；+Affinity 触发
+189|Normal|在日常循环之外，仓库还按 docs/feature-gap-fill.md 落地了一批「崩铁式」内容深度能力，方便策划做长线目标与社交互动。服务端逻辑与配置已具备；部分客户端表现层仍可继续联调。探索深度再加深：PuzzleStateService 维护压力板/
+250|Heading 2|7.35 五大内容深度缺口（剧情表演 / 命座 / 探索谜题 / Raid 协作 / MiniGame，CmdId 1248–1255）
+251|Normal|在 7.34 P11（CmdId 1200–1247）之后，本轮针对产品侧五条「内容深度」短板一次性落地服务端能力：（1）剧情演出缺动态表演；（2）抽卡重复缺命座深度；（3）世界探索缺机关谜题与隐藏收集；（4）社交协作缺职责分工与技能连携；（5）活动同质化缺非
+252|Normal|（1）剧情表演指令集：DialogueNode 增加 performanceId / voiceLineKey；DialoguePerformanceService 在进入节点时推送 DialoguePerformanceScNotify（1248），time
+253|Normal|（2）命座/星魂：ConstellationService 重复获得自动升层（0–6）；CharacterConstellationConfig 支持 STAT_BOOST / MECHANIC / TALENT_UPGRADE / START_STATE；C
+257|List Bullet|实现入口：dialogue/DialoguePerformanceService；character/ConstellationService、ConstellationEffectApplier；exploration/PuzzleStateService、
+258|List Bullet|配置：data/DialoguePerformanceScripts.json、DialogueVoiceConfig.json、CharacterConstellationConfig.json、PuzzleConfigs.json、CollectibleC
+260|List Bullet|客户端联调要点：对接 1248–1255；对话节点按 start_time 混播表情/口型/镜头；抽卡结果点亮命座星；谜题完成播机关特效并刷新路径；Raid 准备期语音沟通 + 连携/Ping 纪律 UI；登录引导新小玩法教学动画，高分一键分享。
+287|Normal|很多玩法数值不以硬编码写死在 Java 里，而是放在 data/ 下的 JSON、CSV、Excel。这样改活动、改卡池、改商店，往往不必重新发整包程序，只要走热更/导入流程。本轮进一步把「活动独有计算」也配置化：data/scripts/activity/*
+402|List Bullet|缺口补齐玩法：世界 BOSS、深渊赛季、光锥遗器词条、赠礼/红包、图鉴、好感、名片、活动模板等；命座/星魂、剧情 Timeline 表演、探索谜题与隐藏收集、Raid 职责连携、MiniGame 跑酷/塔防/钓鱼（CmdId 1248–1255）。
+415|List Bullet|对话/过场/家园：服务端已加深（SAVEPOINT/回放/剧情树快照/环境联动、家具交互、在场虚影、拜访日志、好友助产视觉）；预加载 DISSOLVE/RIFT/BLACK、站内 WebView、扫荡/连续扫荡/日程表入口、战斗 Auto 策略 UI 与大招预
+416|List Bullet|协议已迁到 wire v4（兼容守卫仍 ≥ 2）；v1 客户端必须升级；改 CmdId（含 1020–1045 闭环、1046–1069 沉浸、1070–1076 二期、1078–1097 三期、1098–1104 AI、1105–1108 手感/拥堵/性能/
+426|List Bullet|继续以模块化单体打磨崩铁式体验与数值内容；客户端对齐环境微交互粒子、100ms 预测移动、热管理降级指令、昼夜光照、Auto target_focus UI、连战增量结算、虚影问候与死亡残影抚慰、AI 荧光引路线/自动寻路、以及 DeviceHaptics 震
+514|Normal|MyLunarCore 已经不是「只有空壳的演示仓库」：它在单体形态下具备较完整的崩铁式 RPG 服务端能力——联网、场景（含强制/方向预判预加载、DISSOLVE/RIFT/BLACK 切图、跳跃落地物理反馈、环境微交互池、100ms 客户端预测移动、世界时
+516|Normal|本报告基于仓库当前代码与文档快照整理，2026年09月02日 已在本文档内同步「二游运营热更七项短板」落地（活动脚本 / 生效窗+Time Travel / 资源 Manifest 锁 / Override+熔断 / Server Freeze 1108 / 

@@ -1,0 +1,379 @@
+syntax = "proto3";
+
+package cn.itcast.demo.mylunarcore.proto;
+
+option java_package = "cn.itcast.demo.mylunarcore.protocol";
+option java_outer_classname = "AssistSystemProto";
+
+// 单条教练建议（方案 A 规则引擎输出）
+message CoachHint {
+  string tip_id = 1;
+  string category = 2;
+  uint32 priority = 3;
+  string title = 4;
+  string message = 5;
+  string action = 6;
+  uint32 ref_id = 7; // 关联 questId / activityId / itemId 等
+}
+
+// 攻略媒体：默认站内 WebView 浮层渲染，禁止强制跳转外部浏览器
+message AssistMediaLink {
+  string id = 1;
+  string title = 2;
+  string platform = 3; // bilibili / douyin / official / ...
+  string media_type = 4; // video / article / search
+  string url = 5;
+  // OPEN_IN_APP_WEBVIEW（默认）/ OPEN_VIDEO_INLINE / OPEN_EXTERNAL_LINK（仅显式允许）
+  string action = 6;
+  bool curated = 7; // true=运营精选；false=平台搜索深链
+  // INLINE_WEBVIEW | DEPTH_REF — 客户端浮层小窗；链接仅为深度参考
+  string render_mode = 8;
+}
+
+/** 200 字以内精简攻略摘要（先于链接展示） */
+message AssistInlineSummary {
+  string text = 1;
+  uint32 max_chars = 2;
+  string source = 3; // rule | llm | hybrid
+}
+
+message AskCoachHintCsReq {
+  // 0=返回最优一条；N>0 返回最多 N 条（按优先级降序）
+  uint32 max_hints = 1;
+}
+
+message AskCoachHintScRsp {
+  int32 retcode = 1; // 0=成功 1=未登录 2=功能关闭 3=限流 4=内部错误
+  repeated CoachHint hints = 2;
+}
+
+// 输入通道：文本 / 端侧 ASR 转写后的语音
+enum AssistInputType {
+  ASSIST_INPUT_TEXT = 0;
+  ASSIST_INPUT_VOICE = 1;
+}
+
+/** AI 建议的 Auto 策略覆盖（可一键 Apply） */
+message SuggestedAutoOverride {
+  // 对应 BattleAutoTargetFocus 数值：0默认 1精英 2破盾
+  int32 target_focus = 1;
+  // 对应 BattleAutoStrategy 数值：1优先战技 2优先普攻 3攒能量
+  int32 skill_priority = 2;
+  // true=保留大招能量，不强行放大
+  bool ult_reserve = 3;
+  string reason = 4;
+  // 客户端气泡倒计时建议毫秒（默认 3000）
+  uint32 apply_countdown_ms = 5;
+  // 微观干预：下一动锁定技能 ID（战技=2 终结技=3）；0=不锁定
+  uint32 lock_next_skill_id = 6;
+  // 微观干预：锁定施法者实体 ID；0=当前行动者
+  uint32 lock_caster_entity_id = 7;
+  // true=执行一次微观干预后自动恢复 Auto 策略，无需玩家手动切出
+  bool auto_revert_after_action = 8;
+  // 战斗状态向量摘要（buff/AV/战技点等），供客户端气泡展示
+  string battle_state_summary = 9;
+}
+
+// 自然语言助手请求（方案 B，可降级到规则教练）
+message AskAiAssistCsReq {
+  string question = 1;
+  // 可选场景标签：quest / gacha / growth / activity / general / battle
+  string scene = 2;
+  // 多轮会话 ID；空则使用 default
+  string session_id = 3;
+  // 客户端语言，如 zh-CN / en-US；可与 Accept-Language 对齐
+  string locale = 4;
+  // 文本 / 语音（端侧 ASR 后仍走本通道）
+  AssistInputType input_type = 5;
+  /**
+   * 战斗多模态上下文 JSON：team/enemies/remainTurns/buffs/ultimateReady/teamHpRatio。
+   * 供本地 RL / 远程 LLM 生成定制化建议。
+   */
+  string battle_context_json = 6;
+}
+
+message AskAiAssistScRsp {
+  int32 retcode = 1; // 0=成功 1=未登录 2=功能关闭 3=限流 4=超时/降级 5=内部错误
+  string answer = 2;
+  string source = 3; // rule / llm / fallback
+  repeated CoachHint related_hints = 4;
+  repeated string cited_config_ids = 5;
+  // 合规免责声明（客户端可固定展示在对话底部）
+  string disclaimer = 6;
+  // AI 策略版本（灰度归因）
+  string strategy_version = 7;
+  string locale = 8;
+  // 异步受理时的 request_id（同步模式可空）
+  string request_id = 9;
+  // 深度参考媒体（站内 WebView；禁止默认跳出浏览器）
+  repeated AssistMediaLink media_links = 10;
+  // 精简文字攻略（优先展示；不点链接也能懂）
+  AssistInlineSummary inline_summary = 11;
+  // true=客户端必须用内置 WebView 浮层，禁止系统浏览器
+  bool forbid_external_browser = 12;
+  // 战斗场景下可一键落地的 Auto 策略
+  SuggestedAutoOverride suggested_auto_override = 13;
+  // 回显输入类型，便于埋点
+  AssistInputType input_type = 14;
+  // 角色化人设 ID（如 tingyun）
+  string persona_id = 15;
+  // 预计等待毫秒（三级漏斗：本地<100 / 缓存<50 / 远程大模型）
+  uint32 estimated_wait_ms = 16;
+  // TEAM_CARD | MATERIAL_TREE | PLAIN_TEXT
+  string render_type = 17;
+  // 结构化渲染 JSON（阵容卡牌/材料树等）
+  string render_payload_json = 18;
+}
+
+// 异步 AI 结果推送（旁路推理完成后下发）
+message AiHintNotify {
+  string request_id = 1;
+  string answer = 2;
+  string source = 3;
+  repeated CoachHint related_hints = 4;
+  string disclaimer = 5;
+  string strategy_version = 6;
+  string locale = 7;
+  repeated AssistMediaLink media_links = 8;
+  AssistInlineSummary inline_summary = 9;
+  bool forbid_external_browser = 10;
+  /** stamina_overflow | coach | llm | proactive_scene_stay | persona_tts */
+  string hint_type = 11;
+  // 角色声线 OPUS 音频块（16kbps）；空=仅文本
+  bytes audio_chunk = 12;
+  string voice_persona_id = 13;
+  string audio_format = 14; // opus
+  SuggestedAutoOverride suggested_auto_override = 15;
+  uint32 estimated_wait_ms = 16;
+  string render_type = 17;
+  string render_payload_json = 18;
+}
+
+// ---------- 方案 D：战斗战术提示 ----------
+message AskBattleHintCsReq {
+  uint64 battle_id = 1;
+  uint32 actor_entity_id = 2;
+}
+
+message AskBattleHintScRsp {
+  int32 retcode = 1; // 0成功 1未登录 2功能关闭 3战局无效 4无建议
+  uint64 battle_id = 2;
+  uint32 suggested_skill_id = 3;
+  repeated uint32 suggested_target_ids = 4;
+  string reason = 5;
+  // 弱点与换人时机（只读建议）
+  string weakness_advice = 6;
+  string switch_advice = 7;
+  // 可一键落地的 Auto 策略（客户端弹「执行 AI 策略」气泡）
+  SuggestedAutoOverride suggested_auto_override = 8;
+  // 战斗状态向量摘要（注入 Prompt 的快照）
+  string battle_state_summary = 9;
+  uint32 estimated_wait_ms = 10;
+}
+
+/** 一键采纳 AI Auto 策略（CmdId 1101） */
+message ApplyAiSuggestionCsReq {
+  uint64 battle_id = 1;
+  SuggestedAutoOverride override = 2;
+  bool enable_auto = 3; // true=同时开启 Auto
+}
+
+message ApplyAiSuggestionScRsp {
+  int32 retcode = 1; // 0成功 1未登录 2功能关闭 3战局无效 4策略非法
+  uint64 battle_id = 2;
+  bool auto_enabled = 3;
+  SuggestedAutoOverride applied = 4;
+}
+
+// ---------- 屏幕级视觉理解（VLM） ----------
+message UploadScreenshotCsReq {
+  // JPEG 压缩截图，建议 ≤50KB
+  bytes jpeg_bytes = 1;
+  uint32 plane_id = 2;
+  uint32 floor_id = 3;
+  float pos_x = 4;
+  float pos_y = 5;
+  float pos_z = 6;
+  string question = 7; // 可选：结合画面提问
+  string locale = 8;
+}
+
+message UploadScreenshotScRsp {
+  int32 retcode = 1; // 0受理 1未登录 2关闭 3限流 4过大/非法 5错误
+  string request_id = 2;
+  string answer = 3; // 同步模式下直接返回解读
+  string source = 4; // vlm-local / vlm-remote / heuristic
+}
+
+/** 世界空间锚点（多步骤机关指引链中的单点） */
+message AssistSpatialAnchor {
+  uint32 sequence_step = 1; // 顺序标号 1→2→3
+  float world_x = 2;
+  float world_y = 3;
+  float world_z = 4;
+  float screen_x = 5; // 归一化 0~1，可选屏幕投影
+  float screen_y = 6;
+  string direction_hint = 7; // 如「左边花坛后」
+  string label = 8;
+  string color_hex = 9;
+}
+
+/** 多步骤空间锚点链（机关按序激活） */
+message AssistSpatialAnchorChain {
+  string chain_id = 1;
+  string title = 2;
+  repeated AssistSpatialAnchor anchors = 3;
+}
+
+/** 屏幕叠加半透明 AR 提示（箭头/高亮圈） */
+message AssistVisualOverlay {
+  // arrow | highlight_circle | label
+  string kind = 1;
+  float screen_x = 2; // 归一化 0~1
+  float screen_y = 3;
+  float radius = 4;
+  float arrow_dir_deg = 5;
+  string label = 6;
+  string color_hex = 7;
+  uint32 sequence_step = 8;
+  float world_x = 9;
+  float world_y = 10;
+  float world_z = 11;
+  string direction_hint = 12;
+}
+
+message AssistVisualHintScNotify {
+  string request_id = 1;
+  string answer = 2;
+  string source = 3;
+  repeated AssistVisualOverlay overlays = 4;
+  uint32 plane_id = 5;
+  uint32 floor_id = 6;
+  string persona_id = 7;
+  bytes audio_chunk = 8;
+  string audio_format = 9;
+  repeated AssistSpatialAnchorChain anchor_chains = 10;
+  uint32 estimated_wait_ms = 11;
+}
+
+/** 到达后自动打开二级 UI（合成/强化/抽卡等） */
+message AssistDeepLinkScNotify {
+  string action = 1; // OPEN_SYNTH / OPEN_RELIC_UPGRADE / OPEN_GACHA / OPEN_CLAIM / OPEN_LIGHT_CONE
+  uint32 ref_id = 2;
+  string title = 3;
+  string source = 4; // ai_assist_ui
+  // 建议延迟毫秒：先导航再开 UI
+  uint32 delay_ms = 5;
+  string route_id = 6;
+}
+
+// ---------- 方案 E：端侧攻略包 ----------
+message GuideFaqEntry {
+  string id = 1;
+  string question = 2;
+  string answer = 3;
+  string scene = 4;
+}
+
+message GuidePackInfo {
+  string version = 1;
+  string locale = 2;
+  string download_url = 3;
+  string content_hash = 4;
+  uint64 size = 5;
+  repeated GuideFaqEntry faqs = 6;
+}
+
+message GetGuidePackCsReq {
+  string locale = 1;
+  string client_version = 2;
+}
+
+message GetGuidePackScRsp {
+  int32 retcode = 1;
+  GuidePackInfo pack = 2;
+}
+
+message GuidePackUpdateScNotify {
+  GuidePackInfo pack = 1;
+}
+
+// ---------- P3：用户反馈闭环 ----------
+message AssistFeedbackCsReq {
+  string request_id = 1;
+  bool useful = 2;
+  // inaccurate / outdated / offensive / gacha_inducement / other
+  string reason_code = 3;
+}
+
+message AssistFeedbackScRsp {
+  int32 retcode = 1; // 0成功 1未登录 2功能关闭 3限流 5内部错误
+}
+
+// ---------- P3：已拥有角色阵容推荐 ----------
+message AskLineupRecommendCsReq {
+  // 推荐槽位数，0=默认 4
+  uint32 max_slots = 1;
+  string scene = 2; // meta / challenge / general
+  // 当前敌人标签（如 ice_weak / armor），用于克制加权；可空
+  repeated string enemy_tags = 3;
+}
+
+message AskLineupRecommendScRsp {
+  int32 retcode = 1;
+  repeated uint32 avatar_ids = 2;
+  string reason = 3;
+  repeated CoachHint related_hints = 4;
+}
+
+// ---------- 智能探索：路径标记与沿途资源 ----------
+message AskExplorePathCsReq {
+  uint32 quest_id = 1;
+  uint32 scene_id = 2;
+}
+
+message ExploreWaypoint {
+  float x = 1;
+  float y = 2;
+  float z = 3;
+  string label = 4;
+  string marker_type = 5; // quest / resource / objective
+}
+
+message AskExplorePathScRsp {
+  int32 retcode = 1; // 0成功 1未登录 2功能关闭 3限流 4无路线
+  string route_id = 2;
+  string title = 3;
+  repeated ExploreWaypoint waypoints = 4;
+  repeated string resource_hints = 5;
+  string summary = 6;
+}
+
+// ---------- 个性化任务渐进提示 ----------
+message AskQuestGuidanceCsReq {
+  string question = 1; // 可选：迷路/卡关描述
+}
+
+message AskQuestGuidanceScRsp {
+  int32 retcode = 1;
+  uint32 quest_id = 2;
+  uint32 stage = 3;
+  string title = 4;
+  string message = 5;
+  string source = 6;
+}
+
+// ---------- 环境解说推送（经过遗迹/特殊地形） ----------
+message EnvironmentNarrationScNotify {
+  string poi_id = 1;
+  string title = 2;
+  string message = 3;
+  string source = 4; // poi-rule
+}
+
+// ---------- 语音输入埋点回执（可选，Ask 已含 input_type） ----------
+message AssistVoiceUsageScNotify {
+  string request_id = 1;
+  bool quota_discounted = 2;
+  uint32 remaining_voice_bonus = 3;
+}

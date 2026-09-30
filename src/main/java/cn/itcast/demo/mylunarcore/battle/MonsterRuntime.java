@@ -10,6 +10,8 @@ public class MonsterRuntime {
     private final int level; // 怪物等级
     private final int maxHp; // 最大生命值
     private int hp; // 当前生命值（战斗中可变）
+    /** 战斗内唯一实体 ID（与配置 ID 分离）；未绑定时为 0。 */
+    private int runtimeEntityId;
 
     /**
      * 创建满血怪物运行时实例。
@@ -24,6 +26,15 @@ public class MonsterRuntime {
     /** 返回配置怪物 ID。 */
     public int getConfigMonsterId() { // 获取配置 ID
         return configMonsterId; // 返回 configMonsterId
+    }
+
+    /** 战斗运行时实体 ID；未绑定前回退为配置 ID（兼容旧查找）。 */
+    public int getRuntimeEntityId() {
+        return runtimeEntityId > 0 ? runtimeEntityId : configMonsterId;
+    }
+
+    public void bindRuntimeEntityId(int runtimeEntityId) {
+        this.runtimeEntityId = runtimeEntityId;
     }
 
     /** 返回怪物等级。 */

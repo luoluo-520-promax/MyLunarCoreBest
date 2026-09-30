@@ -1,0 +1,245 @@
+syntax = "proto3";
+
+package cn.itcast.demo.mylunarcore.proto;
+
+option java_package = "cn.itcast.demo.mylunarcore.protocol";
+option java_outer_classname = "HallSystemProto";
+
+message FriendInfo {
+  uint32 player_id = 1;
+  string nickname = 2;
+  uint32 level = 3;
+  uint32 status = 4;
+  string remark = 5;
+}
+
+message GetFriendListCsReq {}
+
+message GetFriendListScRsp {
+  int32 retcode = 1;
+  repeated FriendInfo friends = 2;
+}
+
+/** 跨节点好友上线：仅订阅关系推送，含当前 Plane */
+message FriendOnlineNotify {
+  uint32 friend_player_id = 1;
+  bool online = 2;
+  uint32 plane_id = 3;
+  uint32 floor_id = 4;
+  int64 at_ms = 5;
+  string custom_status = 6;    // ONLINE | BUSY | ABYSS | DND | PARTY 等
+  string status_message = 7;   // 心情/短状态文案
+  string equipped_title = 8;   // 当前装备称号展示名
+}
+
+message SendFriendRequestCsReq {
+  uint32 target_player_id = 1;
+  string remark = 2;
+}
+
+message SendFriendRequestScRsp {
+  int32 retcode = 1;
+  uint32 target_player_id = 2;
+}
+
+message RespondFriendRequestCsReq {
+  uint32 requester_player_id = 1;
+  bool accept = 2;
+}
+
+message RespondFriendRequestScRsp {
+  int32 retcode = 1;
+  uint32 requester_player_id = 2;
+}
+
+message MailAttachment {
+  uint32 item_id = 1;
+  uint32 count = 2;
+  uint32 currency_id = 3;
+  uint32 currency_amount = 4;
+}
+
+message MailInfo {
+  uint64 mail_id = 1;
+  string title = 2;
+  string content = 3;
+  uint32 status = 4;
+  repeated MailAttachment attachments = 5;
+  uint64 send_time = 6;
+  uint64 expire_time = 7;
+}
+
+message GetMailListCsReq {
+  uint32 page = 1;
+  uint32 page_size = 2;
+}
+
+message GetMailListScRsp {
+  int32 retcode = 1;
+  repeated MailInfo mails = 2;
+  uint32 total_count = 3;
+}
+
+message ClaimMailCsReq {
+  uint64 mail_id = 1;
+}
+
+message ClaimMailScRsp {
+  int32 retcode = 1;
+  uint64 mail_id = 2;
+  repeated MailAttachment claimed = 3;
+}
+
+message LeaderboardEntry {
+  uint32 rank = 1;
+  uint32 player_id = 2;
+  string nickname = 3;
+  int64 score = 4;
+}
+
+message GetLeaderboardCsReq {
+  uint32 board_type = 1;
+  uint32 top_n = 2;
+}
+
+message GetLeaderboardScRsp {
+  int32 retcode = 1;
+  uint32 board_type = 2;
+  repeated LeaderboardEntry entries = 3;
+}
+
+message FriendListUpdateScNotify {
+  repeated FriendInfo friends = 1;
+}
+
+message MailUpdateScNotify {
+  repeated MailInfo new_mails = 1;
+}
+
+message ChatMessage {
+  uint32 channel_type = 1;
+  uint32 sender_id = 2;
+  string sender_name = 3;
+  uint32 target_id = 4;
+  string content = 5;
+  uint64 send_time = 6;
+  uint32 emote_id = 7; // 0=纯文本
+}
+
+message EmoteItem {
+  uint32 emote_id = 1;
+  string name = 2;
+  string anim_id = 3;
+  bool sticker = 4; // true=静态贴纸，false=角色动画
+  bool owned = 5;
+}
+
+message GetEmoteInventoryCsReq {}
+
+message GetEmoteInventoryScRsp {
+  int32 retcode = 1;
+  repeated EmoteItem emotes = 2;
+}
+
+message SendChatEmoteCsReq {
+  uint32 channel_type = 1;
+  uint32 target_id = 2;
+  uint32 emote_id = 3;
+}
+
+message SendChatEmoteScRsp {
+  int32 retcode = 1; // 0成功 1未登录 2未拥有 3频道非法
+  uint32 emote_id = 2;
+}
+
+message ChatEmoteScNotify {
+  ChatMessage message = 1;
+  uint32 emote_id = 2;
+  string anim_id = 3;
+  bool sticker = 4;
+}
+
+message SendChatCsReq {
+  uint32 channel_type = 1;
+  uint32 target_id = 2;
+  string content = 3;
+}
+
+message SendChatScRsp {
+  int32 retcode = 1;
+}
+
+message ChatMessageScNotify {
+  ChatMessage message = 1;
+}
+
+message GetChatHistoryCsReq {
+  uint32 channel_type = 1;
+  uint32 target_id = 2;
+  uint32 limit = 3;
+}
+
+message GetChatHistoryScRsp {
+  int32 retcode = 1;
+  repeated ChatMessage messages = 2;
+}
+
+// ---------- 组队（开放世界 Party，与 Match Room 分离） ----------
+message PartyMemberInfo {
+  uint64 player_uid = 1;
+  bool is_leader = 2;
+}
+
+message PartyInfo {
+  string party_id = 1;
+  uint64 leader_uid = 2;
+  repeated PartyMemberInfo members = 3;
+}
+
+message CreatePartyCsReq {}
+
+message CreatePartyScRsp {
+  int32 retcode = 1;
+  PartyInfo party = 2;
+}
+
+message InvitePartyCsReq {
+  uint64 target_uid = 1;
+}
+
+message InvitePartyScRsp {
+  int32 retcode = 1;
+  PartyInfo party = 2;
+}
+
+message LeavePartyCsReq {}
+
+message LeavePartyScRsp {
+  int32 retcode = 1;
+  PartyInfo party = 2;
+}
+
+message DisbandPartyCsReq {}
+
+message DisbandPartyScRsp {
+  int32 retcode = 1;
+}
+
+message GetPartyInfoCsReq {}
+
+message GetPartyInfoScRsp {
+  int32 retcode = 1;
+  PartyInfo party = 2;
+}
+
+/** 跨节点组队跟随迁移：队员临时场景实体序列化至队长节点 */
+message PartyFollowMigrateScNotify {
+  string party_id = 1;
+  uint64 leader_uid = 2;
+  uint64 member_uid = 3;
+  string target_node_id = 4;
+  uint32 target_plane_id = 5;
+  uint32 target_floor_id = 6;
+  string migrate_ticket = 7;
+  string reason = 8; // follow_invite
+}

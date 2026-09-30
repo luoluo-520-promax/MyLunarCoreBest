@@ -1,0 +1,112 @@
+{
+  "version": 1,
+  "exploreRoutes": [
+    {
+      "routeId": "quest_main_demo",
+      "questId": 10001,
+      "sceneId": 1,
+      "title": "主线示范路线",
+      "waypoints": [
+        {"x": 10.0, "y": 0.0, "z": 5.0, "label": "任务起点", "markerType": "quest"},
+        {"x": 28.0, "y": 0.0, "z": 18.0, "label": "中途补给点", "markerType": "resource"},
+        {"x": 45.0, "y": 0.0, "z": 30.0, "label": "目标区域", "markerType": "objective"}
+      ],
+      "resourceHints": [
+        {"itemHint": "沿途可采集星尘矿", "nearWaypointIndex": 1},
+        {"itemHint": "遗迹门口常有调查道具", "nearWaypointIndex": 2}
+      ]
+    }
+  ],
+  "pois": [
+    {
+      "poiId": "ruins_alpha",
+      "sceneId": 1,
+      "tags": ["ruins", "ancient", "puzzle"],
+      "centerX": 40.0,
+      "centerY": 0.0,
+      "centerZ": 25.0,
+      "radius": 12.0,
+      "title": "古代星轨遗迹",
+      "loreShort": "这里曾是观星者观测星轨的祭坛。",
+      "puzzleHint": "石板上的符文顺序与天上星座方向一致。",
+      "persona": "星轨学者"
+    },
+    {
+      "poiId": "marsh_edge",
+      "sceneId": 1,
+      "tags": ["special_terrain", "marsh"],
+      "centerX": 15.0,
+      "centerY": 0.0,
+      "centerZ": 8.0,
+      "radius": 8.0,
+      "title": "雾沼边缘",
+      "loreShort": "雾沼里的潮气会削弱火系攻击。",
+      "puzzleHint": "",
+      "persona": "旅人向导"
+    }
+  ],
+  "enemyWeaknesses": [
+    {
+      "monsterId": 101,
+      "name": "迅捷虫",
+      "tags": ["beast", "fast"],
+      "weakTags": ["ice", "slow"],
+      "resistTags": ["physical"],
+      "strategyHint": "优先控场再集火，避免被多段普攻压低血线。",
+      "switchWhenHpBelow": 0.35
+    },
+    {
+      "monsterId": 102,
+      "name": "坚盾卫",
+      "tags": ["armor", "elite"],
+      "weakTags": ["break", "quantum"],
+      "resistTags": ["ice"],
+      "strategyHint": "先破盾再爆发；残血阶段注意反击。",
+      "switchWhenHpBelow": 0.45
+    }
+  ],
+  "avatarCounterTags": {
+    "1001": ["ice", "slow"],
+    "1002": ["break", "quantum"],
+    "1003": ["heal", "sustain"]
+  },
+  "loreEntries": [
+    {
+      "id": "char_trailblazer",
+      "type": "character",
+      "name": "开拓者",
+      "aliases": ["主角", "开拓者", "旅人"],
+      "persona": "列车长",
+      "summary": "穿越诸世界的旅人，肩负连接星轨的使命。",
+      "detail": "开拓者以星穹列车为家，穿梭于各势力之间，记录尚未写完的历史。"
+    },
+    {
+      "id": "faction_astral",
+      "type": "faction",
+      "name": "星轨同盟",
+      "aliases": ["同盟", "星轨", "观星者"],
+      "persona": "星轨学者",
+      "summary": "致力于守护星轨观测站的学术与防卫同盟。",
+      "detail": "同盟主张以观测与记录对抗遗忘，遗迹中的符文多出自其先贤手笔。"
+    },
+    {
+      "id": "hist_first_eclipse",
+      "type": "history",
+      "name": "首次蚀日",
+      "aliases": ["蚀日", "第一次蚀日", "黑日"],
+      "persona": "史官",
+      "summary": "星轨短暂熄灭的灾变纪年。",
+      "detail": "首次蚀日令多处遗迹封印松动，此后探险者才得以重入古代祭坛。"
+    }
+  ],
+  "questHintLadders": [
+    {
+      "questId": 10001,
+      "stages": [
+        {"stage": 1, "title": "方向提示", "message": "沿着主路向东，留意发光符文的方向。"},
+        {"stage": 2, "title": "目标提示", "message": "你需要抵达古代星轨遗迹附近并调查祭坛。"},
+        {"stage": 3, "title": "行动提示", "message": "与遗迹中的调查点交互，完成当前任务目标。"}
+      ]
+    }
+  ]
+}

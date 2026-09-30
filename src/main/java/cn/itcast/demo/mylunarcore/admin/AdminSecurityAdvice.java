@@ -80,6 +80,11 @@ public class AdminSecurityAdvice {
         return build(HttpStatus.UNAUTHORIZED, "invalid_credentials", "用户名或密码错误", request.getRequestURI());
     }
 
+    @ExceptionHandler(AccountLockedException.class)
+    public ResponseEntity<Map<String, Object>> accountLocked(AccountLockedException ex, HttpServletRequest request) {
+        return build(HttpStatus.TOO_MANY_REQUESTS, "locked", "登录失败次数过多，账号已临时锁定", request.getRequestURI());
+    }
+
     /**
      * 处理账号被禁用场景。
      *

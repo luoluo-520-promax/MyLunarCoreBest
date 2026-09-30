@@ -1,0 +1,391 @@
+syntax = "proto3";
+
+option java_package = "cn.itcast.demo.mylunarcore.protocol";
+option java_outer_classname = "QolSocialSystemProto";
+
+// 体验/社交缺口补齐协议（CmdId 1200–1247）
+
+// ---------- 1. 一键领取日常奖励 ----------
+message ClaimAllDailyRewardsCsReq {}
+
+message ClaimedRewardSummary {
+  string module = 1;          // daily_mission | battle_pass | mail | achievement | sign_in
+  int32 success_count = 2;
+  int32 skip_count = 3;
+  string detail = 4;
+}
+
+message ClaimAllDailyRewardsScRsp {
+  int32 retcode = 1;
+  repeated ClaimedRewardSummary summaries = 2;
+  int32 total_claimed = 3;
+}
+
+// ---------- 2. 区域探索度 / 收集品 ----------
+message ExplorationCollectable {
+  string collect_id = 1;
+  string kind = 2;            // chest | puzzle | viewpoint | book | other
+  string name = 3;
+  bool collected = 4;
+}
+
+message GetExplorationInfoCsReq {
+  int32 plane_id = 1;
+  int32 floor_id = 2;
+}
+
+message GetExplorationInfoScRsp {
+  int32 retcode = 1;
+  int32 plane_id = 2;
+  int32 floor_id = 3;
+  int32 collected = 4;
+  int32 total = 5;
+  int32 progress_percent = 6;
+  repeated ExplorationCollectable collectables = 7;
+}
+
+message ExplorationUpdateScNotify {
+  int32 plane_id = 1;
+  int32 floor_id = 2;
+  string collect_id = 3;
+  string kind = 4;
+  int32 collected = 5;
+  int32 total = 6;
+  int32 progress_percent = 7;
+  /** 隐藏收集品达到阈值时解锁的区域叙事文本 key */
+  string lore_text_key = 8;
+  bool lore_unlocked = 9;
+  int32 owned_collectibles = 10;
+}
+
+// ---------- 3. 个人签名 / 自定义状态 ----------
+message SetPlayerStatusCsReq {
+  string signature = 1;
+  string status_message = 2;
+  string custom_status = 3;   // ONLINE | BUSY | ABYSS | DND | PARTY | 自定义
+}
+
+message SetPlayerStatusScRsp {
+  int32 retcode = 1;
+  string signature = 2;
+  string status_message = 3;
+  string custom_status = 4;
+}
+
+message GetPlayerProfileDetailCsReq {
+  uint32 target_player_id = 1; // 0=自己
+}
+
+message GetPlayerProfileDetailScRsp {
+  int32 retcode = 1;
+  uint32 player_id = 2;
+  string nickname = 3;
+  int32 level = 4;
+  string signature = 5;
+  string status_message = 6;
+  string custom_status = 7;
+  bool online = 8;
+  string equipped_title = 9;
+  string title_id = 10;
+}
+
+// ---------- 4. 举报 / 屏蔽 ----------
+message ReportPlayerCsReq {
+  uint32 target_player_id = 1;
+  string scene = 2;           // chat | scene | battle
+  string evidence_type = 3;   // text | timestamp
+  string evidence = 4;
+  string reason = 5;
+}
+
+message ReportPlayerScRsp {
+  int32 retcode = 1;
+  int64 report_id = 2;
+}
+
+message BlockPlayerCsReq {
+  uint32 target_player_id = 1;
+  bool unblock = 2;
+}
+
+message BlockPlayerScRsp {
+  int32 retcode = 1;
+  uint32 target_player_id = 2;
+  bool blocked = 3;
+}
+
+message ReportResultScNotify {
+  int64 report_id = 1;
+  string result = 2;          // warned | muted | banned | dismissed
+  string note = 3;
+}
+
+// ---------- 5. 回流活动 ----------
+message ReturnActivityScNotify {
+  int32 activity_id = 1;
+  int32 offline_days = 2;
+  int64 expire_at_ms = 3;
+  string title = 4;
+  string bonus_desc = 5;
+}
+
+// ---------- 6. 战斗录像分享 ----------
+message ShareBattleReplayCsReq {
+  string battle_id = 1;
+  uint32 target_friend_id = 2; // 0=仅生成分享码
+  bool to_guild = 3;
+}
+
+message ShareBattleReplayScRsp {
+  int32 retcode = 1;
+  string share_code = 2;
+  int64 expire_at_ms = 3;
+}
+
+message GetSharedReplayCsReq {
+  string share_code = 1;
+}
+
+message GetSharedReplayScRsp {
+  int32 retcode = 1;
+  string battle_id = 2;
+  uint32 owner_player_id = 3;
+  bytes replay_payload = 4;
+  int64 expire_at_ms = 5;
+}
+
+message GuildReplayScNotify {
+  string share_code = 1;
+  uint32 from_player_id = 2;
+  string battle_id = 3;
+  string nickname = 4;
+}
+
+// ---------- 7. 每日挑战次数提醒 ----------
+message ChallengeRemainEntry {
+  string module = 1;          // world_boss | abyss | guild_war | challenge
+  int32 remaining = 2;
+  int32 limit = 3;
+}
+
+message DailyChallengeReminderScNotify {
+  repeated ChallengeRemainEntry entries = 1;
+  string day = 2;
+}
+
+message SetDailyReminderPrefCsReq {
+  bool enabled = 1;
+  repeated string disabled_modules = 2;
+}
+
+message SetDailyReminderPrefScRsp {
+  int32 retcode = 1;
+  bool enabled = 2;
+}
+
+// ---------- 8. 自定义表情上传 ----------
+message UploadCustomEmoteCsReq {
+  bytes image_data = 1;
+  string content_type = 2;    // image/png | image/webp
+  string name = 3;
+}
+
+message UploadCustomEmoteScRsp {
+  int32 retcode = 1;
+  int32 custom_emote_id = 2;
+  string review_status = 3;   // pending | approved | rejected
+}
+
+// ---------- 9. 月卡 / 补签 ----------
+message MonthlyCardScNotify {
+  string card_kind = 1;
+  bool active = 2;
+  int32 remaining_days = 3;
+  bool granted_today = 4;
+  int32 currency_id = 5;
+  int32 currency_amt = 6;
+  int32 stamina_amt = 7;
+}
+
+message MakeupSignInCsReq {
+  int32 activity_id = 1;
+  string miss_day = 2;        // yyyy-MM-dd
+  int32 cost_item_id = 3;
+}
+
+message MakeupSignInScRsp {
+  int32 retcode = 1;
+  string miss_day = 2;
+  bool compensated = 3;
+}
+
+// ---------- 10. 好友/公会模糊搜索 / 最近联系人 ----------
+message PlayerSearchHit {
+  uint32 player_id = 1;
+  string nickname = 2;
+  int32 level = 3;
+  bool online = 4;
+  string custom_status = 5;
+}
+
+message SearchPlayersCsReq {
+  string query = 1;           // 名称前缀或 UID 后缀
+  int32 page = 2;
+  int32 page_size = 3;
+}
+
+message SearchPlayersScRsp {
+  int32 retcode = 1;
+  repeated PlayerSearchHit hits = 2;
+  int32 total = 3;
+}
+
+message GuildSearchHit {
+  uint32 guild_id = 1;
+  string name = 2;
+  int32 level = 3;
+  int32 member_count = 4;
+}
+
+message SearchGuildsCsReq {
+  string query = 1;
+  int32 page = 2;
+  int32 page_size = 3;
+}
+
+message SearchGuildsScRsp {
+  int32 retcode = 1;
+  repeated GuildSearchHit hits = 2;
+  int32 total = 3;
+}
+
+message GetRecentPlayersCsReq {
+  int32 limit = 1;
+}
+
+message GetRecentPlayersScRsp {
+  int32 retcode = 1;
+  repeated PlayerSearchHit players = 2;
+}
+
+// ---------- 11. 称号 ----------
+message TitleEntry {
+  string title_id = 1;
+  string name = 2;
+  string source_achievement = 3;
+  bool unlocked = 4;
+  bool equipped = 5;
+}
+
+message GetTitleListCsReq {}
+
+message GetTitleListScRsp {
+  int32 retcode = 1;
+  repeated TitleEntry titles = 2;
+  string equipped_title_id = 3;
+}
+
+message EquipTitleCsReq {
+  string title_id = 1;        // 空=卸下
+}
+
+message EquipTitleScRsp {
+  int32 retcode = 1;
+  string title_id = 2;
+  string display_name = 3;
+}
+
+// ---------- 12. 组队一键邀请 ----------
+message InviteFriendsToPartyCsReq {
+  repeated uint32 target_uids = 1;
+}
+
+message InviteFriendsToPartyScRsp {
+  int32 retcode = 1;
+  int32 invited = 2;
+  int32 skipped = 3;
+}
+
+message InviteGuildMembersCsReq {
+  int32 max_count = 1;
+}
+
+message InviteGuildMembersScRsp {
+  int32 retcode = 1;
+  int32 invited = 2;
+  int32 skipped = 3;
+}
+
+message PartyInviteScNotify {
+  string party_id = 1;
+  uint32 from_player_id = 2;
+  string from_nickname = 3;
+  int64 at_ms = 4;
+}
+
+// ---------- 13. 活动即将结束提醒 ----------
+message ActivityEndingSoonScNotify {
+  int32 activity_id = 1;
+  string title = 2;
+  int64 remain_ms = 3;
+  bool urgent = 4;            // true=结束前1小时
+  bool has_unclaimed = 5;
+}
+
+// ---------- 14. 保底计数 / 消费历史导出 ----------
+message GachaGuaranteeEntry {
+  int32 banner_type = 1;
+  string banner_name = 2;
+  int32 pity5 = 3;
+  int32 pity4 = 4;
+  int32 remain_to_hard5 = 5;
+  int32 failed_up_count = 6;
+  bool soft_guarantee5 = 7;
+  /** UP 角色当前命座层（character_id → layer） */
+  map<int32, int32> up_constellation_layers = 8;
+}
+
+message GetGachaGuaranteeInfoCsReq {
+  int32 banner_type = 1;      // 0=全部
+}
+
+message GetGachaGuaranteeInfoScRsp {
+  int32 retcode = 1;
+  repeated GachaGuaranteeEntry entries = 2;
+}
+
+message ExportTransactionHistoryCsReq {
+  string kind = 1;            // gacha | shop | all
+  int32 days = 2;             // 默认30
+}
+
+message ExportTransactionHistoryScRsp {
+  int32 retcode = 1;
+  string mail_hint = 2;
+  int32 record_count = 3;
+}
+
+/** 机关解谜完成：奖励 + 隐藏门/宝箱坐标 */
+message ScenePuzzleCompleteScNotify {
+  uint32 puzzle_id = 1;
+  uint32 reward_id = 2;
+  float hidden_door_x = 3;
+  float hidden_door_y = 4;
+  float hidden_door_z = 5;
+  string zone_id = 6;
+}
+
+/** 新小玩法上线提醒 */
+message NewMiniGameScNotify {
+  string mini_game_id = 1;
+  string display_name = 2;
+  string tutorial_anim_url = 3;
+}
+
+/** 活动高分 / Top10 分享建议 */
+message ActivityHighScoreScNotify {
+  string mini_game_id = 1;
+  int64 score = 2;
+  bool personal_high = 3;
+  bool top10 = 4;
+}

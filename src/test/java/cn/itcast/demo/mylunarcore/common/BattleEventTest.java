@@ -9,11 +9,29 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+/**
+ * 战斗生命周期事件测试。
+ * <p>
+ * 针对相关生产代码的单元/切片测试类 {@code BattleEventTest}：
+ * 通过 fixture、mock 与断言覆盖关键成功路径、失败码与状态边界。
+ */
 @DisplayName("战斗生命周期事件测试")
 class BattleEventTest {
 
     private static final Logger log = LoggerFactory.getLogger(BattleEventTest.class);
 
+    /**
+     * 验证点：BattleStartedEvent 应保存战斗开始快照。
+     * <p>测试方法 {@code battleStartedEventShouldExposeFields}：
+     * <ul>
+     *   <li>{@code assertEquals(9001L, event.battleId());}</li>
+     *   <li>{@code assertEquals(77, event.playerId());}</li>
+     *   <li>{@code assertEquals(1001, event.battleStageId());}</li>
+     *   <li>{@code assertEquals(1, event.lineupId());}</li>
+     *   <li>{@code assertEquals(2, event.waveCount());}</li>
+     *   <li>{@code assertEquals(1_700_000_000L, event.startTimeSeconds());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("BattleStartedEvent 应保存战斗开始快照")
     void battleStartedEventShouldExposeFields() {
@@ -30,6 +48,17 @@ class BattleEventTest {
         assertEquals(1_700_000_000L, event.startTimeSeconds());
     }
 
+    /**
+     * 验证点：BattleEndedEvent 应保存战斗结束快照。
+     * <p>测试方法 {@code battleEndedEventShouldExposeFields}：
+     * <ul>
+     *   <li>{@code assertEquals(9001L, event.battleId());}</li>
+     *   <li>{@code assertEquals(77, event.playerId());}</li>
+     *   <li>{@code assertEquals(1, event.endStatus());}</li>
+     *   <li>{@code assertEquals("victory", event.reason());}</li>
+     *   <li>{@code assertEquals(1_700_000_100L, event.endTimeSeconds());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("BattleEndedEvent 应保存战斗结束快照")
     void battleEndedEventShouldExposeFields() {

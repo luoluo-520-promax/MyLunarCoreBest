@@ -11,6 +11,12 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+/**
+ * SceneManager 场景运行时索引测试。
+ * <p>
+ * 针对相关生产代码的单元/切片测试类 {@code SceneManagerTest}：
+ * 通过 fixture、mock 与断言覆盖关键成功路径、失败码与状态边界。
+ */
 @DisplayName("SceneManager 场景运行时索引测试")
 class SceneManagerTest {
 
@@ -28,6 +34,17 @@ class SceneManagerTest {
                 PLAYER_UID, SceneTestFixtures.PLANE_ID, SceneTestFixtures.FLOOR_ID);
     }
 
+    /**
+     * 验证点：put/get 应正确缓存与读取场景上下文。
+     * <p>测试方法 {@code putAndGetShouldStoreContext}：
+     * <ul>
+     *   <li>{@code assertNotNull(loaded);}</li>
+     *   <li>{@code assertEquals(PLAYER_UID, loaded.getPlayerUid());}</li>
+     *   <li>{@code assertEquals(SceneTestFixtures.PLANE_ID, loaded.getPlaneId());}</li>
+     *   <li>{@code assertEquals(SceneTestFixtures.FLOOR_ID, loaded.getFloorId());}</li>
+     *   <li>{@code assertEquals(1000001, loaded.getMonster(1000001).getEntityId());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("put/get 应正确缓存与读取场景上下文")
     void putAndGetShouldStoreContext() {
@@ -45,6 +62,15 @@ class SceneManagerTest {
         assertEquals(1000001, loaded.getMonster(1000001).getEntityId());
     }
 
+    /**
+     * 验证点：put 应覆盖玩家已有场景上下文。
+     * <p>测试方法 {@code putShouldReplaceExistingContext}：
+     * <ul>
+     *   <li>{@code assertNotNull(loaded);}</li>
+     *   <li>{@code assertEquals(second, loaded);}</li>
+     *   <li>{@code assertTrue(loaded.isInitialized());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("put 应覆盖玩家已有场景上下文")
     void putShouldReplaceExistingContext() {
@@ -61,6 +87,14 @@ class SceneManagerTest {
         assertTrue(loaded.isInitialized());
     }
 
+    /**
+     * 验证点：remove 应释放玩家场景上下文。
+     * <p>测试方法 {@code removeShouldDropContext}：
+     * <ul>
+     *   <li>{@code assertNotNull(manager.getByPlayerUid(PLAYER_UID));}</li>
+     *   <li>{@code assertNull(afterRemove);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("remove 应释放玩家场景上下文")
     void removeShouldDropContext() {
@@ -74,6 +108,13 @@ class SceneManagerTest {
         assertNull(afterRemove);
     }
 
+    /**
+     * 验证点：查询未进场景的玩家应返回 null。
+     * <p>测试方法 {@code getMissingUidShouldReturnNull}：
+     * <ul>
+     *   <li>{@code assertNull(missing);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("查询未进场景的玩家应返回 null")
     void getMissingUidShouldReturnNull() {

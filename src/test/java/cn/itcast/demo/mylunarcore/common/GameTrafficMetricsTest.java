@@ -8,6 +8,12 @@ import org.slf4j.LoggerFactory;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+/**
+ * GameTrafficMetrics 协议吞吐计数测试。
+ * <p>
+ * 针对相关生产代码的单元/切片测试类 {@code GameTrafficMetricsTest}：
+ * 通过 fixture、mock 与断言覆盖关键成功路径、失败码与状态边界。
+ */
 @DisplayName("GameTrafficMetrics 协议吞吐计数测试")
 class GameTrafficMetricsTest {
 
@@ -21,6 +27,14 @@ class GameTrafficMetricsTest {
         log.info("吞吐计数器初始化: initialCount={}", metrics.getPacketsHandled());
     }
 
+    /**
+     * 验证点：recordPacketHandled 应原子递增计数。
+     * <p>测试方法 {@code recordPacketHandledShouldIncrementCounter}：
+     * <ul>
+     *   <li>{@code assertEquals(0L, before);}</li>
+     *   <li>{@code assertEquals(3L, after);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("recordPacketHandled 应原子递增计数")
     void recordPacketHandledShouldIncrementCounter() {

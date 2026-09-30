@@ -1,0 +1,21 @@
+# 轻量 Compose：仅 AI 旁路（实验性）。生产仍以单体为准。
+# docker compose -f microservices/docker-compose.ai-assist.yml up -d
+services:
+  ai-assist-service:
+    build:
+      context: ..
+      dockerfile: microservices/services/ai-assist-service/Dockerfile
+    image: mylunarcore/ai-assist-service:local
+    ports:
+      - "18083:18083"
+    environment:
+      AI_ASSIST_INTERNAL_TOKEN: ${AI_ASSIST_INTERNAL_TOKEN:-dev-internal-token}
+      SPRING_PROFILES_ACTIVE: default
+    # 若无 Dockerfile，可改为本地 jar：
+    # command: ["java","-jar","/app/ai-assist-service.jar"]
+    profiles:
+      - with-build
+
+  # 无镜像时用已打包 jar 的简易运行提示：
+  # cd microservices && mvn -pl services/ai-assist-service -am package
+  # java -jar services/ai-assist-service/target/ai-assist-service-*.jar

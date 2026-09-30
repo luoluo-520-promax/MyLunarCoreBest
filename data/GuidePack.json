@@ -1,0 +1,105 @@
+{
+  "version": "1.0.0",
+  "locale": "zh-CN",
+  "downloadUrl": "",
+  "contentHash": "",
+  "size": 0,
+  "faqs": [
+    {
+      "id": "faq_quest_next",
+      "question": "下一步该做什么？",
+      "answer": "优先推进主线任务，再查看限时活动与日常。",
+      "scene": "quest",
+      "keywords": ["下一步", "主线", "做什么"],
+      "priority": 10
+    },
+    {
+      "id": "faq_gacha_pity",
+      "question": "保底还有多少？",
+      "answer": "保底进度以游戏内卡池界面为准，助手不会承诺必出。",
+      "scene": "gacha",
+      "keywords": ["保底", "抽卡", "卡池"],
+      "priority": 10
+    },
+    {
+      "id": "faq_activity",
+      "question": "今天有什么活动？",
+      "answer": "打开活动界面查看当前开启的限时玩法与领奖进度。",
+      "scene": "activity",
+      "keywords": ["活动", "今天", "限时"],
+      "priority": 8
+    },
+    {
+      "id": "faq_mail",
+      "question": "邮件怎么领？",
+      "answer": "在邮箱界面领取附件；未领取邮件不会自动发放。",
+      "scene": "mail",
+      "keywords": ["邮件", "邮箱", "领取"],
+      "priority": 8
+    },
+    {
+      "id": "faq_explore_path",
+      "question": "任务目标怎么走？",
+      "answer": "可请求探索路径标记：助手会给出航点与沿途可收集资源提示，请按地图标记前进。",
+      "scene": "explore",
+      "keywords": ["怎么走", "路线", "导航", "路径", "标记"],
+      "priority": 9
+    },
+    {
+      "id": "faq_lore_wiki",
+      "question": "世界观里这个势力是什么？",
+      "answer": "可询问角色、势力与历史；助手会按设定百科以对应口吻解答，不编造未收录内容。",
+      "scene": "lore",
+      "keywords": ["世界观", "势力", "历史", "百科", "背景"],
+      "priority": 9
+    },
+    {
+      "id": "faq_settings_open",
+      "question": "设置在哪里打开？",
+      "answer": "按 Escape（默认「打开设置」键）或主界面右上角齿轮进入设置。可分别调整画面、声音、按键与游戏细节；改完后会云端同步到当前账号。",
+      "scene": "settings",
+      "keywords": ["设置", "打开设置", "齿轮", "选项"],
+      "priority": 12
+    },
+    {
+      "id": "faq_settings_display",
+      "question": "怎么调画面/画质？",
+      "answer": "设置 → 画面：可调画质档位（低/中/高/极致）、分辨率缩放、亮度、全屏、垂直同步与抗锯齿。卡顿时可先降低画质或分辨率缩放。",
+      "scene": "settings",
+      "keywords": ["画面", "画质", "分辨率", "全屏", "亮度", "抗锯齿", "垂直同步"],
+      "priority": 11
+    },
+    {
+      "id": "faq_settings_sound",
+      "question": "怎么调声音/音量？",
+      "answer": "设置 → 声音：可分别调节主音量、音乐、音效、语音，也可一键静音。无声时请先确认未开启静音，并检查系统音量。",
+      "scene": "settings",
+      "keywords": ["声音", "音量", "静音", "音乐", "音效", "语音"],
+      "priority": 11
+    },
+    {
+      "id": "faq_settings_keybind",
+      "question": "按键怎么改？",
+      "answer": "设置 → 按键：点击动作后按下新键即可改绑。默认含 WASD 移动、F 交互、M 地图、B 背包、Escape 设置、Q/E/R 技能等。冲突时请改掉占用键，或一键恢复默认。",
+      "scene": "settings",
+      "keywords": ["按键", "键位", "改键", "快捷键", "键盘"],
+      "priority": 11
+    },
+    {
+      "id": "faq_settings_gameplay",
+      "question": "游戏细节设置有哪些？",
+      "answer": "设置 → 游戏细节：可调语言、镜头灵敏度、自动战斗、伤害数字、跳过剧情演出、震动与战斗倍速。恢复默认不会影响背包与角色进度。",
+      "scene": "settings",
+      "keywords": ["细节", "灵敏度", "自动战斗", "伤害数字", "倍速", "震动", "语言"],
+      "priority": 10
+    },
+    {
+      "id": "faq_settings_support",
+      "question": "设置有问题怎么找客服？",
+      "answer": "可先问游戏内助手（本 FAQ）；仍无法解决时，在设置页或客服入口提交工单（分类可选画面/声音/按键/游戏细节），客服处理后可在「我的工单」查看回复。",
+      "scene": "settings",
+      "keywords": ["客服", "工单", "投诉", "反馈", "联系客服"],
+      "priority": 12
+    }
+  ]
+}

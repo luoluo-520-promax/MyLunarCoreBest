@@ -1,0 +1,10 @@
+﻿C:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\player\PlayerDataPeriodicPersistenceServiceTest.java
+C:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\player\PlayerLoadingStateServiceTest.java
+C:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\player\PlayerLoginWireVersionTest.java
+C:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\player\PlayerSessionStateMachineTest.java
+C:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\player\PlayerSyncCoordinatorTest.java
+C:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\player\SyncReasonTest.java
+C:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\profile\PlayerCardServiceTest.java
+C:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\quest\QuestConfigRepositoryTest.java
+C:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\quest\QuestNettyServiceTest.java
+C:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\quest\QuestProgressApplicationServiceTest.java

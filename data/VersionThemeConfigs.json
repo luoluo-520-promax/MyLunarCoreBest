@@ -1,0 +1,28 @@
+[
+  {
+    "themeId": "1.0",
+    "displayName": "启程",
+    "startEpochMs": 0,
+    "endEpochMs": 1893456000000,
+    "chapterSetId": 1,
+    "activityPoolId": 1,
+    "bannerPoolId": 1,
+    "shopSetId": 1,
+    "bossSetId": 1,
+    "preloadAssetPack": "pack_theme_1_0",
+    "miniGamePool": ["racing_festival", "fishing_harbor"]
+  },
+  {
+    "themeId": "2.0",
+    "displayName": "新星球",
+    "startEpochMs": 1893456000000,
+    "endEpochMs": 4102444800000,
+    "chapterSetId": 2,
+    "activityPoolId": 2,
+    "bannerPoolId": 2,
+    "shopSetId": 2,
+    "bossSetId": 2,
+    "preloadAssetPack": "pack_theme_2_0",
+    "miniGamePool": ["racing_festival", "tower_defense_outpost", "fishing_harbor"]
+  }
+]

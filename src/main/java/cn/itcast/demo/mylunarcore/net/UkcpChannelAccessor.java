@@ -42,9 +42,10 @@ public final class UkcpChannelAccessor {
             return null; // 空输入直接返回
         }
         try {
-            return (Ukcp) UKCP_FIELD.get(channel); // 读取私有字段 ukcp
-        } catch (IllegalAccessException e) {
-            return null; // 反射失败视为不可用
+            // 非 UkcpServerChildChannel（如 TCP / EmbeddedChannel）会抛 IllegalArgumentException
+            return (Ukcp) UKCP_FIELD.get(channel);
+        } catch (Exception e) {
+            return null; // TCP 或测试通道无 Ukcp，视为不可用
         }
     }
 }

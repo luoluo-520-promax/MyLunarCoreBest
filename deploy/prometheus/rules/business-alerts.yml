@@ -1,0 +1,237 @@
+groups:
+  - name: mylunarcore-business
+    rules:
+      - alert: HighLoginFailRate
+        expr: |
+          (rate(lunarcore_login_fail_total[5m]) /
+           clamp_min(rate(lunarcore_login_fail_total[5m]) + rate(lunarcore_login_success_total[5m]), 1e-9)) > 0.01
+        for: 5m
+        labels:
+          severity: warning
+          priority: P1
+        annotations:
+          summary: 登录失败率过高（>1%/5m，二游生产阈值）
+
+      - alert: CriticalLoginFailRate
+        expr: |
+          (rate(lunarcore_login_fail_total[5m]) /
+           clamp_min(rate(lunarcore_login_fail_total[5m]) + rate(lunarcore_login_success_total[5m]), 1e-9)) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          priority: P0
+        annotations:
+          summary: 登录失败率危急（>5%/5m）
+
+      - alert: HighGachaErrorRate
+        expr: |
+          (rate(lunarcore_gacha_error_total[5m]) /
+           clamp_min(rate(lunarcore_gacha_error_total[5m]) + rate(lunarcore_gacha_success_total[5m]), 1e-9)) > 0.02
+        for: 5m
+        labels:
+          severity: critical
+          priority: P0
+        annotations:
+          summary: 抽卡异常率过高（>2%/5m）
+
+      - alert: BattleTimeoutSpike
+        expr: rate(lunarcore_battle_timeout_total[5m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+          priority: P1
+        annotations:
+          summary: 战斗超时增多
+
+      - alert: MatchSuccessLow
+        expr: |
+          (rate(lunarcore_match_success_total[10m]) /
+           clamp_min(rate(lunarcore_match_success_total[10m]) + rate(lunarcore_match_cancel_total[10m]) + rate(lunarcore_match_timeout_total[10m]), 1e-9)) < 0.3
+        for: 15m
+        labels:
+          severity: info
+          priority: P2
+        annotations:
+          summary: 匹配成功率偏低，需调参
+
+      - alert: ZoneLoadHigh
+        expr: lunarcore_zone_load_ratio > 0.85
+        for: 10m
+        labels:
+          severity: warning
+          priority: P1
+        annotations:
+          summary: Zone 负载偏高，考虑扩容或调 max-players
+
+      - alert: LoginLatencyP99High
+        expr: histogram_quantile(0.99, sum(rate(lunarcore_login_latency_seconds_bucket[5m])) by (le)) > 1
+        for: 10m
+        labels:
+          severity: warning
+          priority: P1
+        annotations:
+          summary: 登录 P99 延迟过高（阈值需 k6 校准）
+
+      - alert: MatchQueueDepthCritical
+        expr: lunarcore_match_queue_depth > 500
+        for: 5m
+        labels:
+          severity: critical
+          priority: P0
+        annotations:
+          summary: 匹配队列堆积，考虑扩容 match 节点或降级机器人补位
+
+      - alert: MatchQueueDepthWarning
+        expr: lunarcore_match_queue_depth > 200
+        for: 10m
+        labels:
+          severity: warning
+          priority: P1
+        annotations:
+          summary: 匹配队列偏高
+
+      - alert: ZoneLoadCritical
+        expr: lunarcore_zone_load_ratio > 0.95
+        for: 5m
+        labels:
+          severity: critical
+          priority: P0
+        annotations:
+          summary: Zone 接近满载，立即扩容或开启拒绝 draining
+
+      - alert: JvmGcPauseP99High
+        expr: histogram_quantile(0.99, sum(rate(jvm_gc_pause_seconds_bucket[5m])) by (le)) > 0.2
+        for: 10m
+        labels:
+          severity: warning
+          priority: P1
+        annotations:
+          summary: JVM GC P99 > 200ms，检查堆与分配速率
+
+      - alert: JvmHeapHigh
+        expr: |
+          (jvm_memory_used_bytes{area="heap"} /
+           clamp_min(jvm_memory_max_bytes{area="heap"}, 1)) > 0.85
+        for: 10m
+        labels:
+          severity: warning
+          priority: P1
+        annotations:
+          summary: JVM Heap 使用率 > 85%
+
+      - alert: HikariPoolExhausted
+        expr: hikaricp_connections_pending > 0
+        for: 5m
+        labels:
+          severity: critical
+          priority: P0
+        annotations:
+          summary: 数据库连接池出现等待，检查慢 SQL / 连接泄漏
+
+      - alert: ProcessCpuHigh
+        expr: process_cpu_usage > 0.85
+        for: 15m
+        labels:
+          severity: warning
+          priority: P2
+        annotations:
+          summary: 进程 CPU 持续偏高，评估扩容或降压
+
+      - alert: AiAssistHighFallbackRate
+        expr: |
+          (rate(lunarcore_ai_requests_total{status="fallback"}[5m]) /
+           clamp_min(rate(lunarcore_ai_requests_total[5m]), 1e-9)) > 0.10
+        for: 10m
+        labels:
+          severity: warning
+          priority: P1
+        annotations:
+          summary: AI 助手 fallback 率 > 10%，检查 sidecar/LLM/熔断
+
+      - alert: AiAssistLatencyP95High
+        expr: histogram_quantile(0.95, sum(rate(lunarcore_ai_latency_seconds_bucket[5m])) by (le)) > 2
+        for: 10m
+        labels:
+          severity: warning
+          priority: P1
+        annotations:
+          summary: AI 助手 P95 延迟 > 2s
+
+      - alert: AiAssistErrorSpike
+        expr: rate(lunarcore_ai_requests_total{status="error"}[5m]) > 0.5
+        for: 5m
+        labels:
+          severity: critical
+          priority: P0
+        annotations:
+          summary: AI 助手错误调用突增
+
+      - alert: IapVerifyFailureRateCritical
+        expr: |
+          (rate(lunarcore_iap_verify_total{result="failure"}[5m]) /
+           clamp_min(rate(lunarcore_iap_verify_total[5m]), 1e-9)) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          priority: P0
+        annotations:
+          summary: IAP 验单失败率 > 5%/5m，触发自动止血
+
+      - alert: BattleAuditMismatchRateHigh
+        expr: |
+          (rate(lunarcore_battle_audit_total{result="mismatch"}[5m]) /
+           clamp_min(rate(lunarcore_battle_audit_total[5m]), 1e-9)) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          priority: P0
+        annotations:
+          summary: 战斗审计不一致率 > 5%，检查外挂/时钟漂移
+
+      - alert: WalletNegativeSpike
+        expr: rate(lunarcore_wallet_negative_total[5m]) > 0
+        for: 2m
+        labels:
+          severity: critical
+          priority: P0
+        annotations:
+          summary: 钱包出现负余额，立即排查账本与并发扣费
+          runbook: "kubectl exec <pod> -- jstack 1; 对照 TraceRootCauseAnalyzer"
+
+      - alert: BattlePoolUsageHigh
+        expr: lunarcore_battle_pool_usage > 0.70
+        for: 3m
+        labels:
+          severity: warning
+          priority: P1
+        annotations:
+          summary: 战斗实例池使用率 >70%，HPA 应扩容
+
+      - alert: BattlePoolUsageCritical
+        expr: lunarcore_battle_pool_usage > 0.90
+        for: 2m
+        labels:
+          severity: critical
+          priority: P0
+        annotations:
+          summary: 战斗实例池使用率 >90%，立即扩容或拒新开战
+
+      - alert: SloErrorBudgetBurn
+        expr: lunarcore_sla_battle_success_rate < 0.999
+        for: 15m
+        labels:
+          severity: critical
+          priority: P0
+        annotations:
+          summary: SLO 战斗成功率跌破预算门槛，触发非核心降级
+
+      - alert: AiAssistFallbackAutoRollback
+        expr: |
+          (rate(lunarcore_ai_requests_total{status="fallback"}[5m]) /
+           clamp_min(rate(lunarcore_ai_requests_total[5m]), 1e-9)) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          priority: P1
+        annotations:
+          summary: AI fallback >5%，自动关闭视觉并降低日志级别

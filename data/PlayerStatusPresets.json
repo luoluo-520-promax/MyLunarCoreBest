@@ -1,0 +1,10 @@
+{
+  "presets": [
+    { "code": "ONLINE", "label": "在线" },
+    { "code": "BUSY", "label": "忙碌" },
+    { "code": "DND", "label": "勿扰" },
+    { "code": "PARTY", "label": "组队中" },
+    { "code": "ABYSS", "label": "在打深渊" },
+    { "code": "AFK", "label": "暂离" }
+  ]
+}

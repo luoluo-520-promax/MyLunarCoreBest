@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "puzzles": [
+    {
+      "puzzleId": 10001,
+      "zoneId": "plane_10001_f1",
+      "planeId": 10001,
+      "floorId": 1,
+      "type": "PRESSURE_PLATE",
+      "radius": 2.5,
+      "center": {"x": 12.0, "y": 0.0, "z": 8.0},
+      "rewardId": 90001,
+      "hiddenDoorPos": {"x": 20.0, "y": 0.0, "z": 8.0},
+      "explorationCollectId": "puzzle_1"
+    },
+    {
+      "puzzleId": 10002,
+      "zoneId": "plane_10001_f1",
+      "planeId": 10001,
+      "floorId": 1,
+      "type": "ELEMENT_LIGHT",
+      "requiredElement": "FIRE",
+      "center": {"x": 30.0, "y": 0.0, "z": 15.0},
+      "rewardId": 90002,
+      "hiddenDoorPos": {"x": 35.0, "y": 0.0, "z": 15.0},
+      "explorationCollectId": "puzzle_element_1"
+    },
+    {
+      "puzzleId": 10003,
+      "zoneId": "plane_10001_f1",
+      "planeId": 10001,
+      "floorId": 1,
+      "type": "SEQUENCE_STEP",
+      "sequence": ["pad_a", "pad_b", "pad_c"],
+      "rewardId": 90003,
+      "hiddenDoorPos": {"x": 40.0, "y": 0.0, "z": 22.0},
+      "explorationCollectId": "puzzle_seq_1"
+    },
+    {
+      "puzzleId": 10004,
+      "zoneId": "plane_10001_f1",
+      "planeId": 10001,
+      "floorId": 1,
+      "type": "TIMED_PARKOUR",
+      "timeLimitMs": 45000,
+      "checkpoints": [
+        {"id": "cp1", "x": 5.0, "y": 0.0, "z": 5.0},
+        {"id": "cp2", "x": 15.0, "y": 2.0, "z": 10.0},
+        {"id": "cp3", "x": 25.0, "y": 0.0, "z": 18.0}
+      ],
+      "rewardId": 90004,
+      "hiddenDoorPos": {"x": 28.0, "y": 0.0, "z": 20.0},
+      "explorationCollectId": "puzzle_parkour_1"
+    }
+  ]
+}

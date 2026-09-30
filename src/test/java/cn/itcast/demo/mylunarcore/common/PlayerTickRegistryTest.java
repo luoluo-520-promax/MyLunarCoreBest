@@ -14,6 +14,12 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+/**
+ * PlayerTickRegistry 在线玩家注册表测试。
+ * <p>
+ * 针对相关生产代码的单元/切片测试类 {@code PlayerTickRegistryTest}：
+ * 通过 fixture、mock 与断言覆盖关键成功路径、失败码与状态边界。
+ */
 @DisplayName("PlayerTickRegistry 在线玩家注册表测试")
 class PlayerTickRegistryTest {
 
@@ -27,6 +33,14 @@ class PlayerTickRegistryTest {
         log.info("玩家注册表初始化: initialSize=0");
     }
 
+    /**
+     * 验证点：register 应登记 OnlinePlayer。
+     * <p>测试方法 {@code registerShouldStoreOnlinePlayer}：
+     * <ul>
+     *   <li>{@code assertEquals(1, snapshot.size());}</li>
+     *   <li>{@code assertEquals(CommonTestFixtures.PLAYER_UID, snapshot.get(0).getUid());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("register 应登记 OnlinePlayer")
     void registerShouldStoreOnlinePlayer() {
@@ -40,6 +54,13 @@ class PlayerTickRegistryTest {
         assertEquals(CommonTestFixtures.PLAYER_UID, snapshot.get(0).getUid());
     }
 
+    /**
+     * 验证点：unregister 应移除指定 uid。
+     * <p>测试方法 {@code unregisterShouldRemovePlayer}：
+     * <ul>
+     *   <li>{@code assertEquals(0, snapshot.size());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("unregister 应移除指定 uid")
     void unregisterShouldRemovePlayer() {
@@ -52,6 +73,14 @@ class PlayerTickRegistryTest {
         assertEquals(0, snapshot.size());
     }
 
+    /**
+     * 验证点：同 uid 重复 register 应覆盖旧实例。
+     * <p>测试方法 {@code registerSameUidShouldOverwrite}：
+     * <ul>
+     *   <li>{@code assertEquals(1, snapshot.size());}</li>
+     *   <li>{@code assertFalse(snapshot.get(0) == first);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("同 uid 重复 register 应覆盖旧实例")
     void registerSameUidShouldOverwrite() {

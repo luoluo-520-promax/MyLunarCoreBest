@@ -1,0 +1,32 @@
+server:
+  port: 18083
+
+spring:
+  application:
+    name: ai-assist-service
+  config:
+    import: optional:nacos:${spring.application.name}.${spring.cloud.nacos.config.file-extension:yaml}
+  cloud:
+    nacos:
+      server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+      discovery:
+        namespace: ${NACOS_NAMESPACE:public}
+      config:
+        namespace: ${NACOS_NAMESPACE:public}
+        file-extension: yaml
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+mylunarcore:
+  ai-assist:
+    internal-token: ${AI_ASSIST_INTERNAL_TOKEN:dev-internal-token}
+    llm-enabled: ${AI_ASSIST_LLM_ENABLED:false}
+    llm-endpoint: ${AI_ASSIST_LLM_ENDPOINT:}
+    llm-api-key: ${AI_ASSIST_LLM_API_KEY:}
+    llm-model: ${AI_ASSIST_LLM_MODEL:gpt-4o-mini}
+    llm-timeout-ms: 3000
+    llm-max-tokens: 512

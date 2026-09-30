@@ -1,0 +1,118 @@
+{
+  "title": "MyLunarCore Business",
+  "uid": "mylunarcore-business",
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "登录成功/失败",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        { "expr": "rate(lunarcore_login_success_total[1m])", "legendFormat": "success" },
+        { "expr": "rate(lunarcore_login_fail_total[1m])", "legendFormat": "fail" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "抽卡成功/异常",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        { "expr": "rate(lunarcore_gacha_success_total[1m])", "legendFormat": "success" },
+        { "expr": "rate(lunarcore_gacha_error_total[1m])", "legendFormat": "error" }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "在线人数",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 8 },
+      "targets": [{ "expr": "lunarcore_online_players", "legendFormat": "online" }]
+    },
+    {
+      "type": "stat",
+      "title": "进行中战斗",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 8 },
+      "targets": [{ "expr": "lunarcore_battle_active", "legendFormat": "battles" }]
+    },
+    {
+      "type": "stat",
+      "title": "匹配队列深度",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 8 },
+      "targets": [{ "expr": "lunarcore_match_queue_depth", "legendFormat": "queue" }]
+    },
+    {
+      "type": "timeseries",
+      "title": "战斗超时/结算",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "targets": [
+        { "expr": "rate(lunarcore_battle_timeout_total[1m])", "legendFormat": "timeout" },
+        { "expr": "rate(lunarcore_battle_settle_total[1m])", "legendFormat": "settle" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "匹配成功/取消/超时",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "targets": [
+        { "expr": "rate(lunarcore_match_success_total[1m])", "legendFormat": "success" },
+        { "expr": "rate(lunarcore_match_cancel_total[1m])", "legendFormat": "cancel" },
+        { "expr": "rate(lunarcore_match_timeout_total[1m])", "legendFormat": "timeout" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "抽卡成功率",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+      "targets": [
+        {
+          "expr": "rate(lunarcore_gacha_success_total[5m]) / clamp_min(rate(lunarcore_gacha_success_total[5m]) + rate(lunarcore_gacha_error_total[5m]), 1e-9)",
+          "legendFormat": "success_ratio"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "战斗平均耗时 / Tick 延迟",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+      "targets": [
+        { "expr": "rate(lunarcore_battle_tick_latency_seconds_sum[5m]) / clamp_min(rate(lunarcore_battle_tick_latency_seconds_count[5m]), 1e-9)", "legendFormat": "avg_tick_s" },
+        { "expr": "histogram_quantile(0.95, sum(rate(lunarcore_battle_tick_latency_seconds_bucket[5m])) by (le))", "legendFormat": "p95" }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Zone 负载比",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 28 },
+      "targets": [{ "expr": "lunarcore_zone_load_ratio", "legendFormat": "zone_load" }]
+    },
+    {
+      "type": "stat",
+      "title": "匹配队列长度",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 28 },
+      "targets": [{ "expr": "lunarcore_match_queue_depth", "legendFormat": "queue" }]
+    },
+    {
+      "type": "stat",
+      "title": "日活 UV（当日）",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 28 },
+      "targets": [{ "expr": "lunarcore_ops_daily_login_uv_gauge", "legendFormat": "uv" }]
+    },
+    {
+      "type": "stat",
+      "title": "累计付费用户",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 28 },
+      "targets": [{ "expr": "lunarcore_ops_paying_users_total", "legendFormat": "payers" }]
+    },
+    {
+      "type": "timeseries",
+      "title": "抽卡独立玩家 / 副本通关",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
+      "targets": [
+        { "expr": "rate(lunarcore_ops_gacha_unique_players_total[5m])", "legendFormat": "gacha_uv_rate" },
+        { "expr": "rate(lunarcore_ops_dungeon_clear_total[5m])", "legendFormat": "dungeon_clear" },
+        { "expr": "rate(lunarcore_ops_dungeon_attempt_total[5m])", "legendFormat": "dungeon_attempt" }
+      ]
+    }
+  ]
+}

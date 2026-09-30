@@ -3,6 +3,8 @@ package cn.itcast.demo.mylunarcore.repo;
 
 // 玩家领域实体集合（账号、聚合根、子表实体等）
 import cn.itcast.demo.mylunarcore.model.*;
+// 增量同步范围
+import cn.itcast.demo.mylunarcore.player.DataChangeScope;
 // 统一日志门面，按分类输出
 import cn.itcast.demo.mylunarcore.common.AppLogger;
 // 日志分类枚举（业务数据类）
@@ -84,6 +86,7 @@ public class PlayerDataRepository {
 
         p.setLastLogin(rs.getTimestamp("last_login")); // 上次登录时间
         p.setLastLogout(rs.getTimestamp("last_logout")); // 上次登出时间
+        p.setDataVersion(readDataVersion(rs)); // 乐观锁版本
         return p; // 返回映射完成的实体
     };
 
@@ -124,7 +127,7 @@ public class PlayerDataRepository {
         // account 与 player 通过 CAST(a.id AS UNSIGNED) = p.account_id 关联
         String sql =
                 "SELECT p.uid, p.account_id, p.nickname, p.level, p.exp, p.world_level, p.stamina, p.currency, " +
-                "p.scene_id, p.pos_x, p.pos_y, p.pos_z, p.last_login, p.last_logout " +
+                "p.scene_id, p.pos_x, p.pos_y, p.pos_z, p.last_login, p.last_logout, p.data_version " +
                 "FROM account a " +
                 "JOIN player p ON p.account_id = CAST(a.id AS UNSIGNED) " +
                 "WHERE a.username = ? " +
@@ -168,11 +171,21 @@ public class PlayerDataRepository {
         Long createdUid = uid.longValue(); // 转为 long 供后续查询
         // 按 uid 再查一次，得到数据库中的完整行（含默认值列）
         String loadSql = "SELECT uid, account_id, nickname, level, exp, world_level, stamina, currency, " +
-                "scene_id, pos_x, pos_y, pos_z, last_login, last_logout " +
+                "scene_id, pos_x, pos_y, pos_z, last_login, last_logout, data_version " +
                 "FROM player WHERE uid = ? LIMIT 1";
 
         List<PlayerEntity> list = jdbcTemplate.query(loadSql, playerMapper, createdUid);
         return list.isEmpty() ? null : list.get(0); // 理论上必有一行
+    }
+
+    /**
+     * 将账号密码更新为编码后的哈希（迁移明文或轮换口令）。
+     */
+    public void updateAccountPassword(String accountId, String encodedPassword) {
+        if (accountId == null || encodedPassword == null || encodedPassword.isBlank()) {
+            return;
+        }
+        jdbcTemplate.update("UPDATE account SET password = ? WHERE id = ?", encodedPassword, accountId);
     }
 
     /**
@@ -205,30 +218,38 @@ public class PlayerDataRepository {
     }
 
     /**
-     * 将会话内玩家核心快照定时回写到 player 主表。
+     * 将会话内玩家核心快照定时回写到 player 主表（带乐观锁）。
+     * <p>
+     * {@code WHERE uid=? AND data_version=?}；成功后内存实体的 dataVersion +1。
      *
-     * @param p 内存中的玩家实体快照
-     * @return JDBC 受影响行数；参数无效时返回 0
+     * @param p 内存中的玩家实体快照（含期望的 dataVersion）
+     * @return JDBC 受影响行数；0 表示版本冲突或无效实体
      */
     public int persistPlayerSnapshot(PlayerEntity p) {
         if (p == null || p.getUid() <= 0) {
             return 0; // 无效实体不执行 UPDATE
         }
-        // updated_at=NOW() 由数据库自动刷新修改时间
+        long expectedVersion = p.getDataVersion();
         String sql = "UPDATE player SET nickname=?, level=?, exp=?, world_level=?, stamina=?, currency=?, " +
-                "scene_id=?, pos_x=?, pos_y=?, pos_z=?, updated_at=NOW() WHERE uid=?";
-        return jdbcTemplate.update(sql,
-                p.getNickname(),   // 昵称
-                p.getLevel(),      // 等级
-                p.getExp(),        // 经验
-                p.getWorldLevel(), // 世界等级
-                p.getStamina(),    // 体力
-                p.getCurrencyJson(), // 货币 JSON
-                p.getSceneId(),    // 场景
-                p.getPosX(),       // X 坐标
-                p.getPosY(),       // Y 坐标
-                p.getPosZ(),       // Z 坐标
-                p.getUid());       // WHERE 条件：玩家 uid
+                "scene_id=?, pos_x=?, pos_y=?, pos_z=?, data_version=data_version+1, updated_at=NOW() " +
+                "WHERE uid=? AND data_version=?";
+        int updated = jdbcTemplate.update(sql,
+                p.getNickname(),
+                p.getLevel(),
+                p.getExp(),
+                p.getWorldLevel(),
+                p.getStamina(),
+                p.getCurrencyJson(),
+                p.getSceneId(),
+                p.getPosX(),
+                p.getPosY(),
+                p.getPosZ(),
+                p.getUid(),
+                expectedVersion);
+        if (updated > 0) {
+            p.setDataVersion(expectedVersion + 1);
+        }
+        return updated;
     }
 
     /**
@@ -285,6 +306,35 @@ public class PlayerDataRepository {
     }
 
     /**
+     * 按变更范围增量刷新 {@link PlayerData} 中的子表切片。
+     *
+     * @param target   待合并的聚合根（通常来自 Session 或缓存）
+     * @param playerId 玩家 uid
+     * @param scope    变更范围
+     */
+    public void mergeScope(PlayerData target, long playerId, DataChangeScope scope) {
+        if (target == null || scope == null || scope == DataChangeScope.ALL) {
+            return;
+        }
+        int pid = (int) playerId;
+        switch (scope) {
+            case CORE -> target.setPlayer(loadPlayerByUid(playerId));
+            case ITEMS -> target.setItems(loadItems(pid));
+            case AVATARS -> target.setAvatars(loadAvatars(pid));
+            case LINEUPS -> target.setLineups(loadLineups(pid));
+            case CHALLENGES -> target.setChallenges(loadChallenges(pid));
+            case ROGUES -> target.setRogues(loadRogues(pid));
+            case GACHA -> {
+                // gacha 保底表未纳入 PlayerData 聚合，变更时刷新道具切片即可
+                target.setItems(loadItems(pid));
+            }
+            case FRIENDS -> target.setFriends(loadFriends(pid));
+            case QUESTS -> { /* quest 进度按需查询，此处保留扩展点 */ }
+            default -> { }
+        }
+    }
+
+    /**
      * 将 PlayerData 中各子表列表初始化为不可变空列表。
      *
      * @param data 待初始化的聚合根
@@ -307,10 +357,21 @@ public class PlayerDataRepository {
     public PlayerEntity loadPlayerByUid(long uid) {
         String sql =
                 "SELECT uid, account_id, nickname, level, exp, world_level, stamina, currency, " +
-                "scene_id, pos_x, pos_y, pos_z, last_login, last_logout " +
+                "scene_id, pos_x, pos_y, pos_z, last_login, last_logout, data_version " +
                 "FROM player WHERE uid = ? LIMIT 1";
         List<PlayerEntity> list = jdbcTemplate.query(sql, playerMapper, uid);
         return list.isEmpty() ? null : list.get(0);
+    }
+
+    /**
+     * 兼容旧库：列缺失时 ResultSet 可能无 data_version，默认 0。
+     */
+    private static long readDataVersion(ResultSet rs) throws SQLException {
+        try {
+            return rs.getLong("data_version");
+        } catch (SQLException ex) {
+            return 0L;
+        }
     }
 
     /**
@@ -331,6 +392,11 @@ public class PlayerDataRepository {
             a.setPromotion(rs.getInt("promotion")); // 突破阶数
             a.setRank(rs.getInt("rank")); // 星魂/叠影阶
             a.setLocked(rs.getInt("locked") != 0); // TINYINT 非 0 表示锁定
+            try {
+                a.setEquippedSkinId(rs.getInt("equipped_skin_id"));
+            } catch (java.sql.SQLException ignored) {
+                a.setEquippedSkinId(0);
+            }
             a.setCreatedAt(rs.getTimestamp("created_at")); // 创建时间
             a.setUpdatedAt(rs.getTimestamp("updated_at")); // 更新时间
             return a;

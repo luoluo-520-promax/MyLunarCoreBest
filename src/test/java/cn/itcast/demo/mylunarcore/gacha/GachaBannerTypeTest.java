@@ -9,6 +9,12 @@ import org.slf4j.LoggerFactory;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+/**
+ * GachaBannerType 卡池类型转换测试。
+ * <p>
+ * 针对相关生产代码的单元/切片测试类 {@code GachaBannerTypeTest}：
+ * 通过 fixture、mock 与断言覆盖关键成功路径、失败码与状态边界。
+ */
 @DisplayName("GachaBannerType 卡池类型转换测试")
 class GachaBannerTypeTest {
 
@@ -28,6 +34,14 @@ class GachaBannerTypeTest {
         assertEquals(expectedType, actual);
     }
 
+    /**
+     * 验证点：null 或未知字符串应返回 0。
+     * <p>测试方法 {@code unknownOrNullShouldReturnZero}：
+     * <ul>
+     *   <li>{@code assertEquals(0, nullType);}</li>
+     *   <li>{@code assertEquals(0, unknownType);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("null 或未知字符串应返回 0")
     void unknownOrNullShouldReturnZero() {

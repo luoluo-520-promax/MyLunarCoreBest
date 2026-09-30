@@ -15,6 +15,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.mock;
 
+/**
+ * GameDataRepository 游戏数据仓储测试。
+ * <p>
+ * 针对相关生产代码的单元/切片测试类 {@code GameDataRepositoryTest}：
+ * 通过 fixture、mock 与断言覆盖关键成功路径、失败码与状态边界。
+ */
 @DisplayName("GameDataRepository 游戏数据仓储测试")
 class GameDataRepositoryTest {
 
@@ -30,6 +36,14 @@ class GameDataRepositoryTest {
         log.info("仓储初始化: repository={}", repository.getClass().getSimpleName());
     }
 
+    /**
+     * 验证点：findByKey 应返回游戏数据实体。
+     * <p>测试方法 {@code findByKeyShouldReturnEntity}：
+     * <ul>
+     *   <li>{@code assertEquals("hotfix_v1", entity.getDataKey());}</li>
+     *   <li>{@code assertEquals("{\"version\":1}", entity.getPayloadJson());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("findByKey 应返回游戏数据实体")
     void findByKeyShouldReturnEntity() {
@@ -48,6 +62,13 @@ class GameDataRepositoryTest {
         assertEquals("{\"version\":1}", entity.getPayloadJson());
     }
 
+    /**
+     * 验证点：键不存在时应返回 null。
+     * <p>测试方法 {@code findByKeyShouldReturnNullWhenMissing}：
+     * <ul>
+     *   <li>{@code assertNull(entity);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("键不存在时应返回 null")
     void findByKeyShouldReturnNullWhenMissing() {
@@ -57,5 +78,23 @@ class GameDataRepositoryTest {
 
         log.info("缺失键校验: dataKey=not_exist, entityNull={}", entity == null);
         assertNull(entity);
+    }
+
+    /**
+     * 验证点：upsert 应写入或更新 game_data。
+     * <p>测试方法 {@code upsertShouldUpdateRow}：
+     * <ul>
+     *   <li>{@code assertEquals(1, affected);}</li>
+     * </ul>
+     */
+    @Test
+    @DisplayName("upsert 应写入或更新 game_data")
+    void upsertShouldUpdateRow() {
+        RepoTestFixtures.stubUpdate(jdbcTemplate, 1);
+
+        int affected = repository.upsert("activity.5000701", "{\"activityId\":5000701}");
+
+        assertEquals(1, affected);
+        log.info("upsert 校验: dataKey=activity.5000701, affectedRows={}", affected);
     }
 }

@@ -1,36 +1,100 @@
-// 玩家服务 HTTP 控制器所在包
 package cn.itcast.demo.mylunarcore.player.controller;
 
-// 统一 API 响应体
 import cn.itcast.demo.mylunarcore.common.api.ApiResponse;
-// GET 映射注解
 import org.springframework.web.bind.annotation.GetMapping;
-// 路径变量绑定
 import org.springframework.web.bind.annotation.PathVariable;
-// 类级别请求路径前缀
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-// REST 控制器
 import org.springframework.web.bind.annotation.RestController;
 
-// 不可变 Map
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 玩家数据 REST 接口（演示）：根据 uid 返回占位数据，实际项目可接数据库。
+ * 玩家 Profile / Session 独立查询接口（可中心化部署）。
+ * <p>当前进程内 ConcurrentHashMap 模拟 Redis 中心化存储；接入 Redis 后替换实现即可，
+ * 单体通过 HTTP/Feign 调用本接口，战斗服重启不丢失基础信息。
  */
-@RestController // 返回 JSON 而非视图名
-@RequestMapping("/players") // 所有接口以 /players 开头
+@RestController
+@RequestMapping("/players")
 public class PlayerController {
 
-    /**
-     * 按用户 ID 查询玩家摘要（演示实现）。
-     *
-     * @param uid 路径中的玩家 ID，由网关注入的 X-User-Id 或客户端指定
-     */
-    @GetMapping("/{uid}") // GET /players/{uid}
+    private final ConcurrentHashMap<Long, Map<String, Object>> profiles = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Long, Map<String, Object>> sessions = new ConcurrentHashMap<>();
+
+    @GetMapping("/{uid}")
     public ApiResponse<Map<String, Object>> getPlayer(@PathVariable("uid") Long uid) {
-        // 返回 uid 与服务名，便于验证网关路由与粘性负载均衡
-        return ApiResponse.ok(Map.of("uid", uid, "service", "player-service"));
+        Map<String, Object> profile = profiles.get(uid);
+        if (profile == null) {
+            profile = defaultProfile(uid);
+            profiles.put(uid, profile);
+        }
+        return ApiResponse.ok(new LinkedHashMap<>(profile));
+    }
+
+    @PutMapping("/{uid}/profile")
+    public ApiResponse<Map<String, Object>> putProfile(@PathVariable("uid") Long uid,
+                                                       @RequestBody Map<String, Object> body) {
+        Map<String, Object> profile = new LinkedHashMap<>();
+        profile.put("uid", uid);
+        profile.put("nickname", String.valueOf(body.getOrDefault("nickname", "Trailblazer")));
+        profile.put("level", toInt(body.get("level"), 1));
+        profile.put("avatarId", toInt(body.get("avatarId"), 0));
+        profile.put("service", "player-service");
+        profile.put("scaffoldOnly", false);
+        profile.put("source", "central-store");
+        profile.put("updatedAt", System.currentTimeMillis());
+        profiles.put(uid, profile);
+        return ApiResponse.ok(profile);
+    }
+
+    @PutMapping("/{uid}/session")
+    public ApiResponse<Map<String, Object>> putSession(@PathVariable("uid") Long uid,
+                                                       @RequestBody Map<String, Object> body) {
+        Map<String, Object> session = new LinkedHashMap<>();
+        session.put("uid", uid);
+        session.put("sessionToken", String.valueOf(body.getOrDefault("sessionToken", "")));
+        session.put("nodeId", String.valueOf(body.getOrDefault("nodeId", "")));
+        session.put("updatedAt", System.currentTimeMillis());
+        sessions.put(uid, session);
+        return ApiResponse.ok(session);
+    }
+
+    @GetMapping("/{uid}/session")
+    public ApiResponse<Map<String, Object>> getSession(@PathVariable("uid") Long uid) {
+        Map<String, Object> session = sessions.get(uid);
+        if (session == null) {
+            return ApiResponse.ok(Map.of("uid", uid, "sessionToken", "", "source", "miss"));
+        }
+        Map<String, Object> out = new LinkedHashMap<>(session);
+        out.put("source", "central-store");
+        return ApiResponse.ok(out);
+    }
+
+    private static Map<String, Object> defaultProfile(Long uid) {
+        Map<String, Object> profile = new LinkedHashMap<>();
+        profile.put("uid", uid);
+        profile.put("nickname", "Trailblazer");
+        profile.put("level", 1);
+        profile.put("avatarId", 0);
+        profile.put("service", "player-service");
+        profile.put("scaffoldOnly", false);
+        profile.put("source", "default");
+        return profile;
+    }
+
+    private static int toInt(Object v, int def) {
+        if (v instanceof Number n) {
+            return n.intValue();
+        }
+        if (v != null) {
+            try {
+                return Integer.parseInt(String.valueOf(v));
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        return def;
     }
 }
-

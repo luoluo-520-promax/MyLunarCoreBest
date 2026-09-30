@@ -1,0 +1,115 @@
+{
+  "version": 3,
+  "tips": [
+    {
+      "id": "quest_next",
+      "category": "quest",
+      "priority": 100,
+      "title": "继续任务",
+      "template": "你还有进行中的任务「{questTitle}」，建议优先完成目标。",
+      "action": "OPEN_QUEST",
+      "enabled": true
+    },
+    {
+      "id": "quest_claim",
+      "category": "quest",
+      "priority": 110,
+      "title": "任务可提交",
+      "template": "任务「{questTitle}」已完成目标，记得提交领取奖励。",
+      "action": "OPEN_QUEST",
+      "enabled": true
+    },
+    {
+      "id": "activity_ending",
+      "category": "activity",
+      "priority": 90,
+      "title": "活动即将结束",
+      "template": "活动「{activityName}」将在约 {hoursLeft} 小时后结束，建议尽快参与或领奖。",
+      "action": "OPEN_ACTIVITY",
+      "endingWithinHours": 72,
+      "enabled": true
+    },
+    {
+      "id": "meta_popular",
+      "category": "meta",
+      "priority": 80,
+      "title": "全服热门角色",
+      "template": "全服出场榜第 {rank} 的角色 avatarId={avatarId}（使用率 {usageRate}，胜率 {winRate}）。{usageSummary}",
+      "action": "OPEN_CHARACTER",
+      "metaTopN": 5,
+      "metaRequireOwned": false,
+      "enabled": true
+    },
+    {
+      "id": "meta_own_popular",
+      "category": "meta",
+      "priority": 78,
+      "title": "优先养成热门角色",
+      "template": "你已拥有全服热门角色 avatarId={avatarId}（榜第 {rank}，使用率 {usageRate}），建议优先投入养成与编队，贴合多数玩家使用习惯。",
+      "action": "OPEN_CHARACTER",
+      "metaTopN": 5,
+      "metaRequireOwned": true,
+      "enabled": true
+    },
+    {
+      "id": "growth_promote",
+      "category": "growth",
+      "priority": 70,
+      "title": "养成材料充足",
+      "template": "背包中材料「{itemId}」数量充足（拥有 {ownedCount}，门槛 ≥{requiredCount}），可考虑进行角色突破/养成。",
+      "action": "OPEN_CHARACTER",
+      "requiredItemId": 101,
+      "requiredItemCount": 5,
+      "enabled": true
+    },
+    {
+      "id": "avatar_level_up",
+      "category": "avatar",
+      "priority": 75,
+      "title": "角色等级偏低",
+      "template": "角色 avatarId={avatarId} 当前 Lv.{avatarLevel}（突破 {promotion}），面板 ATK={atk} HP={hp}，建议优先升级以提升战力。",
+      "action": "OPEN_CHARACTER",
+      "maxAvatarLevel": 40,
+      "enabled": true
+    },
+    {
+      "id": "avatar_promote",
+      "category": "avatar",
+      "priority": 72,
+      "title": "角色可考虑突破",
+      "template": "角色 avatarId={avatarId} 突破阶仅为 {promotion}（Lv.{avatarLevel}），建议在材料充足时进行突破。",
+      "action": "OPEN_CHARACTER",
+      "maxPromotion": 1,
+      "enabled": true
+    },
+    {
+      "id": "talent_inactive",
+      "category": "talent",
+      "priority": 68,
+      "title": "天赋未激活",
+      "template": "角色 avatarId={avatarId} 的天赋 talentId={talentId} 当前{activated}（Lv.{talentLevel}），建议前往激活。",
+      "action": "OPEN_TALENT",
+      "requireInactiveTalent": true,
+      "enabled": true
+    },
+    {
+      "id": "talent_upgrade",
+      "category": "talent",
+      "priority": 65,
+      "title": "天赋可升级",
+      "template": "角色 avatarId={avatarId} 天赋 talentId={talentId} 仅为 Lv.{talentLevel}，建议继续升级提升效果。",
+      "action": "OPEN_TALENT",
+      "maxTalentLevel": 3,
+      "enabled": true
+    },
+    {
+      "id": "fallback_today",
+      "category": "fallback",
+      "priority": 10,
+      "title": "今日建议",
+      "template": "今天可以先推进主线任务，再查看限时活动、角色养成与商店兑换。",
+      "action": "OPEN_HOME",
+      "enabled": true
+    }
+  ]
+}

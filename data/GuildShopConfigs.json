@@ -1,0 +1,18 @@
+[
+  {
+    "productId": 1,
+    "itemId": 101,
+    "count": 60,
+    "contributionCost": 100,
+    "weeklyLimit": 5,
+    "name": "星琼小份"
+  },
+  {
+    "productId": 2,
+    "itemId": 201,
+    "count": 1,
+    "contributionCost": 500,
+    "weeklyLimit": 1,
+    "name": "公会专属材料"
+  }
+]

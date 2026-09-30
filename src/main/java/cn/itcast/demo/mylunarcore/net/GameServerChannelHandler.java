@@ -3,6 +3,8 @@ package cn.itcast.demo.mylunarcore.net;
 
 // 解码后的业务包
 import cn.itcast.demo.mylunarcore.net.GamePacket;
+// 连接断开时的会话清理
+import cn.itcast.demo.mylunarcore.player.ConnectionLifecycleService;
 // Handler 可共享注解（同一实例挂到多条连接）
 import io.netty.channel.ChannelHandler;
 // 通道上下文
@@ -30,12 +32,16 @@ public class GameServerChannelHandler extends SimpleChannelInboundHandler<GamePa
 
     // 命令分发总线
     private final GamePacketDispatcher packetDispatcher;
+    // 断连清理：落盘 + 注销会话
+    private final ConnectionLifecycleService connectionLifecycleService;
 
     /**
      * 构造器注入全局唯一的 {@link GamePacketDispatcher}。
      */
-    public GameServerChannelHandler(GamePacketDispatcher packetDispatcher) {
+    public GameServerChannelHandler(GamePacketDispatcher packetDispatcher,
+                                    ConnectionLifecycleService connectionLifecycleService) {
         this.packetDispatcher = packetDispatcher; // 保存分发器引用
+        this.connectionLifecycleService = connectionLifecycleService;
     }
 
     /**
@@ -44,6 +50,15 @@ public class GameServerChannelHandler extends SimpleChannelInboundHandler<GamePa
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, GamePacket packet) {
         packetDispatcher.dispatch(ctx, packet); // 每条入站包进入分发
+    }
+
+    /**
+     * 连接断开：触发落盘与会话清理，避免幽灵在线。
+     */
+    @Override
+    public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+        connectionLifecycleService.onDisconnect(ctx.channel());
+        super.channelInactive(ctx);
     }
 
     /**

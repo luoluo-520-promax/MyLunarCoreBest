@@ -21,8 +21,12 @@ import cn.itcast.demo.mylunarcore.player.GameSessionManager;
 import cn.itcast.demo.mylunarcore.player.PlayerChannelAttributes;
 // 登录后数据同步协调器
 import cn.itcast.demo.mylunarcore.player.PlayerSyncCoordinator;
+// 主界面开始游戏 / 返回主界面流程
+import cn.itcast.demo.mylunarcore.player.GameFlowNettyService;
 // 同步触发原因枚举
 import cn.itcast.demo.mylunarcore.player.SyncReason;
+// 版本/活动热更推送
+import cn.itcast.demo.mylunarcore.common.UpdateNotifyBroadcaster;
 // Netty Channel 抽象
 import io.netty.channel.Channel;
 // 写完成后监听器（如关闭连接）
@@ -45,18 +49,27 @@ public class PlayerSessionPacketHandlers {
     private final GameServerPacketCache packetCache; // 预计算响应缓存（不可变依赖）
     private final GameSessionManager sessionManager; // 在线会话注册表（不可变依赖）
     private final PlayerSyncCoordinator playerSyncCoordinator; // 推送协调器（不可变依赖）
+    private final UpdateNotifyBroadcaster updateNotifyBroadcaster;
+    /**
+     * 主界面 ↔ 开始游戏 / 返回主界面
+     */
+    private final GameFlowNettyService gameFlowNettyService;
 
     /**
-     * 构造器注入会话、缓存、会话管理与同步组件。
+     * 构造器注入会话、缓存、会话管理、同步与主流程组件。
      */
     public PlayerSessionPacketHandlers(PlayerSessionService sessionService,
                                        GameServerPacketCache packetCache,
                                        GameSessionManager sessionManager,
-                                       PlayerSyncCoordinator playerSyncCoordinator) {
+                                       PlayerSyncCoordinator playerSyncCoordinator,
+                                       UpdateNotifyBroadcaster updateNotifyBroadcaster,
+                                       GameFlowNettyService gameFlowNettyService) {
         this.sessionService = sessionService; // 保存会话服务
         this.packetCache = packetCache; // 保存缓存
         this.sessionManager = sessionManager; // 保存会话管理器
         this.playerSyncCoordinator = playerSyncCoordinator; // 保存同步协调器
+        this.updateNotifyBroadcaster = updateNotifyBroadcaster;
+        this.gameFlowNettyService = gameFlowNettyService;
     }
 
     /**
@@ -86,6 +99,7 @@ public class PlayerSessionPacketHandlers {
                     PlayerData pd = session != null ? session.getPlayerData() : null; // 取出玩家内存数据
                     if (session != null && pd != null) { // 会话与数据均就绪
                         playerSyncCoordinator.pushToSession(session, pd, SyncReason.LOGIN); // 登录触发全量推送
+                        updateNotifyBroadcaster.pushBootstrapNotifies(ch); // 下发版本与活动配置
                     }
                 });
     }
@@ -123,5 +137,28 @@ public class PlayerSessionPacketHandlers {
     public void onGetSessionInfo(ChannelHandlerContext ctx, GamePacket packet) throws Exception {
         PlayerSessionProto.GetSessionInfoScRsp rsp = sessionService.handleGetSessionInfo(ctx.channel()); // 从 Channel 属性等组装响应
         ctx.writeAndFlush(new GamePacket(CmdIds.GET_SESSION_INFO_SC_RSP, rsp.toByteArray())); // 写回
+    }
+
+    /**
+     * 主界面「开始游戏」：HALL → 进入场景玩法（START_GAME_CS_REQ=80）。
+     */
+    @PacketCmd(CmdIds.START_GAME_CS_REQ)
+    public void onStartGame(ChannelHandlerContext ctx, GamePacket packet) throws Exception {
+        PlayerSessionProto.StartGameCsReq req =
+                PlayerSessionProto.StartGameCsReq.parseFrom(packet.getPayload());
+        PlayerSessionProto.StartGameScRsp rsp = gameFlowNettyService.handleStartGame(req, ctx.channel());
+        ctx.writeAndFlush(new GamePacket(CmdIds.START_GAME_SC_RSP, rsp.toByteArray()));
+    }
+
+    /**
+     * 退出当前玩法返回主界面（RETURN_MAIN_MENU_CS_REQ=82），保持登录不断开。
+     */
+    @PacketCmd(CmdIds.RETURN_MAIN_MENU_CS_REQ)
+    public void onReturnMainMenu(ChannelHandlerContext ctx, GamePacket packet) throws Exception {
+        PlayerSessionProto.ReturnMainMenuCsReq req =
+                PlayerSessionProto.ReturnMainMenuCsReq.parseFrom(packet.getPayload());
+        PlayerSessionProto.ReturnMainMenuScRsp rsp =
+                gameFlowNettyService.handleReturnMainMenu(req, ctx.channel());
+        ctx.writeAndFlush(new GamePacket(CmdIds.RETURN_MAIN_MENU_SC_RSP, rsp.toByteArray()));
     }
 }

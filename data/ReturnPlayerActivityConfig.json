@@ -1,0 +1,12 @@
+{
+  "activityId": 90001,
+  "offlineDaysThreshold": 14,
+  "durationDays": 7,
+  "title": "回归开拓者礼遇",
+  "bonusDesc": "双倍掉落+专属任务链",
+  "questChain": [
+    "login_day1",
+    "claim_mail",
+    "clear_abyss"
+  ]
+}

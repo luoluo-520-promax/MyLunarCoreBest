@@ -74,4 +74,24 @@ public final class PlayerCurrencyHelper {
             return Collections.emptyMap(); // 降级为空 map，不阻断登录/同步主流程
         }
     }
+
+    /**
+     * 将货币 Map 序列化为数据库存储 JSON 格式。
+     */
+    public static String toCurrencyJson(Map<Integer, Integer> currency) {
+        if (currency == null || currency.isEmpty()) {
+            return null;
+        }
+        StringBuilder sb = new StringBuilder("{");
+        boolean first = true;
+        for (Map.Entry<Integer, Integer> e : currency.entrySet()) {
+            if (!first) {
+                sb.append(',');
+            }
+            sb.append('"').append(e.getKey()).append("\":\"").append(e.getValue()).append('"');
+            first = false;
+        }
+        sb.append('}');
+        return sb.toString();
+    }
 }

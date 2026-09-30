@@ -1,13 +1,20 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+  MyLunarCore Maven 项目描述文件。
+  定义 Spring Boot 游戏私服的核心依赖（Netty/KCP/Protobuf/MySQL）、构建插件与测试/环境 Profile。
+-->
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <!-- Maven 模型版本，固定 4.0.0 -->
     <modelVersion>4.0.0</modelVersion>
+    <!-- 继承 Spring Boot 父 POM：统一管理 Spring、Logback、JUnit 等版本 -->
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
         <version>4.0.4</version>
-        <relativePath/> <!-- lookup parent from repository -->
+        <relativePath/> <!-- 从本地/远程仓库查找 parent，不使用 ../pom.xml -->
     </parent>
+    <!-- 项目坐标：组织 cn.itcast.demo，构件名 MyLunarCore -->
     <groupId>cn.itcast.demo</groupId>
     <artifactId>MyLunarCore</artifactId>
     <version>0.0.1-SNAPSHOT</version>
@@ -26,55 +33,75 @@
         <tag/>
         <url/>
     </scm>
+    <!-- 全局属性：JDK 版本、第三方库版本、测试套件路径、默认 Spring Profile -->
     <properties>
-        <java.version>17</java.version>
-        <netty.version>4.2.9.Final</netty.version>
-        <protobuf.version>4.34.0</protobuf.version>
+        <java.version>17</java.version> <!-- 编译与运行目标 JDK 17 -->
+        <netty.version>4.2.9.Final</netty.version> <!-- 游戏 TCP/KCP 网络层 -->
+        <protobuf.version>4.34.0</protobuf.version> <!-- 客户端协议序列化，与 protoc 插件对齐 -->
         <junit.platform.version>6.0.3</junit.platform.version>
         <junit.jupiter.version>6.0.3</junit.jupiter.version>
-        <testng.version>7.10.2</testng.version>
-        <testng.suite.file>src/test/resources/testng/testng-unit.xml</testng.suite.file>
-        <spring.profiles.active>test</spring.profiles.active>
+        <testng.version>7.10.2</testng.version> <!-- TestNG 集成/单元测试套件 -->
+        <testng.suite.file>src/test/resources/testng/testng-unit.xml</testng.suite.file> <!-- 默认跑单元测试 XML -->
+        <spring.profiles.active>test</spring.profiles.active> <!-- Surefire 默认激活 test 环境 -->
+        <testcontainers.version>1.20.4</testcontainers.version>
     </properties>
     <dependencies>
+        <!-- Spring Boot 核心：自动配置、日志、应用上下文 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter</artifactId>
         </dependency>
 
+        <!-- JDBC + 连接池：玩家数据、账号、道具等 MySQL 持久化 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-jdbc</artifactId>
         </dependency>
 
+        <!-- 嵌入式 Tomcat + Spring MVC：管理后台 REST（ConfigImport、HotReload 等） -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
+        <!-- AOP：@GrayRead 等切面（Spring Boot 4 使用 aspectj starter） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aspectj</artifactId>
+        </dependency>
+
+        <!-- Spring Security：保护 /admin 管理接口 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
 
+        <!-- JSON 解析：热更配置、活动 Excel 导入、邮件附件等 -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
         </dependency>
 
+        <!-- Groovy JSR-223：活动独有计算逻辑热更脚本引擎 -->
+        <dependency>
+            <groupId>org.apache.groovy</groupId>
+            <artifactId>groovy-jsr223</artifactId>
+        </dependency>
+
+        <!-- MySQL 驱动：版本跟随 Spring Boot BOM -->
         <dependency>
             <groupId>com.mysql</groupId>
             <artifactId>mysql-connector-j</artifactId>
-            <version>8.0.33</version>
         </dependency>
 
+        <!-- Netty 全量包：GameNettyServer、背压、限流 Handler -->
         <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty-all</artifactId>
             <version>${netty.version}</version>
         </dependency>
 
-        <!-- KCP over Netty (UDP); Netty version aligned via exclusion -->
+        <!-- KCP over Netty（UDP 可靠传输）；排除自带 netty-transport 与上方 netty-all 版本对齐 -->
         <dependency>
             <groupId>io.jpower.kcp</groupId>
             <artifactId>kcp-netty</artifactId>
@@ -87,20 +114,77 @@
             </exclusions>
         </dependency>
 
+        <!-- Protobuf 运行时：各 *SystemProto 生成的 Java 类依赖此库 -->
         <dependency>
             <groupId>com.google.protobuf</groupId>
             <artifactId>protobuf-java</artifactId>
             <version>${protobuf.version}</version>
         </dependency>
 
+        <!-- Lombok：@Getter/@Setter 等减少样板代码；optional 不传递给依赖本项目的外部模块 -->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <optional>true</optional>
         </dependency>
+        <!-- Caffeine 本地缓存：PlayerDataCacheService 缓存在线玩家聚合数据 -->
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+        </dependency>
+        <!-- Commons Pool2：MatchSession / Room 对象池，抑制万人秒排 YGC -->
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-pool2</artifactId>
+        </dependency>
+
+        <!-- Redis：迁移票据 / 在线表 / 排行榜等跨节点状态（默认关闭，见 lunarcore.redis.enabled） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+        <!-- Redisson RLock：多节点钱包/IAP 互斥（lunarcore.redis.redisson-enabled=true 时启用） -->
+        <dependency>
+            <groupId>org.redisson</groupId>
+            <artifactId>redisson</artifactId>
+            <version>3.40.2</version>
+        </dependency>
+        <!-- Micrometer Tracing + Zipkin 导出（采样见 management.tracing） -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-tracing-bridge-brave</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.zipkin.reporter2</groupId>
+            <artifactId>zipkin-reporter-brave</artifactId>
+        </dependency>
+        <!-- 令牌桶限流：GameLoginRateLimiter、ConnectionPacketRateLimiterHandler -->
+        <dependency>
+            <groupId>com.bucket4j</groupId>
+            <artifactId>bucket4j-core</artifactId>
+            <version>8.10.1</version>
+        </dependency>
+        <!-- Actuator 健康检查与指标端点 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <!-- Prometheus 指标导出：GameTrafficMetrics、在线人数等 -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
+
+        <!-- 测试依赖：仅 test 作用域 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- 公会等新流程的内存库集成测试 -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -108,6 +192,12 @@
             <artifactId>junit-platform-launcher</artifactId>
             <version>${junit.platform.version}</version>
             <scope>test</scope>
+        </dependency>
+        <!-- Admin OpenAPI / Swagger UI（仅 HTTP Admin；游戏协议见 docs/protocol-docs.md） -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>2.8.6</version>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
@@ -121,13 +211,38 @@
             <scope>test</scope>
         </dependency>
         <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>org.testng</groupId>
             <artifactId>testng</artifactId>
             <version>${testng.version}</version>
             <scope>test</scope>
         </dependency>
+        <!-- 集成测试：MySQL/Redis Testcontainers（需 Docker + RUN_TESTCONTAINERS=true） -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${testcontainers.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>mysql</artifactId>
+            <version>${testcontainers.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers</artifactId>
+            <version>${testcontainers.version}</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
+    <!-- 依赖仓库：优先阿里云镜像加速国内下载，Central 作备用 -->
     <repositories>
         <repository>
             <id>aliyunmaven</id>
@@ -137,7 +252,7 @@
                 <enabled>true</enabled>
             </releases>
             <snapshots>
-                <enabled>false</enabled>
+                <enabled>false</enabled> <!-- 不使用阿里云快照，避免不稳定版本 -->
             </snapshots>
         </repository>
         <repository>
@@ -153,6 +268,7 @@
         </repository>
     </repositories>
 
+    <!-- 构建插件仓库，与 dependencies 仓库策略一致 -->
     <pluginRepositories>
         <pluginRepository>
             <id>aliyunmaven</id>
@@ -179,8 +295,9 @@
     </pluginRepositories>
 
     <build>
-        <finalName>MyLunarCore</finalName>
+        <finalName>MyLunarCore</finalName> <!-- 打包产物名：MyLunarCore.jar -->
         <plugins>
+            <!-- 编译插件：配置 Lombok 注解处理器路径，编译期生成 getter/setter -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
@@ -194,6 +311,7 @@
                     </annotationProcessorPaths>
                 </configuration>
             </plugin>
+            <!-- Spring Boot 可执行 jar 打包；排除 lombok 不进入最终 fat jar -->
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
@@ -207,21 +325,23 @@
                 </configuration>
             </plugin>
 
+            <!-- 编译 src/main/proto/*.proto 为 Java 类，供各 NettyService 使用 -->
             <plugin>
                 <groupId>io.github.ascopes</groupId>
                 <artifactId>protobuf-maven-plugin</artifactId>
                 <version>5.0.2</version>
                 <configuration>
-                    <protoc>${protobuf.version}</protoc>
+                    <protoc>${protobuf.version}</protoc> <!-- protoc 版本与 protobuf-java 依赖一致 -->
                 </configuration>
                 <executions>
                     <execution>
                         <goals>
-                            <goal>generate</goal>
+                            <goal>generate</goal> <!-- mvn compile 时自动生成 *Proto.java -->
                         </goals>
                     </execution>
                 </executions>
             </plugin>
+            <!-- 单元测试执行器：UTF-8 编码、注入 spring.profiles.active 系统属性 -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
@@ -236,31 +356,37 @@
         </plugins>
     </build>
 
+    <!-- Maven Profile：切换测试套件与运行环境 -->
     <profiles>
+        <!-- 仅跑 TestNG 单元测试套件 -->
         <profile>
             <id>unit</id>
             <properties>
                 <testng.suite.file>src/test/resources/testng/testng-unit.xml</testng.suite.file>
             </properties>
         </profile>
+        <!-- 跑集成测试套件（需数据库等外部依赖） -->
         <profile>
             <id>integration</id>
             <properties>
                 <testng.suite.file>src/test/resources/testng/testng-integration.xml</testng.suite.file>
             </properties>
         </profile>
+        <!-- 开发环境：application-dev.yml -->
         <profile>
             <id>env-dev</id>
             <properties>
                 <spring.profiles.active>dev</spring.profiles.active>
             </properties>
         </profile>
+        <!-- 测试环境：默认激活 -->
         <profile>
             <id>env-test</id>
             <properties>
                 <spring.profiles.active>test</spring.profiles.active>
             </properties>
         </profile>
+        <!-- 生产环境：application-prod.yml -->
         <profile>
             <id>env-prod</id>
             <properties>

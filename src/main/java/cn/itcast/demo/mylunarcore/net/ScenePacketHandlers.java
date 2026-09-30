@@ -20,13 +20,13 @@ import org.springframework.stereotype.Component;
 @Component // 注册为 Spring Bean
 public class ScenePacketHandlers {
 
-    private final SceneNettyService sceneNettyService; // 场景域服务（不可变依赖）
+    private final SceneNettyService sceneNettyService;
+    private final cn.itcast.demo.mylunarcore.social.EmoteNettyService emoteNettyService;
 
-    /**
-     * 构造器注入场景服务。
-     */
-    public ScenePacketHandlers(SceneNettyService sceneNettyService) {
-        this.sceneNettyService = sceneNettyService; // 保存引用
+    public ScenePacketHandlers(SceneNettyService sceneNettyService,
+                               cn.itcast.demo.mylunarcore.social.EmoteNettyService emoteNettyService) {
+        this.sceneNettyService = sceneNettyService;
+        this.emoteNettyService = emoteNettyService;
     }
 
     /**
@@ -84,6 +84,46 @@ public class ScenePacketHandlers {
         ctx.writeAndFlush(new GamePacket(CmdIds.TRIGGER_SCENE_EVENT_SC_RSP, rsp.toByteArray())); // 写回响应
     }
 
+    @PacketCmd(CmdIds.MOVE_CS_REQ)
+    public void onMove(ChannelHandlerContext ctx, GamePacket packet) throws Exception {
+        SceneSystemProto.MoveCsReq req = SceneSystemProto.MoveCsReq.parseFrom(packet.getPayload());
+        SceneSystemProto.MoveScRsp rsp = sceneNettyService.handleMove(req, ctx.channel());
+        ctx.writeAndFlush(new GamePacket(CmdIds.MOVE_SC_RSP, rsp.toByteArray()));
+    }
+
+    @PacketCmd(CmdIds.MIGRATE_SCENE_CS_REQ)
+    public void onMigrateScene(ChannelHandlerContext ctx, GamePacket packet) throws Exception {
+        SceneSystemProto.MigrateSceneCsReq req = SceneSystemProto.MigrateSceneCsReq.parseFrom(packet.getPayload());
+        SceneSystemProto.MigrateSceneScRsp rsp = sceneNettyService.handleMigrateScene(req, ctx.channel());
+        ctx.writeAndFlush(new GamePacket(CmdIds.MIGRATE_SCENE_SC_RSP, rsp.toByteArray()));
+    }
+
+    @PacketCmd(CmdIds.SCENE_LOAD_COMPLETE_CS_REQ)
+    public void onSceneLoadComplete(ChannelHandlerContext ctx, GamePacket packet) throws Exception {
+        SceneSystemProto.SceneLoadCompleteCsReq req =
+                SceneSystemProto.SceneLoadCompleteCsReq.parseFrom(packet.getPayload());
+        SceneSystemProto.SceneLoadCompleteScRsp rsp =
+                sceneNettyService.handleSceneLoadComplete(req, ctx.channel());
+        ctx.writeAndFlush(new GamePacket(CmdIds.SCENE_LOAD_COMPLETE_SC_RSP, rsp.toByteArray()));
+    }
+
+    @PacketCmd(CmdIds.SCENE_PRELOAD_CS_REQ)
+    public void onScenePreload(ChannelHandlerContext ctx, GamePacket packet) throws Exception {
+        SceneSystemProto.ScenePreloadCsReq req =
+                SceneSystemProto.ScenePreloadCsReq.parseFrom(
+                        packet.getPayload() == null ? new byte[0] : packet.getPayload());
+        SceneSystemProto.ScenePreloadScRsp rsp = sceneNettyService.handleScenePreload(req, ctx.channel());
+        ctx.writeAndFlush(new GamePacket(CmdIds.SCENE_PRELOAD_SC_RSP, rsp.toByteArray()));
+    }
+
+    @PacketCmd(CmdIds.SCENE_EMOTE_CS_REQ)
+    public void onSceneEmote(ChannelHandlerContext ctx, GamePacket packet) throws Exception {
+        SceneSystemProto.SceneEmoteCsReq req = SceneSystemProto.SceneEmoteCsReq.parseFrom(
+                packet.getPayload() == null ? new byte[0] : packet.getPayload());
+        SceneSystemProto.SceneEmoteScRsp rsp = emoteNettyService.handleSceneEmote(req, ctx.channel());
+        ctx.writeAndFlush(new GamePacket(CmdIds.SCENE_EMOTE_SC_RSP, rsp.toByteArray()));
+    }
+
     /**
      * 使用治疗泉等场景恢复点。
      */
@@ -93,5 +133,27 @@ public class ScenePacketHandlers {
         SceneSystemProto.UseHealingSpringCsReq req = SceneSystemProto.UseHealingSpringCsReq.parseFrom(payload); // 反序列化
         SceneSystemProto.UseHealingSpringScRsp rsp = sceneNettyService.handleUseHealingSpring(req, ctx.channel()); // 业务处理
         ctx.writeAndFlush(new GamePacket(CmdIds.USE_HEALING_SPRING_SC_RSP, rsp.toByteArray())); // 写回响应
+    }
+
+    @PacketCmd(CmdIds.REPORT_DEVICE_PERF_CS_REQ)
+    public void onReportDevicePerf(ChannelHandlerContext ctx, GamePacket packet) throws Exception {
+        SceneSystemProto.ReportDevicePerfCsReq req = SceneSystemProto.ReportDevicePerfCsReq.parseFrom(
+                packet.getPayload() == null ? new byte[0] : packet.getPayload());
+        SceneSystemProto.ReportDevicePerfScRsp rsp = sceneNettyService.handleReportDevicePerf(req, ctx.channel());
+        ctx.writeAndFlush(new GamePacket(CmdIds.REPORT_DEVICE_PERF_SC_RSP, rsp.toByteArray()));
+    }
+
+    @PacketCmd(CmdIds.GET_WORLD_TIME_CS_REQ)
+    public void onGetWorldTime(ChannelHandlerContext ctx, GamePacket packet) {
+        SceneSystemProto.GetWorldTimeScRsp rsp = sceneNettyService.handleGetWorldTime(ctx.channel());
+        ctx.writeAndFlush(new GamePacket(CmdIds.GET_WORLD_TIME_SC_RSP, rsp.toByteArray()));
+    }
+
+    @PacketCmd(CmdIds.COMFORT_DEATH_ECHO_CS_REQ)
+    public void onComfortDeathEcho(ChannelHandlerContext ctx, GamePacket packet) throws Exception {
+        SceneSystemProto.ComfortDeathEchoCsReq req = SceneSystemProto.ComfortDeathEchoCsReq.parseFrom(
+                packet.getPayload() == null ? new byte[0] : packet.getPayload());
+        SceneSystemProto.ComfortDeathEchoScRsp rsp = sceneNettyService.handleComfortDeathEcho(req, ctx.channel());
+        ctx.writeAndFlush(new GamePacket(CmdIds.COMFORT_DEATH_ECHO_SC_RSP, rsp.toByteArray()));
     }
 }

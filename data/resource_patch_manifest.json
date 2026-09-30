@@ -1,0 +1,28 @@
+{
+  "fromVersion": "1.0.0",
+  "toVersion": "1.1.0",
+  "files": [
+    {
+      "path": "ab/ui.bundle",
+      "md5": "abc123",
+      "size": 1048576,
+      "fullUrl": "https://cdn.example.com/ab/ui.bundle",
+      "blocks": [
+        {
+          "offset": 0,
+          "length": 524288,
+          "algo": "bsdiff",
+          "patchUrl": "https://cdn.example.com/patch/ui.0.bsdiff",
+          "patchMd5": "p1"
+        },
+        {
+          "offset": 524288,
+          "length": 524288,
+          "algo": "xdelta",
+          "patchUrl": "https://cdn.example.com/patch/ui.1.xdelta",
+          "patchMd5": "p2"
+        }
+      ]
+    }
+  ]
+}

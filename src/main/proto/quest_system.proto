@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+package cn.itcast.demo.mylunarcore.proto;
+
+option java_package = "cn.itcast.demo.mylunarcore.protocol";
+option java_outer_classname = "QuestSystemProto";
+
+message QuestObjective {
+  uint32 objective_id = 1;
+  uint32 target_type = 2;
+  uint32 target_id = 3;
+  uint32 current = 4;
+  uint32 required = 5;
+}
+
+message QuestInfo {
+  uint32 quest_id = 1;
+  string title = 2;
+  string description = 3;
+  uint32 status = 4;
+  repeated QuestObjective objectives = 5;
+}
+
+message GetQuestListCsReq {
+  uint32 filter = 1;
+}
+
+message GetQuestListScRsp {
+  int32 retcode = 1;
+  repeated QuestInfo quests = 2;
+}
+
+message AcceptQuestCsReq {
+  uint32 quest_id = 1;
+}
+
+message AcceptQuestScRsp {
+  int32 retcode = 1;
+  QuestInfo quest = 2;
+}
+
+message SubmitQuestCsReq {
+  uint32 quest_id = 1;
+}
+
+message SubmitQuestScRsp {
+  int32 retcode = 1;
+  uint32 quest_id = 2;
+}
+
+message AbandonQuestCsReq {
+  uint32 quest_id = 1;
+}
+
+message AbandonQuestScRsp {
+  int32 retcode = 1;
+  uint32 quest_id = 2;
+}
+
+message QuestUpdateScNotify {
+  QuestInfo quest = 1;
+}

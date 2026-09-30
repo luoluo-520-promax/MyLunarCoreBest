@@ -15,6 +15,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.mock;
 
+/**
+ * RogueTalentRepository 模拟宇宙天赋仓储测试。
+ * <p>
+ * 针对相关生产代码的单元/切片测试类 {@code RogueTalentRepositoryTest}：
+ * 通过 fixture、mock 与断言覆盖关键成功路径、失败码与状态边界。
+ */
 @DisplayName("RogueTalentRepository 模拟宇宙天赋仓储测试")
 class RogueTalentRepositoryTest {
 
@@ -30,6 +36,15 @@ class RogueTalentRepositoryTest {
         log.info("仓储初始化: repository={}", repository.getClass().getSimpleName());
     }
 
+    /**
+     * 验证点：listByPlayerId 应按 talent_id 返回天赋列表。
+     * <p>测试方法 {@code listByPlayerIdShouldReturnTalents}：
+     * <ul>
+     *   <li>{@code assertEquals(2, talents.size());}</li>
+     *   <li>{@code assertEquals(1, talents.get(0).getTalentId());}</li>
+     *   <li>{@code assertEquals(2, talents.get(0).getLevel());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("listByPlayerId 应按 talent_id 返回天赋列表")
     void listByPlayerIdShouldReturnTalents() {
@@ -56,6 +71,13 @@ class RogueTalentRepositoryTest {
         assertEquals(2, talents.get(0).getLevel());
     }
 
+    /**
+     * 验证点：load 不存在时应返回 null。
+     * <p>测试方法 {@code loadShouldReturnNullWhenMissing}：
+     * <ul>
+     *   <li>{@code assertNull(talent);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("load 不存在时应返回 null")
     void loadShouldReturnNullWhenMissing() {
@@ -67,6 +89,14 @@ class RogueTalentRepositoryTest {
         assertNull(talent);
     }
 
+    /**
+     * 验证点：upgradeTalent 应执行 upsert 并读回最新行。
+     * <p>测试方法 {@code upgradeTalentShouldUpsertAndReload}：
+     * <ul>
+     *   <li>{@code assertEquals(3, talent.getLevel());}</li>
+     *   <li>{@code assertEquals(true, talent.isActivated());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("upgradeTalent 应执行 upsert 并读回最新行")
     void upgradeTalentShouldUpsertAndReload() {

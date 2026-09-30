@@ -1,0 +1,85 @@
+syntax = "proto3";
+
+package cn.itcast.demo.mylunarcore.proto;
+
+option java_package = "cn.itcast.demo.mylunarcore.protocol";
+option java_outer_classname = "MatchmakingSystemProto";
+
+message MatchRoomMember {
+  uint32 player_id = 1;
+  bool ready = 2;
+}
+
+message JoinMatchQueueCsReq {
+  uint32 mode = 1;
+  uint32 level = 2;
+  uint32 power = 3;
+}
+
+message JoinMatchQueueScRsp {
+  int32 retcode = 1;
+  uint32 mode = 2;
+  uint32 queue_position = 3;
+}
+
+message CancelMatchQueueCsReq {
+  uint32 mode = 1;
+}
+
+message CancelMatchQueueScRsp {
+  int32 retcode = 1;
+}
+
+message SetRoomReadyCsReq {
+  uint64 room_id = 1;
+  bool ready = 2;
+}
+
+message SetRoomReadyScRsp {
+  int32 retcode = 1;
+  uint64 room_id = 2;
+}
+
+message MatchRoomScNotify {
+  uint64 room_id = 1;
+  uint32 mode = 2;
+  uint32 status = 3;
+  repeated MatchRoomMember members = 4;
+}
+
+/** 匹配成功：附带 10 秒准备确认；排队期不锁界面 */
+message MatchSuccessScNotify {
+  uint64 room_id = 1;
+  uint32 mode = 2;
+  uint32 ready_timeout_ms = 3;
+  int64 ready_deadline_ms = 4;
+  repeated MatchRoomMember members = 5;
+}
+
+message MatchReadyCheckCsReq {
+  uint64 room_id = 1;
+  bool ready = 2;
+}
+
+message MatchReadyCheckScRsp {
+  int32 retcode = 1; // 0成功 1未登录 2房间无效 3已超时
+  uint64 room_id = 2;
+  bool locked = 3; // true=进入准备锁定，不可再切阵容
+}
+
+/** Ready Check 倒计时期间迷你交互：待机动作 / 队友名片破冰 */
+message MatchCountdownInteractiveScNotify {
+  uint64 room_id = 1;
+  int64 ready_deadline_ms = 2;
+  uint32 remain_ms = 3;
+  repeated string idle_actions = 4; // kick_pebble | flourish_weapon | wave
+  repeated MatchTeammateCard teammate_cards = 5;
+}
+
+message MatchTeammateCard {
+  uint32 player_id = 1;
+  string nickname = 2;
+  uint32 level = 3;
+  uint32 avatar_id = 4;
+  string title = 5;
+}

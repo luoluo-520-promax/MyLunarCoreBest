@@ -94,5 +94,16 @@ public class SummonUnitConfigRepository {
             this.hp = hp;                         // 赋值 HP
         }
 
+        public int getSummonConfigId() {
+            return summonConfigId;
+        }
+
+        public int getDuration() {
+            return duration;
+        }
+
+        public int getHp() {
+            return hp;
+        }
     }
 }

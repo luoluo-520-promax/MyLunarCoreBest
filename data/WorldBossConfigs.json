@@ -1,0 +1,18 @@
+{
+  "bossId": 90001,
+  "name": "裂界灾兽·永夜",
+  "seasonDays": 7,
+  "maxHp": 100000000,
+  "phases": [
+    {"hpRatio": 1.0, "name": "觉醒", "buffDesc": "全服协力开启"},
+    {"hpRatio": 0.6, "name": "狂暴", "buffDesc": "Boss 攻击提升，掉落倍率×1.2"},
+    {"hpRatio": 0.25, "name": "终焉", "buffDesc": "Boss 韧性降低，掉落倍率×1.5"}
+  ],
+  "dailyChallengeLimit": 3,
+  "rankRewards": [
+    {"rankMax": 10, "rewardDesc": "星琼*800 + 专属头像框"},
+    {"rankMax": 100, "rewardDesc": "星琼*400"},
+    {"rankMax": 1000, "rewardDesc": "信用点*50000"}
+  ],
+  "participationReward": "信用点*10000"
+}

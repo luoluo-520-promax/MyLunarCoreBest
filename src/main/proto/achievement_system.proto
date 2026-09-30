@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package cn.itcast.demo.mylunarcore.proto;
+
+option java_package = "cn.itcast.demo.mylunarcore.protocol";
+option java_outer_classname = "AchievementSystemProto";
+
+message AchievementEntry {
+  string achievement_id = 1;
+  string title = 2;
+  int32 target = 3;
+  int32 progress = 4;
+  bool claimed = 5;
+  string reward_desc = 6;
+  bool unlocked = 7;
+}
+
+message GetAchievementListCsReq {}
+
+message GetAchievementListScRsp {
+  int32 retcode = 1;
+  repeated AchievementEntry achievements = 2;
+}
+
+message ClaimAchievementCsReq {
+  string achievement_id = 1;
+}
+
+message ClaimAchievementScRsp {
+  int32 retcode = 1;
+  string achievement_id = 2;
+}
+
+message AchievementUpdateScNotify {
+  AchievementEntry achievement = 1;
+}
+
+/** 成就达成即时浮层：不等客户端拉取 */
+message AchievementUnlockPushScNotify {
+  string achievement_id = 1;
+  string title = 2;
+  string toast_text = 3;
+  string reward_desc = 4;
+  bool can_claim = 5;
+  int32 target = 6;
+}

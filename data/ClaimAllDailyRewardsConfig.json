@@ -1,0 +1,8 @@
+{
+  "dailyMission": true,
+  "battlePass": true,
+  "mail": true,
+  "achievement": true,
+  "signIn": true,
+  "excludeHighValueMail": true
+}

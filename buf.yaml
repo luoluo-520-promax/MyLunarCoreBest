@@ -1,0 +1,10 @@
+# Buf 协议仓库约定：与客户端共享 src/main/proto
+version: v2
+modules:
+  - path: src/main/proto
+lint:
+  use:
+    - STANDARD
+breaking:
+  use:
+    - FILE

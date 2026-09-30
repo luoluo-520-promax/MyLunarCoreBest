@@ -276,9 +276,19 @@ public class GatewayAuthFilter implements GlobalFilter, Ordered {
 
 
 
-        // 在原始请求上追加下游微服务可读的透传头
+        // 剥离入站伪造身份头后，再写入网关签发的身份头
 
         ServerHttpRequest request = exchange.getRequest().mutate()
+
+                .headers(headers -> {
+
+                    headers.remove("X-User-Id");
+
+                    headers.remove("X-User-Name");
+
+                    headers.remove("X-User-Role");
+
+                })
 
                 .header("X-User-Id", uid)
 

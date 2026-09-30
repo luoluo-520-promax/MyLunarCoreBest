@@ -1,0 +1,103 @@
+[
+  {
+    "activityId": 5000701,
+    "name": "夏日庆典",
+    "activityType": "seasonal",
+    "moduleId": 50007,
+    "beginTime": 1782835200,
+    "endTime": 1785513600,
+    "unlockLevel": 20,
+    "conditions": [
+      {
+        "type": "level",
+        "intValue": 20
+      }
+    ],
+    "description": "参与夏日庆典，收集代币兑换限定奖励。",
+    "gameplay": "完成每日任务与关卡挑战，获取夏日代币并在活动商店兑换道具。",
+    "rules": "每日参与次数有限；代币活动结束清零；UP 卡池与活动同步开放。",
+    "stages": [
+      {
+        "stageId": 1,
+        "name": "开幕阶段",
+        "description": "完成 3 次日常任务",
+        "unlockScore": 0,
+        "rewards": [
+          {
+            "itemId": 90001,
+            "count": 50,
+            "type": "token",
+            "grantTiming": "stage_clear"
+          }
+        ]
+      }
+    ],
+    "costAndLimits": {
+      "costItemId": 90001,
+      "costCount": 10,
+      "dailyLimit": 5,
+      "totalLimit": 50,
+      "cooldownSeconds": 3600
+    },
+    "rewards": [
+      {
+        "itemId": 90001,
+        "count": 100,
+        "type": "token",
+        "grantTiming": "immediate"
+      }
+    ],
+    "rewardMethod": "milestone",
+    "pointsTokens": [
+      {
+        "tokenId": 90001,
+        "name": "夏日代币",
+        "maxStack": 9999,
+        "iconPath": "ui/activity/summer_token.png"
+      }
+    ],
+    "shopId": 7001,
+    "shopProducts": [
+      {
+        "productId": 1,
+        "itemId": 90002,
+        "price": 200,
+        "currencyId": 90001,
+        "dailyLimit": 1,
+        "totalLimit": 5
+      }
+    ],
+    "uiResources": {
+      "bannerImage": "ui/activity/summer_banner.png",
+      "backgroundImage": "ui/activity/summer_bg.png",
+      "iconImage": "ui/activity/summer_icon.png",
+      "prefabPath": "ui/prefabs/ActivitySummerPanel",
+      "themeColor": "#FF8C42"
+    },
+    "displayText": {
+      "title": "夏日庆典",
+      "subtitle": "限时 UP · 代币兑换",
+      "bannerText": "限时 UP",
+      "tabLabel": "夏日",
+      "helpText": "活动期间完成关卡与任务获取代币，前往活动商店兑换奖励。"
+    },
+    "banners": [
+      {
+        "id": 9001,
+        "gachaType": "AvatarUp",
+        "rateUpItems5": [1102],
+        "rateUpItems4": [1105]
+      }
+    ],
+    "items": [
+      {
+        "id": 90001,
+        "name": "夏日代币",
+        "stack": 999
+      }
+    ],
+    "extra": {
+      "source": "unified"
+    }
+  }
+]

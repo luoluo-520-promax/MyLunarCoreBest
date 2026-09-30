@@ -21,6 +21,12 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * OnlinePlayer 在线玩家 Tick 测试。
+ * <p>
+ * 针对相关生产代码的单元/切片测试类 {@code OnlinePlayerTest}：
+ * 通过 fixture、mock 与断言覆盖关键成功路径、失败码与状态边界。
+ */
 @DisplayName("OnlinePlayer 在线玩家 Tick 测试")
 class OnlinePlayerTest {
 
@@ -56,6 +62,15 @@ class OnlinePlayerTest {
                 persistenceService.intervalMs());
     }
 
+    /**
+     * 验证点：会话不存在时 onTick 应直接返回。
+     * <p>测试方法 {@code onTickWithoutSessionShouldReturnEarly}：
+     * <ul>
+     *   <li>{@code when(sessionManager.getOrNull(CommonTestFixtures.PLAYER_UID)).thenReturn(null);}</li>
+     *   <li>{@code verify(asyncLoadService, never()).reloadFullAsync(eq(CommonTestFixtures.PLAYER_UID), eq(SyncReason.TIMER));}</li>
+     *   <li>{@code verify(sceneManager, never()).getByPlayerUid(CommonTestFixtures.PLAYER_UID);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("会话不存在时 onTick 应直接返回")
     void onTickWithoutSessionShouldReturnEarly() {
@@ -68,6 +83,15 @@ class OnlinePlayerTest {
         verify(sceneManager, never()).getByPlayerUid(CommonTestFixtures.PLAYER_UID);
     }
 
+    /**
+     * 验证点：会话存在时应转发场景 Tick。
+     * <p>测试方法 {@code onTickWithSessionShouldForwardSceneTick}：
+     * <ul>
+     *   <li>{@code when(sessionManager.getOrNull(CommonTestFixtures.PLAYER_UID)).thenReturn(session);}</li>
+     *   <li>{@code when(sceneManager.getByPlayerUid(CommonTestFixtures.PLAYER_UID)).thenReturn(scene);}</li>
+     *   <li>{@code verify(scene).onTick(now, 50L);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("会话存在时应转发场景 Tick")
     void onTickWithSessionShouldForwardSceneTick() {
@@ -84,6 +108,15 @@ class OnlinePlayerTest {
         verify(scene).onTick(now, 50L);
     }
 
+    /**
+     * 验证点：被动同步间隔到达时应触发异步全量加载。
+     * <p>测试方法 {@code onTickShouldTriggerPassiveSyncWhenIntervalElapsed}：
+     * <ul>
+     *   <li>{@code when(sessionManager.getOrNull(CommonTestFixtures.PLAYER_UID)).thenReturn(session);}</li>
+     *   <li>{@code when(sceneManager.getByPlayerUid(CommonTestFixtures.PLAYER_UID)).thenReturn(null);}</li>
+     *   <li>{@code verify(asyncLoadService).reloadFullAsync(CommonTestFixtures.PLAYER_UID, SyncReason.TIMER);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("被动同步间隔到达时应触发异步全量加载")
     void onTickShouldTriggerPassiveSyncWhenIntervalElapsed() {

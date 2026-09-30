@@ -1,0 +1,6 @@
+{
+  "minClientResVersion": "1.0.0",
+  "minClientAppVersion": "1.0.0",
+  "updateUrl": "https://download.example.com/client/latest",
+  "forceUpgradeDeadline": 0
+}

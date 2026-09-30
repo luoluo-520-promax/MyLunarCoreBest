@@ -3,8 +3,6 @@ package cn.itcast.demo.mylunarcore.repo;
 
 // 背包道具领域实体
 import cn.itcast.demo.mylunarcore.model.GameItemEntity;
-// 副词条 JSON 解析器
-import cn.itcast.demo.mylunarcore.item.ItemJsonParser;
 // Spring JDBC 模板
 import org.springframework.jdbc.core.JdbcTemplate;
 // 行映射函数式接口
@@ -20,23 +18,16 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 // SQL 异常
 import java.sql.SQLException;
-// 可变列表，构建 Proto 列表
-import java.util.ArrayList;
 // 列表接口
 import java.util.List;
 
-// 道具系统 Protobuf 定义
-import cn.itcast.demo.mylunarcore.protocol.ItemSystemProto;
-
 /**
- * 背包物品表 {@code game_item} 访问：查询、统计、映射为 Proto，以及 {@link cn.itcast.demo.mylunarcore.item.ItemNettyService} 所需的增删改。
+ * 背包物品表 {@code game_item} 访问：查询、统计与增删改，仅返回 {@link GameItemEntity}。
  */
 @Repository // 注册为数据访问 Bean
 public class ItemRepository {
 
     private final JdbcTemplate jdbcTemplate; // 执行 SQL 的 JDBC 模板
-    private final ItemJsonParser jsonParser = new ItemJsonParser(); // 解析 sub_affixes JSON 为 Proto 列表
-
     /**
      * 构造器注入 JdbcTemplate。
      *
@@ -66,18 +57,17 @@ public class ItemRepository {
     }
 
     /**
-     * 分页查询背包列表并转为协议 {@link ItemSystemProto.BagItem}。
+     * 分页查询背包列表。
      *
      * @param playerId   玩家 id
      * @param typeFilter 类型过滤；≤0 忽略
      * @param page       页码（从 1 起）
      * @param pageSize   每页条数
-     * @return Proto 背包项列表
+     * @return 道具实体列表
      */
-    public List<ItemSystemProto.BagItem> listBagItems(int playerId, int typeFilter, int page, int pageSize) {
-        int offset = Math.max(0, (page - 1) * pageSize); // 计算 SQL OFFSET，页码非法时钳制为 0
+    public List<GameItemEntity> listBagItems(int playerId, int typeFilter, int page, int pageSize) {
+        int offset = Math.max(0, (page - 1) * pageSize);
 
-        // 动态拼接 type 条件；ORDER BY id DESC 新道具在前
         String sql = "SELECT id, player_id, item_id, type, count, level, exp, promotion, rank, locked, " +
                 "main_affix_id, sub_affixes, equip_avatar_id " +
                 "FROM game_item " +
@@ -85,21 +75,14 @@ public class ItemRepository {
                 (typeFilter > 0 ? "AND type=? " : "") +
                 "ORDER BY id DESC LIMIT ? OFFSET ?";
 
-        Object[] args; // 根据是否过滤类型构造参数数组
+        Object[] args;
         if (typeFilter > 0) {
             args = new Object[]{playerId, typeFilter, pageSize, offset};
         } else {
             args = new Object[]{playerId, pageSize, offset};
         }
 
-        RowMapper<GameItemEntity> mapper = this::mapItem; // 方法引用作为 RowMapper
-        List<GameItemEntity> rows = jdbcTemplate.query(sql, mapper, args); // 执行分页查询
-
-        List<ItemSystemProto.BagItem> out = new ArrayList<>(rows.size()); // 预分配容量
-        for (GameItemEntity e : rows) {
-            out.add(toBagItem(e)); // 逐行转 Proto 供 Netty 下发
-        }
-        return out;
+        return jdbcTemplate.query(sql, this::mapItem, args);
     }
 
     /**
@@ -127,34 +110,6 @@ public class ItemRepository {
         it.setEquipAvatarId((Integer) rs.getObject("equip_avatar_id")); // 当前装备的角色 id（可 NULL）
         it.setDiscarded(false); // 列表查询已过滤 discarded=0，实体侧固定 false
         return it; // 返回映射结果
-    }
-
-    /**
-     * 领域实体 → 客户端背包单项 Protobuf。
-     *
-     * @param e 道具实体
-     * @return BagItem Proto 消息
-     */
-    public ItemSystemProto.BagItem toBagItem(GameItemEntity e) {
-        // count/exp 可能超过 int 范围，钳制到 [0, Integer.MAX_VALUE] 再写入 Proto
-        int count = (int) Math.min(Integer.MAX_VALUE, Math.max(0L, e.getCount()));
-        int exp = (int) Math.min(Integer.MAX_VALUE, Math.max(0L, e.getExp()));
-        ItemSystemProto.BagItem.Builder b = ItemSystemProto.BagItem.newBuilder()
-                .setUid(e.getId())           // 实例 uid
-                .setItemId(e.getItemId())    // 模板 id
-                .setType(e.getType())        // 类型
-                .setCount(count)             // 数量（int）
-                .setLevel(Math.max(0, e.getLevel()))       // 等级非负
-                .setExp(exp)                 // 经验（int）
-                .setPromotion(Math.max(0, e.getPromotion())) // 突破非负
-                .setRank(Math.max(0, e.getRank()))         // 阶非负
-                .setLocked(e.isLocked())     // 锁定状态
-                .setMainAffixId(e.getMainAffixId() == null ? 0 : e.getMainAffixId()) // null → 0
-                .setEquipAvatarId(e.getEquipAvatarId() == null ? 0 : e.getEquipAvatarId()); // null → 0
-
-        List<ItemSystemProto.SubAffix> subs = jsonParser.parseSubAffixes(e.getSubAffixesJson()); // JSON → Proto 列表
-        b.addAllSubAffixes(subs); // 写入副词条
-        return b.build(); // 构建不可变 Proto 消息
     }
 
     /**
@@ -263,6 +218,32 @@ public class ItemRepository {
     }
 
     /**
+     * 强化后回写副词条 JSON（升级触发的副词条成长/追加）。
+     */
+    public int updateSubAffixes(int playerId, long uid, String subAffixesJson) {
+        String sql = "UPDATE game_item SET sub_affixes=?, updated_at=NOW() WHERE player_id=? AND id=? LIMIT 1";
+        return jdbcTemplate.update(sql, subAffixesJson, playerId, uid);
+    }
+
+    /**
+     * 写入主词条 + 副词条（新掉落遗器/光锥初始化）。
+     */
+    public int updateAffixes(int playerId, long uid, Integer mainAffixId, String subAffixesJson) {
+        String sql = "UPDATE game_item SET main_affix_id=?, sub_affixes=?, updated_at=NOW() WHERE player_id=? AND id=? LIMIT 1";
+        return jdbcTemplate.update(sql, mainAffixId, subAffixesJson, playerId, uid);
+    }
+
+    /**
+     * 查询已装备在指定角色上的光锥/遗器。
+     */
+    public List<GameItemEntity> listEquippedOnAvatar(int playerId, int avatarId) {
+        String sql = "SELECT id, player_id, item_id, type, count, level, exp, promotion, rank, locked, " +
+                "main_affix_id, sub_affixes, equip_avatar_id " +
+                "FROM game_item WHERE player_id=? AND discarded=0 AND equip_avatar_id=?";
+        return jdbcTemplate.query(sql, this::mapItem, playerId, avatarId);
+    }
+
+    /**
      * 逻辑删除：标记 discarded 并清零数量、卸下装备。
      *
      * @param playerId 玩家 id
@@ -339,4 +320,62 @@ public class ItemRepository {
         Number id = keyHolder.getKey(); // 取生成的主键
         return id == null ? 0L : id.longValue(); // 失败返回 0
     }
+
+    /**
+     * 按模板 itemId 汇总未丢弃数量。
+     */
+    public long sumCountByItemId(int playerId, int itemId) {
+        Long sum = jdbcTemplate.queryForObject(
+                "SELECT COALESCE(SUM(count),0) FROM game_item WHERE player_id=? AND item_id=? AND discarded=0",
+                Long.class, playerId, itemId);
+        return sum == null ? 0L : sum;
+    }
+
+    /**
+     * 强制按模板 itemId 扣除数量（可跨多堆叠行），运维负向发放用。
+     */
+    public SubtractResult forceSubtractByItemId(int playerId, int itemId, long need) {
+        if (need <= 0) {
+            return new SubtractResult(0, sumCountByItemId(playerId, itemId), 0, List.of());
+        }
+        String sql = "SELECT id, player_id, item_id, type, count, level, exp, promotion, rank, locked, " +
+                "main_affix_id, sub_affixes, equip_avatar_id, discarded " +
+                "FROM game_item WHERE player_id=? AND item_id=? AND discarded=0 ORDER BY id ASC";
+        List<GameItemEntity> rows = jdbcTemplate.query(sql, this::mapItemWithDiscarded, playerId, itemId);
+        long remainNeed = need;
+        long subtracted = 0;
+        int affected = 0;
+        List<GameItemEntity> changed = new java.util.ArrayList<>();
+        for (GameItemEntity row : rows) {
+            if (remainNeed <= 0) {
+                break;
+            }
+            long have = row.getCount();
+            if (have <= 0) {
+                continue;
+            }
+            long take = Math.min(have, remainNeed);
+            long next = have - take;
+            boolean discard = next <= 0;
+            // 运维强制扣除：忽略 locked 限制
+            if (discard) {
+                jdbcTemplate.update(
+                        "UPDATE game_item SET count=0, discarded=1, equip_avatar_id=NULL, updated_at=NOW() WHERE player_id=? AND id=?",
+                        playerId, row.getId());
+            } else {
+                jdbcTemplate.update(
+                        "UPDATE game_item SET count=?, discarded=0, updated_at=NOW() WHERE player_id=? AND id=?",
+                        next, playerId, row.getId());
+            }
+            row.setCount(Math.max(0, next));
+            row.setDiscarded(discard);
+            changed.add(row);
+            subtracted += take;
+            remainNeed -= take;
+            affected++;
+        }
+        return new SubtractResult(subtracted, sumCountByItemId(playerId, itemId), affected, changed);
+    }
+
+    public record SubtractResult(long subtracted, long remain, int affectedRows, List<GameItemEntity> affectedItems) {}
 }

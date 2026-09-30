@@ -15,6 +15,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.mock;
 
+/**
+ * RogueRoomDataRepository 模拟宇宙房间仓储测试。
+ * <p>
+ * 针对相关生产代码的单元/切片测试类 {@code RogueRoomDataRepositoryTest}：
+ * 通过 fixture、mock 与断言覆盖关键成功路径、失败码与状态边界。
+ */
 @DisplayName("RogueRoomDataRepository 模拟宇宙房间仓储测试")
 class RogueRoomDataRepositoryTest {
 
@@ -30,6 +36,16 @@ class RogueRoomDataRepositoryTest {
         log.info("仓储初始化: repository={}", repository.getClass().getSimpleName());
     }
 
+    /**
+     * 验证点：findByRoomId 应返回房间配置。
+     * <p>测试方法 {@code findByRoomIdShouldReturnRoomData}：
+     * <ul>
+     *   <li>{@code assertEquals(101, room.getRoomId());}</li>
+     *   <li>{@code assertEquals(2, room.getRoomType());}</li>
+     *   <li>{@code assertEquals(3, room.getPosX());}</li>
+     *   <li>{@code assertEquals(4, room.getPosY());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("findByRoomId 应返回房间配置")
     void findByRoomIdShouldReturnRoomData() {
@@ -49,6 +65,13 @@ class RogueRoomDataRepositoryTest {
         assertEquals(4, room.getPosY());
     }
 
+    /**
+     * 验证点：房间不存在时应返回 null。
+     * <p>测试方法 {@code findByRoomIdShouldReturnNullWhenMissing}：
+     * <ul>
+     *   <li>{@code assertNull(room);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("房间不存在时应返回 null")
     void findByRoomIdShouldReturnNullWhenMissing() {

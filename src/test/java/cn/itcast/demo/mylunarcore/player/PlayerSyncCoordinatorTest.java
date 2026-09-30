@@ -18,6 +18,12 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * PlayerSyncCoordinator 统一同步协调器测试。
+ * <p>
+ * 针对相关生产代码的单元/切片测试类 {@code PlayerSyncCoordinatorTest}：
+ * 通过 fixture、mock 与断言覆盖关键成功路径、失败码与状态边界。
+ */
 @DisplayName("PlayerSyncCoordinator 统一同步协调器测试")
 class PlayerSyncCoordinatorTest {
 
@@ -33,6 +39,18 @@ class PlayerSyncCoordinatorTest {
         log.info("协调器初始化: syncableCount=1");
     }
 
+    /**
+     * 验证点：build 应写入同步原因与核心字段。
+     * <p>测试方法 {@code buildShouldPopulateReasonAndCoreFields}：
+     * <ul>
+     *   <li>{@code assertEquals(SyncReason.LOGIN.getCode(), notify.getSyncReason());}</li>
+     *   <li>{@code assertTrue(notify.getServerTime() > 0);}</li>
+     *   <li>{@code assertEquals(45, notify.getLevel());}</li>
+     *   <li>{@code assertEquals(180, notify.getStamina());}</li>
+     *   <li>{@code assertEquals(PlayerTestFixtures.NICKNAME, notify.getNickname());}</li>
+     *   <li>{@code assertEquals(1000, notify.getCurrencyOrDefault(1, 0));}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("build 应写入同步原因与核心字段")
     void buildShouldPopulateReasonAndCoreFields() {
@@ -53,6 +71,15 @@ class PlayerSyncCoordinatorTest {
         assertEquals(50, notify.getCurrencyOrDefault(2, 0));
     }
 
+    /**
+     * 验证点：data 为 null 时仅填充元信息。
+     * <p>测试方法 {@code buildWithNullDataShouldOnlySetMetadata}：
+     * <ul>
+     *   <li>{@code assertEquals(SyncReason.DATA_CHANGE.getCode(), notify.getSyncReason());}</li>
+     *   <li>{@code assertEquals(0, notify.getLevel());}</li>
+     *   <li>{@code assertEquals(0, notify.getCurrencyCount());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("data 为 null 时仅填充元信息")
     void buildWithNullDataShouldOnlySetMetadata() {
@@ -66,6 +93,11 @@ class PlayerSyncCoordinatorTest {
         assertEquals(0, notify.getCurrencyCount());
     }
 
+    /**
+     * 验证点：pushToSession 在 session 为 null 时应静默忽略。
+     * <p>测试方法 {@code pushToSessionWithNullShouldNoOp}：
+     * 按用例准备数据后断言返回值或协作对象调用是否符合预期。
+     */
     @Test
     @DisplayName("pushToSession 在 session 为 null 时应静默忽略")
     void pushToSessionWithNullShouldNoOp() {
@@ -73,6 +105,14 @@ class PlayerSyncCoordinatorTest {
         log.info("空会话推送校验: session=null, pushed=false");
     }
 
+    /**
+     * 验证点：pushToSession 应通过会话下发同步包。
+     * <p>测试方法 {@code pushToSessionShouldSendViaChannel}：
+     * <ul>
+     *   <li>{@code when(channel.writeAndFlush(any())).thenReturn(null);}</li>
+     *   <li>{@code verify(channel).writeAndFlush(any());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("pushToSession 应通过会话下发同步包")
     void pushToSessionShouldSendViaChannel() {

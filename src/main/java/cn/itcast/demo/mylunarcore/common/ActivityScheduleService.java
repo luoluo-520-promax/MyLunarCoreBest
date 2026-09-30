@@ -50,6 +50,8 @@ public class ActivityScheduleService {
     private final LunarCoreProperties properties;
     // 用于 getResource("classpath:...") 等
     private final ResourceLoader resourceLoader;
+    private final ActivityConfigService activityConfigService;
+    private final PeriodicResetService periodicResetService;
     // JSON 解析器（每个服务持有一个实例即可）
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -65,9 +67,20 @@ public class ActivityScheduleService {
     /**
      * 构造器注入配置与资源加载器。
      */
-    public ActivityScheduleService(LunarCoreProperties properties, ResourceLoader resourceLoader) {
+    public ActivityScheduleService(LunarCoreProperties properties,
+                                   ResourceLoader resourceLoader,
+                                   ActivityConfigService activityConfigService) {
+        this(properties, resourceLoader, activityConfigService, null);
+    }
+
+    public ActivityScheduleService(LunarCoreProperties properties,
+                                   ResourceLoader resourceLoader,
+                                   ActivityConfigService activityConfigService,
+                                   org.springframework.beans.factory.ObjectProvider<PeriodicResetService> periodicResetProvider) {
         this.properties = properties;
         this.resourceLoader = resourceLoader;
+        this.activityConfigService = activityConfigService;
+        this.periodicResetService = periodicResetProvider == null ? null : periodicResetProvider.getIfAvailable();
     }
 
     /**
@@ -82,23 +95,26 @@ public class ActivityScheduleService {
      * 重新从配置文件加载排期；热更新协调器在 /reload 时也会调用。
      */
     public void reloadSchedule() {
-        String loc = properties.getActivityScheduleResource(); // 如 classpath:data/ActivityScheduling.json
+        String loc = properties.getActivityScheduleResource();
         try {
             Resource resource = resourceLoader.getResource(loc);
             if (!resource.exists()) {
                 log.warn("Activity schedule resource not found: {}", loc);
                 return;
             }
-            try (InputStream in = resource.getInputStream()) { // try-with-resources 自动关闭流
-                // 将 JSON 数组解析为 List<ActivityWindow>
+            try (InputStream in = resource.getInputStream()) {
                 List<ActivityWindow> list = objectMapper.readValue(in, new TypeReference<List<ActivityWindow>>() {});
-                // null 安全：拷贝为不可变列表，防止外部修改
                 this.windows = list == null ? Collections.emptyList() : List.copyOf(list);
                 log.info("Loaded {} activity schedule entries from {}", windows.size(), loc);
             }
         } catch (Exception e) {
             log.error("Failed to load activity schedule from {}", loc, e);
+            throw new IllegalStateException("activity schedule reload failed: " + loc, e);
         }
+    }
+
+    public void restore(List<ActivityWindow> previous) {
+        this.windows = previous == null ? Collections.emptyList() : previous;
     }
 
     /**
@@ -116,7 +132,10 @@ public class ActivityScheduleService {
         }
         if (!today.equals(lastResetDay)) {
             log.info("Daily reset: server date {} -> {}", lastResetDay, today);
-            lastResetDay = today; // 更新为今天，后续可在此挂每日任务
+            lastResetDay = today;
+            if (periodicResetService != null) {
+                periodicResetService.onTick(nowMillis);
+            }
         }
     }
 
@@ -127,6 +146,9 @@ public class ActivityScheduleService {
      * @return 若在任一时间窗 [beginTime, endTime] 内（秒级）则 true
      */
     public boolean isActivityActive(int activityId) {
+        if (activityConfigService.isActivityActive(activityId)) {
+            return true;
+        }
         long nowSec = Instant.now().getEpochSecond(); // 当前 Unix 秒
         for (ActivityWindow w : windows) {
             if (w.activityId == activityId && nowSec >= w.beginTime && nowSec <= w.endTime) {
@@ -134,6 +156,19 @@ public class ActivityScheduleService {
             }
         }
         return false;
+    }
+
+    /**
+     * 判断活动是否开放，并校验玩家等级是否满足统一活动配置中的解锁条件。
+     */
+    public boolean isActivityActive(int activityId, int playerLevel) {
+        if (activityConfigService.isActivityActive(activityId, playerLevel)) {
+            return true;
+        }
+        if (playerLevel > 0 && activityConfigService.findById(activityId).isPresent()) {
+            return false;
+        }
+        return isActivityActive(activityId);
     }
 
     /**

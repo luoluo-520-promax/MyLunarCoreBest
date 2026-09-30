@@ -5,7 +5,9 @@ import cn.itcast.demo.mylunarcore.repo.MonsterConfigRepository;
 import cn.itcast.demo.mylunarcore.repo.NpcConfigRepository;
 import cn.itcast.demo.mylunarcore.repo.SceneConfigRepository;
 import cn.itcast.demo.mylunarcore.repo.SummonUnitConfigRepository;
+import cn.itcast.demo.mylunarcore.player.PlayerContextResolver;
 import io.netty.channel.Channel;
+import java.util.OptionalLong;
 import io.netty.util.Attribute;
 import io.netty.util.AttributeKey;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,13 +20,28 @@ import org.slf4j.LoggerFactory;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.springframework.beans.factory.ObjectProvider;
+
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+/**
+ * SceneNettyService 场景协议服务测试。
+ * <p>
+ * 针对相关生产代码的单元/切片测试类 {@code SceneNettyServiceTest}：
+ * 通过 fixture、mock 与断言覆盖关键成功路径、失败码与状态边界。
+ */
 @DisplayName("SceneNettyService 场景协议服务测试")
 class SceneNettyServiceTest {
 
     private static final Logger log = LoggerFactory.getLogger(SceneNettyServiceTest.class);
+
+    @SuppressWarnings("unchecked")
+    private static <T> ObjectProvider<T> emptyProvider() {
+        ObjectProvider<T> p = mock(ObjectProvider.class);
+        when(p.getIfAvailable()).thenReturn(null);
+        return p;
+    }
 
     private static final AttributeKey<Long> UID_KEY = AttributeKey.valueOf("playerUid");
     private static final long PLAYER_UID = SceneTestFixtures.PLAYER_UID;
@@ -34,6 +51,8 @@ class SceneNettyServiceTest {
     private MonsterConfigRepository monsterConfigRepository;
     private NpcConfigRepository npcConfigRepository;
     private SummonUnitConfigRepository summonUnitConfigRepository;
+    private PlayerContextResolver contextResolver;
+    private ZoneWorldService zoneWorldService;
     private SceneNettyService service;
 
     @BeforeEach
@@ -43,16 +62,80 @@ class SceneNettyServiceTest {
         monsterConfigRepository = mock(MonsterConfigRepository.class);
         npcConfigRepository = mock(NpcConfigRepository.class);
         summonUnitConfigRepository = mock(SummonUnitConfigRepository.class);
+        contextResolver = mock(PlayerContextResolver.class);
+        cn.itcast.demo.mylunarcore.battle.EncounterConfigRepository encounterRepo =
+                mock(cn.itcast.demo.mylunarcore.battle.EncounterConfigRepository.class);
+        when(encounterRepo.current()).thenReturn(cn.itcast.demo.mylunarcore.battle.EncounterConfig.empty());
+        zoneWorldService = mock(ZoneWorldService.class);
+        org.mockito.Mockito.doAnswer(invocation -> {
+            SceneContext ctx = invocation.getArgument(0);
+            ctx.addMonster(SceneTestFixtures.monsterState(
+                    1000001, 101, 5, 500, 500, 1.0f, 2.0f, 3.0f, java.util.List.of()));
+            ctx.addNpc(SceneTestFixtures.npcState(1000002, 501, 42, 4.0f, 5.0f, 6.0f));
+            ctx.addProp(SceneTestFixtures.propState(1000003, 301, 0, 7.0f, 8.0f, 9.0f));
+            return null;
+        }).when(zoneWorldService).seedAndProject(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+        cn.itcast.demo.mylunarcore.dialogue.DialogueTriggerEngine dialogueEngine =
+                mock(cn.itcast.demo.mylunarcore.dialogue.DialogueTriggerEngine.class);
+        when(dialogueEngine.startByNpc(org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyString()))
+                .thenReturn(cn.itcast.demo.mylunarcore.dialogue.DialogueTriggerEngine.DialogueStepResult.fail(2));
+        DynamicZoneLineAllocator lineAllocator = mock(DynamicZoneLineAllocator.class);
+        when(lineAllocator.pickJoinableLine(org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyLong()))
+                .thenReturn(0);
+        ZoneManager zoneManager = mock(ZoneManager.class);
+        when(zoneManager.checkCanJoin(org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyLong()))
+                .thenReturn(ZoneManager.JoinResult.OK);
+        when(zoneManager.checkCanJoin(org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.anyLong()))
+                .thenReturn(ZoneManager.JoinResult.OK);
         service = new SceneNettyService(
                 sceneManager,
                 sceneConfigRepository,
                 monsterConfigRepository,
                 npcConfigRepository,
-                summonUnitConfigRepository);
+                summonUnitConfigRepository,
+                contextResolver,
+                mock(SceneSyncBroadcaster.class),
+                mock(cn.itcast.demo.mylunarcore.quest.QuestTriggerEngine.class),
+                zoneManager,
+                lineAllocator,
+                mock(cn.itcast.demo.mylunarcore.center.PlayerMigrationService.class),
+                mock(cn.itcast.demo.mylunarcore.player.GameSessionManager.class),
+                mock(cn.itcast.demo.mylunarcore.assist.EnvironmentNarrationService.class),
+                mock(cn.itcast.demo.mylunarcore.assist.AssistNettyService.class),
+                encounterRepo,
+                mock(cn.itcast.demo.mylunarcore.economy.RewardDistributor.class),
+                zoneWorldService,
+                new cn.itcast.demo.mylunarcore.anticheat.MoveSpeedGuard(
+                        new cn.itcast.demo.mylunarcore.config.LunarCoreProperties()),
+                mock(cn.itcast.demo.mylunarcore.world.CellBoundaryHandoffService.class),
+                dialogueEngine,
+                emptyProvider(),
+                emptyProvider(),
+                emptyProvider(),
+                emptyProvider(),
+                emptyProvider(),
+                emptyProvider(),
+                emptyProvider());
         log.info("场景协议服务初始化: playerUid={}, planeId={}, floorId={}, entryId={}",
                 PLAYER_UID, SceneTestFixtures.PLANE_ID, SceneTestFixtures.FLOOR_ID, SceneTestFixtures.ENTRY_ID);
     }
 
+    /**
+     * 验证点：进入场景成功应注册上下文并返回实体列表。
+     * <p>测试方法 {@code enterSceneSuccessShouldRegisterContext}：
+     * <ul>
+     *   <li>{@code assertNotNull(ctx);}</li>
+     *   <li>{@code assertEquals(0, rsp.getRetcode());}</li>
+     *   <li>{@code assertEquals(SceneTestFixtures.PLANE_ID, rsp.getSceneInfo().getPlaneId());}</li>
+     *   <li>{@code assertEquals(1, rsp.getEntityList().getMonstersCount());}</li>
+     *   <li>{@code assertEquals(1, rsp.getEntityList().getNpcsCount());}</li>
+     *   <li>{@code assertEquals(1, rsp.getEntityList().getPropsCount());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("进入场景成功应注册上下文并返回实体列表")
     void enterSceneSuccessShouldRegisterContext() {
@@ -87,6 +170,13 @@ class SceneNettyServiceTest {
         assertTrue(ctx.isInitialized());
     }
 
+    /**
+     * 验证点：未登录进入场景应返回 retcode=1。
+     * <p>测试方法 {@code enterSceneWithoutLoginShouldFail}：
+     * <ul>
+     *   <li>{@code assertEquals(1, rsp.getRetcode());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("未登录进入场景应返回 retcode=1")
     void enterSceneWithoutLoginShouldFail() {
@@ -101,6 +191,14 @@ class SceneNettyServiceTest {
         assertEquals(1, rsp.getRetcode());
     }
 
+    /**
+     * 验证点：场景配置不存在应返回 retcode=2。
+     * <p>测试方法 {@code enterSceneMissingConfigShouldFail}：
+     * <ul>
+     *   <li>{@code when(sceneConfigRepository.findGroups(SceneTestFixtures.PLANE_ID, SceneTestFixtures.FLOOR_ID))}</li>
+     *   <li>{@code assertEquals(2, rsp.getRetcode());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("场景配置不存在应返回 retcode=2")
     void enterSceneMissingConfigShouldFail() {
@@ -118,6 +216,16 @@ class SceneNettyServiceTest {
         assertEquals(2, rsp.getRetcode());
     }
 
+    /**
+     * 验证点：查询当前场景成功应返回完整快照。
+     * <p>测试方法 {@code getCurSceneInfoSuccessShouldReturnSnapshot}：
+     * <ul>
+     *   <li>{@code assertEquals(0, rsp.getRetcode());}</li>
+     *   <li>{@code assertEquals(SceneTestFixtures.PLANE_ID, rsp.getSceneInfo().getPlaneId());}</li>
+     *   <li>{@code assertEquals(1, rsp.getEntityList().getMonstersCount());}</li>
+     *   <li>{@code assertEquals(1000002, rsp.getEntityList().getNpcs(0).getEntityId());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("查询当前场景成功应返回完整快照")
     void getCurSceneInfoSuccessShouldReturnSnapshot() {
@@ -142,6 +250,13 @@ class SceneNettyServiceTest {
         assertEquals(1000002, rsp.getEntityList().getNpcs(0).getEntityId());
     }
 
+    /**
+     * 验证点：未登录查询当前场景应返回 retcode=1。
+     * <p>测试方法 {@code getCurSceneInfoWithoutLoginShouldFail}：
+     * <ul>
+     *   <li>{@code assertEquals(1, rsp.getRetcode());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("未登录查询当前场景应返回 retcode=1")
     void getCurSceneInfoWithoutLoginShouldFail() {
@@ -152,6 +267,13 @@ class SceneNettyServiceTest {
         assertEquals(1, rsp.getRetcode());
     }
 
+    /**
+     * 验证点：尚未进入场景查询应返回 retcode=2。
+     * <p>测试方法 {@code getCurSceneInfoWithoutSceneShouldFail}：
+     * <ul>
+     *   <li>{@code assertEquals(2, rsp.getRetcode());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("尚未进入场景查询应返回 retcode=2")
     void getCurSceneInfoWithoutSceneShouldFail() {
@@ -162,6 +284,16 @@ class SceneNettyServiceTest {
         assertEquals(2, rsp.getRetcode());
     }
 
+    /**
+     * 验证点：NPC 交互成功应返回对话 ID。
+     * <p>测试方法 {@code interactNpcSuccessShouldReturnDialogueId}：
+     * <ul>
+     *   <li>{@code when(npcConfigRepository.findById(SceneTestFixtures.NPC_CONFIG_ID))}</li>
+     *   <li>{@code assertEquals(0, rsp.getRetcode());}</li>
+     *   <li>{@code assertEquals(1000002, rsp.getEntityId());}</li>
+     *   <li>{@code assertEquals(SceneTestFixtures.NPC_DIALOGUE_ID, rsp.getDialogueId());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("NPC 交互成功应返回对话 ID")
     void interactNpcSuccessShouldReturnDialogueId() {
@@ -185,6 +317,14 @@ class SceneNettyServiceTest {
         assertEquals(SceneTestFixtures.NPC_DIALOGUE_ID, rsp.getDialogueId());
     }
 
+    /**
+     * 验证点：交互不存在的 NPC 实体应返回 retcode=3。
+     * <p>测试方法 {@code interactMissingNpcShouldFail}：
+     * <ul>
+     *   <li>{@code assertEquals(3, rsp.getRetcode());}</li>
+     *   <li>{@code assertEquals(9999999, rsp.getEntityId());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("交互不存在的 NPC 实体应返回 retcode=3")
     void interactMissingNpcShouldFail() {
@@ -201,6 +341,16 @@ class SceneNettyServiceTest {
         assertEquals(9999999, rsp.getEntityId());
     }
 
+    /**
+     * 验证点：拾取道具成功应更新道具状态为已开启。
+     * <p>测试方法 {@code pickupPropSuccessShouldOpenProp}：
+     * <ul>
+     *   <li>{@code assertEquals(0, rsp.getRetcode());}</li>
+     *   <li>{@code assertEquals(1000003, rsp.getEntityId());}</li>
+     *   <li>{@code assertEquals(1, rsp.getPropState());}</li>
+     *   <li>{@code assertEquals(1, propStateAfter);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("拾取道具成功应更新道具状态为已开启")
     void pickupPropSuccessShouldOpenProp() {
@@ -223,6 +373,14 @@ class SceneNettyServiceTest {
         assertEquals(1, propStateAfter);
     }
 
+    /**
+     * 验证点：拾取不存在的道具应返回 retcode=3。
+     * <p>测试方法 {@code pickupMissingPropShouldFail}：
+     * <ul>
+     *   <li>{@code assertEquals(3, rsp.getRetcode());}</li>
+     *   <li>{@code assertEquals(0, rsp.getPropState());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("拾取不存在的道具应返回 retcode=3")
     void pickupMissingPropShouldFail() {
@@ -240,6 +398,14 @@ class SceneNettyServiceTest {
         assertEquals(0, rsp.getPropState());
     }
 
+    /**
+     * 验证点：触发场景事件应返回 retcode=0。
+     * <p>测试方法 {@code triggerSceneEventShouldSucceed}：
+     * <ul>
+     *   <li>{@code assertEquals(0, rsp.getRetcode());}</li>
+     *   <li>{@code assertEquals(1000004, rsp.getEntityId());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("触发场景事件应返回 retcode=0")
     void triggerSceneEventShouldSucceed() {
@@ -254,6 +420,16 @@ class SceneNettyServiceTest {
         assertEquals(1000004, rsp.getEntityId());
     }
 
+    /**
+     * 验证点：useHealingSpringShouldReturnDemoEffect。
+     * <p>测试方法 {@code useHealingSpringShouldReturnDemoEffect}：
+     * <ul>
+     *   <li>{@code assertEquals(0, rsp.getRetcode());}</li>
+     *   <li>{@code assertEquals(1000005, rsp.getEntityId());}</li>
+     *   <li>{@code assertEquals(0, rsp.getHealEffect().getHpRecovered());}</li>
+     *   <li>{@code assertTrue(rsp.getRespawnPointSet());}</li>
+     * </ul>
+     */
     @Test
     @Disabled("SceneSystemProto.UseHealingSpringScRsp 生成代码存在 NoSuchMethodError，待 proto 重新生成后启用")
     @DisplayName("使用治疗泉应返回演示效果")
@@ -288,22 +464,18 @@ class SceneNettyServiceTest {
                         SceneTestFixtures.NPC_ROGUE_EVENT_ID));
     }
 
-    @SuppressWarnings("unchecked")
     private Channel loggedInChannel(long uid) {
         Channel channel = mock(Channel.class);
-        Attribute<Long> uidAttr = mock(Attribute.class);
-        when(channel.attr(UID_KEY)).thenReturn(uidAttr);
-        when(uidAttr.get()).thenReturn(uid);
+        when(contextResolver.resolvePlayerId(channel)).thenReturn((int) (uid & 0xffffffffL));
+        when(contextResolver.resolveUid(channel)).thenReturn(OptionalLong.of(uid));
         log.info("模拟登录 Channel: uid={}", uid);
         return channel;
     }
 
-    @SuppressWarnings("unchecked")
     private Channel loggedOutChannel() {
         Channel channel = mock(Channel.class);
-        Attribute<Long> uidAttr = mock(Attribute.class);
-        when(channel.attr(UID_KEY)).thenReturn(uidAttr);
-        when(uidAttr.get()).thenReturn(null);
+        when(contextResolver.resolvePlayerId(channel)).thenReturn(0);
+        when(contextResolver.resolveUid(channel)).thenReturn(OptionalLong.empty());
         return channel;
     }
 }

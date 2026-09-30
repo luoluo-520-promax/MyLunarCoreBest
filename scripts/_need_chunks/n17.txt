@@ -1,0 +1,15 @@
+c:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\main\java\cn\itcast\demo\mylunarcore\player\ShutdownPersistResult.java
+c:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\settings\SettingsNettyServiceTest.java
+c:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\battle\BattleSceneFactoryTest.java
+c:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\main\java\cn\itcast\demo\mylunarcore\model\ChallengeHistoryEntity.java
+c:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\main\java\cn\itcast\demo\mylunarcore\net\ClientFeatureFlags.java
+c:\Users\ASUS\IdeaProjects\test\MyLunarCore\microservices\services\ai-assist-service\src\test\java\cn\itcast\demo\mylunarcore\assist\RemoteAssistEngineTest.java
+c:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\main\java\cn\itcast\demo\mylunarcore\anticheat\BattleAuditService.java
+c:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\player\PlayerLoginWireVersionTest.java
+c:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\center\MigrationTicketServiceTest.java
+c:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\main\java\cn\itcast\demo\mylunarcore\item\ItemJsonParser.java
+c:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\main\java\cn\itcast\demo\mylunarcore\guild\GuildWarService.java
+c:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\main\java\cn\itcast\demo\mylunarcore\center\InMemoryMultiNodeRoutingClient.java
+c:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\main\java\cn\itcast\demo\mylunarcore\matchmaking\MatchDomainEvents.java
+c:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\main\java\cn\itcast\demo\mylunarcore\repo\WalletRepository.java
+c:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\main\java\cn\itcast\demo\mylunarcore\worldboss\WorldBossService.java

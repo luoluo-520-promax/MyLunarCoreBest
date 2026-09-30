@@ -1,11 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
     <springProperty scope="context" name="LOG_PATH" source="logging.file.path" defaultValue="logs"/>
+    <springProperty scope="context" name="LOG_STRUCTURED" source="logging.structured.enabled" defaultValue="false"/>
 
+    <conversionRule conversionWord="maskMsg"
+                    converterClass="cn.itcast.demo.mylunarcore.common.MaskingMessageConverter"/>
+
+    <!-- 文本日志（开发默认）：含脱敏 msg + traceId -->
     <property name="CONSOLE_PATTERN"
-              value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{50} - %msg%n"/>
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{traceId}] %-5level %logger{50} - %maskMsg%n"/>
     <property name="FILE_PATTERN"
-              value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{50} - %msg%n"/>
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{traceId}] %-5level %logger{50} - %maskMsg%n"/>
+    <!-- 结构化近似 JSON（生产可开 logging.structured.enabled=true 切 profile） -->
+    <property name="JSON_PATTERN"
+              value='{"ts":"%d{yyyy-MM-dd HH:mm:ss.SSS}","level":"%level","logger":"%logger{50}","traceId":"%X{traceId}","thread":"%thread","msg":"%maskMsg"}%n'/>
 
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
@@ -14,7 +22,6 @@
         </encoder>
     </appender>
 
-    <!-- 系统日志：按天滚动 -->
     <appender name="SYSTEM_ROLLING" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <file>${LOG_PATH}/system/system.log</file>
         <encoder>
@@ -27,7 +34,6 @@
         </rollingPolicy>
     </appender>
 
-    <!-- 业务日志：按天滚动 -->
     <appender name="BUSINESS_ROLLING" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <file>${LOG_PATH}/business/business.log</file>
         <encoder>
@@ -40,17 +46,32 @@
         </rollingPolicy>
     </appender>
 
+    <appender name="STRUCTURED_ROLLING" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_PATH}/structured/app.json.log</file>
+        <encoder>
+            <pattern>${JSON_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_PATH}/structured/app.%d{yyyy-MM-dd}.json.log</fileNamePattern>
+            <maxHistory>14</maxHistory>
+        </rollingPolicy>
+    </appender>
+
     <logger name="cn.itcast.demo.mylunarcore.sys" level="INFO" additivity="false">
         <appender-ref ref="SYSTEM_ROLLING"/>
         <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="STRUCTURED_ROLLING"/>
     </logger>
 
     <logger name="cn.itcast.demo.mylunarcore.biz" level="INFO" additivity="false">
         <appender-ref ref="BUSINESS_ROLLING"/>
         <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="STRUCTURED_ROLLING"/>
     </logger>
 
     <root level="INFO">
         <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="STRUCTURED_ROLLING"/>
     </root>
 </configuration>

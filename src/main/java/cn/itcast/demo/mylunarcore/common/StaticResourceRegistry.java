@@ -18,11 +18,9 @@ import org.springframework.stereotype.Component;
 
 // 不可修改视图包装
 import java.util.Collections;
-// 插入顺序稳定的 Map
 import java.util.LinkedHashMap;
-// Map 接口
+import java.util.List;
 import java.util.Map;
-// Optional 容器
 import java.util.Optional;
 
 /**
@@ -86,11 +84,29 @@ public class StaticResourceRegistry {
     }
 
     /**
-     * 获取当前注册表快照。
-     *
-     * @return 不可修改的注册表视图
+     * 获取当前注册表快照（资源引用视图）。
      */
     public Map<String, TabularStaticResource> snapshot() {
-        return Collections.unmodifiableMap(byType); // 防止外部修改内部 Map
+        return Collections.unmodifiableMap(byType);
+    }
+
+    /** 热更前缓存行快照：type → rows（null 表示当时未加载）。 */
+    public Map<String, List<String[]>> snapshotCachedRows() {
+        Map<String, List<String[]>> out = new LinkedHashMap<>();
+        for (Map.Entry<String, TabularStaticResource> e : byType.entrySet()) {
+            out.put(e.getKey(), e.getValue().snapshotCachedRows());
+        }
+        return out;
+    }
+
+    /** 热更失败时恢复静态表缓存。 */
+    public void restoreCachedRows(Map<String, List<String[]>> previous) {
+        if (previous == null) {
+            return;
+        }
+        for (Map.Entry<String, TabularStaticResource> e : byType.entrySet()) {
+            e.getValue().restoreCachedRows(previous.get(e.getKey()));
+        }
+        log.info("Restored cached rows for {} tabular static resources", byType.size());
     }
 }

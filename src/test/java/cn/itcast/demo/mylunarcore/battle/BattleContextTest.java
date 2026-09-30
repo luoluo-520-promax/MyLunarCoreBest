@@ -17,6 +17,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+/**
+ * BattleContext 战斗上下文测试。
+ * <p>
+ * 针对相关生产代码的单元/切片测试类 {@code BattleContextTest}：
+ * 通过 fixture、mock 与断言覆盖关键成功路径、失败码与状态边界。
+ */
 @DisplayName("BattleContext 战斗上下文测试")
 class BattleContextTest {
 
@@ -33,6 +39,17 @@ class BattleContextTest {
                 context.getBattleId(), context.getWaveCount(), context.getCurrentWave(), context.getTurn());
     }
 
+    /**
+     * 验证点：createNew 应初始化玩家与第一波怪物。
+     * <p>测试方法 {@code createNewShouldInitializePlayerAndFirstWave}：
+     * <ul>
+     *   <li>{@code assertNotNull(player);}</li>
+     *   <li>{@code assertNotNull(monster101);}</li>
+     *   <li>{@code assertNotNull(monster102);}</li>
+     *   <li>{@code assertEquals(1000, player.getHp());}</li>
+     *   <li>{@code assertFalse(player.isDead());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("createNew 应初始化玩家与第一波怪物")
     void createNewShouldInitializePlayerAndFirstWave() {
@@ -49,6 +66,13 @@ class BattleContextTest {
         assertFalse(player.isDead());
     }
 
+    /**
+     * 验证点：incrementTurn 应递增回合数。
+     * <p>测试方法 {@code incrementTurnShouldAdvanceTurnCounter}：
+     * <ul>
+     *   <li>{@code assertEquals(3, context.getTurn());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("incrementTurn 应递增回合数")
     void incrementTurnShouldAdvanceTurnCounter() {
@@ -59,6 +83,15 @@ class BattleContextTest {
         assertEquals(3, context.getTurn());
     }
 
+    /**
+     * 验证点：switchToWave 应切换波次并注册新怪物。
+     * <p>测试方法 {@code switchToWaveShouldLoadMonstersForWave}：
+     * <ul>
+     *   <li>{@code assertNotNull(monster201);}</li>
+     *   <li>{@code assertEquals(2, context.getCurrentWave());}</li>
+     *   <li>{@code assertEquals(300, monster201.getHp());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("switchToWave 应切换波次并注册新怪物")
     void switchToWaveShouldLoadMonstersForWave() {
@@ -73,6 +106,14 @@ class BattleContextTest {
         assertEquals(300, monster201.getHp());
     }
 
+    /**
+     * 验证点：isAllMonstersDeadInWave 应正确判断波次清场。
+     * <p>测试方法 {@code isAllMonstersDeadInWaveShouldDetectWaveClear}：
+     * <ul>
+     *   <li>{@code assertFalse(clearedBefore);}</li>
+     *   <li>{@code assertTrue(clearedAfter);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("isAllMonstersDeadInWave 应正确判断波次清场")
     void isAllMonstersDeadInWaveShouldDetectWaveClear() {
@@ -90,6 +131,17 @@ class BattleContextTest {
         assertTrue(clearedAfter);
     }
 
+    /**
+     * 验证点：getResolvedActionsForSkill 应解析技能行为链。
+     * <p>测试方法 {@code getResolvedActionsForSkillShouldParseActions}：
+     * <ul>
+     *   <li>{@code when(repo.findBySkillId(1001)).thenReturn(List.of(}</li>
+     *   <li>{@code assertEquals(3, actions.size());}</li>
+     *   <li>{@code assertEquals(-150, actions.get(0).tryParseHpDelta());}</li>
+     *   <li>{@code assertEquals(List.of(5), actions.get(1).tryParseBuffIds());}</li>
+     *   <li>{@code assertTrue(actions.get(2).tryParseKillTrue());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("getResolvedActionsForSkill 应解析技能行为链")
     void getResolvedActionsForSkillShouldParseActions() {
@@ -114,6 +166,14 @@ class BattleContextTest {
         assertTrue(actions.get(2).tryParseKillTrue());
     }
 
+    /**
+     * 验证点：非法 skillId 或空行为应返回空列表。
+     * <p>测试方法 {@code invalidSkillShouldReturnEmptyActions}：
+     * <ul>
+     *   <li>{@code when(repo.findBySkillId(2000)).thenReturn(List.of());}</li>
+     *   <li>{@code assertTrue(sizeForZero == 0 && sizeForNegative == 0 && sizeForEmpty == 0);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("非法 skillId 或空行为应返回空列表")
     void invalidSkillShouldReturnEmptyActions() {
@@ -129,6 +189,15 @@ class BattleContextTest {
         assertTrue(sizeForZero == 0 && sizeForNegative == 0 && sizeForEmpty == 0);
     }
 
+    /**
+     * 验证点：MazeSkillActionRuntime 应兼容多种 JSON 字段名。
+     * <p>测试方法 {@code mazeSkillActionRuntimeShouldParseAlternateFieldNames}：
+     * <ul>
+     *   <li>{@code assertEquals(-80, hpAction.tryParseHpDelta());}</li>
+     *   <li>{@code assertEquals(List.of(7, 8), buffAction.tryParseBuffIds());}</li>
+     *   <li>{@code assertTrue(killAction.tryParseKillTrue());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("MazeSkillActionRuntime 应兼容多种 JSON 字段名")
     void mazeSkillActionRuntimeShouldParseAlternateFieldNames() throws Exception {
@@ -146,6 +215,15 @@ class BattleContextTest {
                 hpAction.tryParseHpDelta(), buffAction.tryParseBuffIds(), killAction.tryParseKillTrue());
     }
 
+    /**
+     * 验证点：非法 paramsJson 应被忽略而不中断流程。
+     * <p>测试方法 {@code invalidParamsJsonShouldBeIgnored}：
+     * <ul>
+     *   <li>{@code when(repo.findBySkillId(3000)).thenReturn(List.of(}</li>
+     *   <li>{@code assertEquals(1, actions.size());}</li>
+     *   <li>{@code assertEquals(0, actions.get(0).tryParseHpDelta());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("非法 paramsJson 应被忽略而不中断流程")
     void invalidParamsJsonShouldBeIgnored() {
@@ -162,6 +240,14 @@ class BattleContextTest {
         assertEquals(0, actions.get(0).tryParseHpDelta());
     }
 
+    /**
+     * 验证点：setEnded 应更新战斗结束标记。
+     * <p>测试方法 {@code setEndedShouldUpdateFlag}：
+     * <ul>
+     *   <li>{@code assertFalse(endedBefore);}</li>
+     *   <li>{@code assertTrue(context.isEnded());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("setEnded 应更新战斗结束标记")
     void setEndedShouldUpdateFlag() {

@@ -1,5 +1,6 @@
 package cn.itcast.demo.mylunarcore.config;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.netty.util.concurrent.DefaultEventExecutorGroup;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.Promise;
@@ -25,6 +26,12 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+/**
+ * NettyGameBusinessConfiguration 业务线程池测试。
+ * <p>
+ * 针对相关生产代码的单元/切片测试类 {@code NettyGameBusinessConfigurationTest}：
+ * 通过 fixture、mock 与断言覆盖关键成功路径、失败码与状态边界。
+ */
 @DisplayName("NettyGameBusinessConfiguration 业务线程池测试")
 class NettyGameBusinessConfigurationTest {
 
@@ -36,6 +43,7 @@ class NettyGameBusinessConfigurationTest {
 
     private NettyGameBusinessConfiguration configuration;
     private DefaultEventExecutorGroup executorGroup;
+    private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
 
     @BeforeEach
     void setUp() {
@@ -50,11 +58,20 @@ class NettyGameBusinessConfigurationTest {
         }
     }
 
+    /**
+     * 验证点：显式配置 businessThreads 应创建对应数量的执行器。
+     * <p>测试方法 {@code explicitBusinessThreadsShouldCreateMatchingExecutorCount}：
+     * <ul>
+     *   <li>{@code assertEquals(EXPLICIT_THREADS, executorCount);}</li>
+     *   <li>{@code assertFalse(executorGroup.isShuttingDown());}</li>
+     *   <li>{@code assertFalse(executorGroup.isTerminated());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("显式配置 businessThreads 应创建对应数量的执行器")
     void explicitBusinessThreadsShouldCreateMatchingExecutorCount() {
         LunarCoreProperties properties = propertiesWithBusinessThreads(EXPLICIT_THREADS);
-        executorGroup = configuration.gameBusinessExecutorGroup(properties);
+        executorGroup = configuration.gameBusinessExecutorGroup(properties, meterRegistry);
 
         int executorCount = countExecutors(executorGroup);
         log.info("线程池初始化: configuredThreads={}, executorCount={}, isShuttingDown={}, isTerminated={}",
@@ -64,13 +81,20 @@ class NettyGameBusinessConfigurationTest {
         assertFalse(executorGroup.isTerminated());
     }
 
+    /**
+     * 验证点：businessThreads<=0 时应按 CPU 推算默认线程数。
+     * <p>测试方法 {@code zeroBusinessThreadsShouldUseCpuBasedDefault}：
+     * <ul>
+     *   <li>{@code assertEquals(expected, executorCount);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("businessThreads<=0 时应按 CPU 推算默认线程数")
     void zeroBusinessThreadsShouldUseCpuBasedDefault() {
         LunarCoreProperties properties = propertiesWithBusinessThreads(0);
         int expected = Math.max(4, Runtime.getRuntime().availableProcessors() * 2);
 
-        executorGroup = configuration.gameBusinessExecutorGroup(properties);
+        executorGroup = configuration.gameBusinessExecutorGroup(properties, meterRegistry);
         int executorCount = countExecutors(executorGroup);
 
         log.info("默认线程数推算: businessThreads=0, availableProcessors={}, expectedThreads={}, executorCount={}",
@@ -78,11 +102,21 @@ class NettyGameBusinessConfigurationTest {
         assertEquals(expected, executorCount);
     }
 
+    /**
+     * 验证点：提交任务应在 game-business 线程上执行并完成。
+     * <p>测试方法 {@code submittedTasksShouldRunOnBusinessThreads}：
+     * <ul>
+     *   <li>{@code assertTrue(finished, "任务应在超时前全部完成");}</li>
+     *   <li>{@code assertEquals(TASK_COUNT, completed.get());}</li>
+     *   <li>{@code assertTrue(threadNames.size() >= 1 && threadNames.size() <= EXPLICIT_THREADS);}</li>
+     *   <li>{@code assertTrue(threadName.startsWith("game-business"),}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("提交任务应在 game-business 线程上执行并完成")
     void submittedTasksShouldRunOnBusinessThreads() throws Exception {
         LunarCoreProperties properties = propertiesWithBusinessThreads(EXPLICIT_THREADS);
-        executorGroup = configuration.gameBusinessExecutorGroup(properties);
+        executorGroup = configuration.gameBusinessExecutorGroup(properties, meterRegistry);
 
         CountDownLatch latch = new CountDownLatch(TASK_COUNT);
         AtomicInteger completed = new AtomicInteger();
@@ -120,11 +154,19 @@ class NettyGameBusinessConfigurationTest {
         }
     }
 
+    /**
+     * 验证点：多任务应能并行使用池中不同线程。
+     * <p>测试方法 {@code multipleTasksShouldUsePoolInParallel}：
+     * <ul>
+     *   <li>{@code assertTrue(allRunning);}</li>
+     *   <li>{@code assertEquals(EXPLICIT_THREADS, activeThreads.size());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("多任务应能并行使用池中不同线程")
     void multipleTasksShouldUsePoolInParallel() throws Exception {
         LunarCoreProperties properties = propertiesWithBusinessThreads(EXPLICIT_THREADS);
-        executorGroup = configuration.gameBusinessExecutorGroup(properties);
+        executorGroup = configuration.gameBusinessExecutorGroup(properties, meterRegistry);
 
         CountDownLatch startGate = new CountDownLatch(1);
         CountDownLatch running = new CountDownLatch(EXPLICIT_THREADS);
@@ -156,11 +198,19 @@ class NettyGameBusinessConfigurationTest {
         assertEquals(EXPLICIT_THREADS, activeThreads.size());
     }
 
+    /**
+     * 验证点：shutdownBusinessExecutors 应优雅关闭线程池。
+     * <p>测试方法 {@code shutdownShouldTerminateExecutorGroup}：
+     * <ul>
+     *   <li>{@code assertNotNull(threadName);}</li>
+     *   <li>{@code assertTrue(executorGroup.isTerminated() || executorGroup.isShutdown());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("shutdownBusinessExecutors 应优雅关闭线程池")
     void shutdownShouldTerminateExecutorGroup() throws Exception {
         LunarCoreProperties properties = propertiesWithBusinessThreads(2);
-        executorGroup = configuration.gameBusinessExecutorGroup(properties);
+        executorGroup = configuration.gameBusinessExecutorGroup(properties, meterRegistry);
 
         Promise<String> probe = executorGroup.next().newPromise();
         executorGroup.execute(() -> {

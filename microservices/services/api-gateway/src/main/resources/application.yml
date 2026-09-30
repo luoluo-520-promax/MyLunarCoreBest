@@ -11,6 +11,8 @@ server:
 spring:
   application:
     name: api-gateway
+  config:
+    import: optional:nacos:${spring.application.name}.${spring.cloud.nacos.config.file-extension:yaml}
   cloud:
     nacos:
       server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
@@ -20,34 +22,139 @@ spring:
         namespace: ${NACOS_NAMESPACE:public}
         file-extension: yaml
     gateway:
-      discovery:
-        locator:
-          enabled: true
-          lower-case-service-id: true
-      routes:
-        - id: auth-service-route
-          uri: lb://auth-service
-          predicates:
-            - Path=/auth/**
-        - id: player-service-route
-          uri: lb://player-service
-          predicates:
-            - Path=/players/**
+      server:
+        webflux:
+          httpclient:
+            connect-timeout: 1000
+            response-timeout: 3s
+          discovery:
+            locator:
+              enabled: ${GATEWAY_DISCOVERY_LOCATOR_ENABLED:false}
+              lower-case-service-id: true
+          routes:
+            # v1 版本化路由（平滑升级；旧路径保留兼容）
+            - id: auth-service-route-v1
+              uri: lb://auth-service
+              predicates:
+                - Path=/v1/auth/**
+              filters:
+                - RewritePath=/v1/auth(?<segment>/?.*), /auth${segment}
+            - id: player-service-route-v1
+              uri: lb://player-service
+              predicates:
+                - Path=/v1/players/**
+              filters:
+                - RewritePath=/v1/players(?<segment>/?.*), /players${segment}
+            - id: ai-assist-service-route-v1
+              uri: lb://ai-assist-service
+              predicates:
+                - Path=/v1/ai/**
+              filters:
+                - RewritePath=/v1/ai(?<segment>/?.*), /ai${segment}
+                - name: Retry
+                  args:
+                    retries: 2
+                    series: SERVER_ERROR
+                    methods: GET,POST
+                    backoff:
+                      firstBackoff: 100ms
+                      maxBackoff: 500ms
+                      factor: 2
+                      basedOnPreviousValue: false
+                - name: CircuitBreaker
+                  args:
+                    name: aiAssistCircuit
+                    fallbackUri: forward:/ai/fallback
+              metadata:
+                response-timeout: 3000
+                connect-timeout: 1000
+            - id: auth-service-route
+              uri: lb://auth-service
+              predicates:
+                - Path=/auth/**
+            - id: player-service-route
+              uri: lb://player-service
+              predicates:
+                - Path=/players/**
+            - id: ai-assist-service-route
+              uri: lb://ai-assist-service
+              predicates:
+                - Path=/ai/**
+              filters:
+                - name: Retry
+                  args:
+                    retries: 2
+                    series: SERVER_ERROR
+                    methods: GET,POST
+                    backoff:
+                      firstBackoff: 100ms
+                      maxBackoff: 500ms
+                      factor: 2
+                      basedOnPreviousValue: false
+                - name: CircuitBreaker
+                  args:
+                    name: aiAssistCircuit
+                    fallbackUri: forward:/ai/fallback
+              metadata:
+                response-timeout: 3000
+                connect-timeout: 1000
+            - id: chat-service-route-v1
+              uri: lb://chat-service
+              predicates:
+                - Path=/v1/chat/**
+            - id: match-service-route-v1
+              uri: lb://match-service
+              predicates:
+                - Path=/v1/match/**
+            - id: chat-service-route
+              uri: lb://chat-service
+              predicates:
+                - Path=/chat/**
+              filters:
+                - RewritePath=/chat(?<segment>/?.*), /v1/chat${segment}
+            - id: match-service-route
+              uri: lb://match-service
+              predicates:
+                - Path=/match/**
+              filters:
+                - RewritePath=/match(?<segment>/?.*), /v1/match${segment}
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      aiAssistCircuit:
+        slidingWindowSize: 20
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 5
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+  timelimiter:
+    instances:
+      aiAssistCircuit:
+        timeoutDuration: 3s
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,gateway
+        include: health
+  endpoint:
+    health:
+      show-details: never
 
 mylunarcore:
   gateway:
     auth:
       enabled: true
+      # 仅最小公开面；/ai/fallback 由网关 forward 内部调用，仍要求同进程回路（勿对外暴露）
       exclude-paths:
         - /auth/**
-        - /actuator/**
-      jwt-secret: "change-me-to-a-secure-32-byte-secret!"
+        - /v1/auth/**
+        - /ai/health
+        - /v1/ai/health
+        - /ai/fallback
+        - /actuator/health
+      jwt-secret: ${GATEWAY_JWT_SECRET:change-me-to-a-secure-32-byte-secret!}
       jwt-issuer: "mylunarcore-auth-service"
     ratelimit:
       enabled: true
@@ -55,4 +162,8 @@ mylunarcore:
       user-qps: 30
       exclude-paths:
         - /auth/**
-        - /actuator/**
+        - /v1/auth/**
+        - /ai/health
+        - /v1/ai/health
+        - /ai/fallback
+        - /actuator/health

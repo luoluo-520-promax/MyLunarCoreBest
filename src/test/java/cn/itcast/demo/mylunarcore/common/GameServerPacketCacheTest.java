@@ -9,6 +9,12 @@ import org.slf4j.LoggerFactory;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
+/**
+ * GameServerPacketCache 协议包体缓存测试。
+ * <p>
+ * 针对相关生产代码的单元/切片测试类 {@code GameServerPacketCacheTest}：
+ * 通过 fixture、mock 与断言覆盖关键成功路径、失败码与状态边界。
+ */
 @DisplayName("GameServerPacketCache 协议包体缓存测试")
 class GameServerPacketCacheTest {
 
@@ -24,6 +30,14 @@ class GameServerPacketCacheTest {
         log.info("包体缓存初始化: cacheClass={}", cache.getClass().getSimpleName());
     }
 
+    /**
+     * 验证点：getOrPutSerializedPayload 应缓存并复用同一 byte[]。
+     * <p>测试方法 {@code getOrPutShouldCachePayload}：
+     * <ul>
+     *   <li>{@code assertSame(first, second);}</li>
+     *   <li>{@code assertArrayEquals(new byte[]{(byte) TEST_CMD_ID, 1, 2}, first);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("getOrPutSerializedPayload 应缓存并复用同一 byte[]")
     void getOrPutShouldCachePayload() {
@@ -36,6 +50,13 @@ class GameServerPacketCacheTest {
         assertArrayEquals(new byte[]{(byte) TEST_CMD_ID, 1, 2}, first);
     }
 
+    /**
+     * 验证点：invalidateCmd 应清除指定指令缓存。
+     * <p>测试方法 {@code invalidateCmdShouldRemoveCachedPayload}：
+     * <ul>
+     *   <li>{@code assertArrayEquals(new byte[]{8, 8, 8}, after);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("invalidateCmd 应清除指定指令缓存")
     void invalidateCmdShouldRemoveCachedPayload() {
@@ -49,6 +70,13 @@ class GameServerPacketCacheTest {
         assertArrayEquals(new byte[]{8, 8, 8}, after);
     }
 
+    /**
+     * 验证点：playerLogoutOkPayload 应返回固定登出成功包体。
+     * <p>测试方法 {@code playerLogoutOkPayloadShouldBeStable}：
+     * <ul>
+     *   <li>{@code assertSame(first, second);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("playerLogoutOkPayload 应返回固定登出成功包体")
     void playerLogoutOkPayloadShouldBeStable() {

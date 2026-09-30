@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>配置版本列表 · MyLunarCore</title>
+  <style>
+    :root { --bg:#0f1419; --card:#1a2332; --text:#e7ecf3; --muted:#8b9bb4; --accent:#3d8bfd; }
+    body { margin:0; font-family:"Segoe UI","PingFang SC",sans-serif; background:var(--bg); color:var(--text); }
+    main { max-width:960px; margin:40px auto; padding:0 20px; }
+    h1 { font-size:1.35rem; }
+    p, label { color:var(--muted); }
+    input { background:var(--card); border:1px solid #2a3548; color:var(--text); border-radius:8px; padding:8px 12px; }
+    button { border:0; border-radius:8px; padding:8px 16px; background:var(--accent); color:#fff; cursor:pointer; }
+    table { width:100%; border-collapse:collapse; margin-top:16px; font-size:.85rem; }
+    th, td { border-bottom:1px solid #2a3548; padding:8px; text-align:left; }
+    #diff { margin-top:16px; white-space:pre-wrap; background:var(--card); padding:12px; border-radius:8px; }
+    a { color:var(--accent); }
+  </style>
+</head>
+<body>
+<main>
+  <h1>配置版本列表 / 对比</h1>
+  <p>数据来自 <code>config_release</code>。回滚请用 <a href="/admin/config-rollback.html">一键回滚</a>。</p>
+  <label>配置名过滤 <input id="name" placeholder="Banners.json"/> </label>
+  <button id="load">刷新列表</button>
+  <button id="doDiff">对比所选</button>
+  <table>
+    <thead><tr><th></th><th>ID</th><th>配置</th><th>Hash</th><th>版本</th><th>操作者</th><th>时间</th></tr></thead>
+    <tbody id="tbody"></tbody>
+  </table>
+  <pre id="diff"></pre>
+  <div id="diffHtml" style="margin-top:12px;font-family:ui-monospace,Consolas,monospace;font-size:.8rem;line-height:1.45"></div>
+</main>
+<script>
+function escapeHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+/** 简易行级 JSON 高亮：+ 绿 / - 红 */
+function renderDiffHighlight(leftText, rightText) {
+  const L = String(leftText||'').split('\n');
+  const R = String(rightText||'').split('\n');
+  const max = Math.max(L.length, R.length);
+  let html = '';
+  for (let i = 0; i < max; i++) {
+    const a = L[i], b = R[i];
+    if (a === b) {
+      html += `<div style="color:#8b9bb4">${escapeHtml(a||'')}</div>`;
+    } else {
+      if (a != null) html += `<div style="background:#3a1a1a;color:#ff8a8a">- ${escapeHtml(a)}</div>`;
+      if (b != null) html += `<div style="background:#1a3a1a;color:#8aff8a">+ ${escapeHtml(b)}</div>`;
+    }
+  }
+  document.getElementById('diffHtml').innerHTML = html || '<i>无差异</i>';
+}
+async function csrf() {
+  const r = await fetch('/api/admin/csrf', { credentials: 'include' });
+  if (!r.ok) throw new Error('请先登录');
+  const j = await r.json();
+  return j.token || j.csrfToken || j._csrf;
+}
+document.getElementById('load').onclick = async () => {
+  const name = document.getElementById('name').value.trim();
+  const q = name ? ('?configName=' + encodeURIComponent(name) + '&limit=50') : '?limit=50';
+  const r = await fetch('/api/admin/config-versions' + q, { credentials: 'include' });
+  const j = await r.json();
+  const tb = document.getElementById('tbody');
+  tb.innerHTML = '';
+  for (const it of (j.items || [])) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td><input type="checkbox" value="${it.id}"/></td>
+      <td>${it.id}</td><td>${it.config_name}</td><td>${(it.content_hash||'').slice(0,12)}</td>
+      <td>${it.game_version||''}</td><td>${it.operator||''}</td><td>${it.created_at||''}</td>`;
+    tb.appendChild(tr);
+  }
+};
+document.getElementById('doDiff').onclick = async () => {
+  const checked = [...document.querySelectorAll('#tbody input:checked')].map(x => x.value);
+  if (checked.length !== 2) { document.getElementById('diff').textContent = '请恰好选择 2 条记录'; return; }
+  const name = document.getElementById('name').value.trim() || 'Banners.json';
+  const r = await fetch(`/api/admin/config-versions/diff?configName=${encodeURIComponent(name)}&leftId=${checked[0]}&rightId=${checked[1]}`,
+    { credentials: 'include' });
+  const j = await r.json();
+  document.getElementById('diff').textContent = JSON.stringify(j, null, 2);
+  const left = typeof j.left === 'string' ? j.left : JSON.stringify(j.leftContent || j.left || {}, null, 2);
+  const right = typeof j.right === 'string' ? j.right : JSON.stringify(j.rightContent || j.right || j.diff || {}, null, 2);
+  renderDiffHighlight(left, right);
+};
+document.getElementById('load').click();
+</script>
+</body>
+</html>

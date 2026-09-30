@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "collectibles": [
+    {
+      "collectibleId": "mem_bubble_01",
+      "name": "忆泡·启程",
+      "tier": "NORMAL",
+      "planeId": 10001,
+      "floorId": 1,
+      "pos": {"x": 8.0, "y": 1.0, "z": 3.0},
+      "loreUnlockThreshold": 1,
+      "loreTextKey": "lore.mem_bubble_01"
+    },
+    {
+      "collectibleId": "archive_book_01",
+      "name": "旧档·星轨笔记",
+      "tier": "HIDDEN",
+      "planeId": 10001,
+      "floorId": 1,
+      "pos": {"x": 42.0, "y": 0.5, "z": 27.0},
+      "aoiRevealRadius": 4.0,
+      "loreUnlockThreshold": 2,
+      "loreTextKey": "lore.archive_book_01"
+    },
+    {
+      "collectibleId": "easter_egg_kick_01",
+      "name": "彩蛋·石子回响",
+      "tier": "EASTER_EGG",
+      "planeId": 10001,
+      "floorId": 1,
+      "requiredAction": "KICK_PEBBLE",
+      "loreUnlockThreshold": 3,
+      "loreTextKey": "lore.easter_egg_kick_01"
+    }
+  ]
+}

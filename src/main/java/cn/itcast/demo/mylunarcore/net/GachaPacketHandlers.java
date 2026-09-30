@@ -1,73 +1,98 @@
-// 网络命令处理器实现所在包（抽卡相关）
 package cn.itcast.demo.mylunarcore.net;
 
-// 抽卡领域 Netty 服务
 import cn.itcast.demo.mylunarcore.gacha.GachaNettyService;
-// 抽卡 cmdId
-import cn.itcast.demo.mylunarcore.net.CmdIds;
-// 解码后的业务包
-import cn.itcast.demo.mylunarcore.net.GamePacket;
-// 抽卡系统 Protobuf
+import cn.itcast.demo.mylunarcore.player.PlayerContextResolver;
 import cn.itcast.demo.mylunarcore.protocol.GachaSystemProto;
-// Netty 上下文
 import io.netty.channel.ChannelHandlerContext;
-// Spring 组件
 import org.springframework.stereotype.Component;
 
 /**
- * 抽卡命令入口：拉取卡池信息、抽卡与兑换保底等，委托 {@link cn.itcast.demo.mylunarcore.gacha.GachaNettyService}。
+ * 抽卡命令入口：拉取卡池信息、抽卡与兑换保底等；抽卡动作叠加 UID/IP 限流。
  */
-@Component // 注册为 Spring Bean
+@Component
 public class GachaPacketHandlers {
 
-    private final GachaNettyService gachaNettyService; // 抽卡域服务（不可变依赖）
+    private final GachaNettyService gachaNettyService;
+    private final SensitiveApiRateLimiter sensitiveApiRateLimiter;
+    private final PlayerContextResolver playerContextResolver;
 
-    /**
-     * 构造器注入抽卡服务。
-     */
-    public GachaPacketHandlers(GachaNettyService gachaNettyService) {
-        this.gachaNettyService = gachaNettyService; // 保存引用
+    public GachaPacketHandlers(GachaNettyService gachaNettyService,
+                               SensitiveApiRateLimiter sensitiveApiRateLimiter,
+                               PlayerContextResolver playerContextResolver) {
+        this.gachaNettyService = gachaNettyService;
+        this.sensitiveApiRateLimiter = sensitiveApiRateLimiter;
+        this.playerContextResolver = playerContextResolver;
     }
 
-    /**
-     * 查询当前开放的卡池与概率摘要。
-     */
     @PacketCmd(CmdIds.GET_GACHA_INFO_CS_REQ)
     public void onGetGachaInfo(ChannelHandlerContext ctx, GamePacket packet) throws Exception {
-        GachaSystemProto.GetGachaInfoScRsp rsp = gachaNettyService.handleGetGachaInfo(ctx.channel()); // 无负载请求：直接从 Channel 上下文组装
-        ctx.writeAndFlush(new GamePacket(CmdIds.GET_GACHA_INFO_SC_RSP, rsp.toByteArray())); // 写回响应
+        GachaSystemProto.GetGachaInfoScRsp rsp = gachaNettyService.handleGetGachaInfo(ctx.channel());
+        ctx.writeAndFlush(new GamePacket(CmdIds.GET_GACHA_INFO_SC_RSP, rsp.toByteArray()));
     }
 
-    /**
-     * 执行一次或多次抽卡。
-     */
     @PacketCmd(CmdIds.DO_GACHA_CS_REQ)
     public void onDoGacha(ChannelHandlerContext ctx, GamePacket packet) throws Exception {
-        byte[] payload = packet.getPayload(); // 请求正文（卡池 id、次数等）
-        GachaSystemProto.DoGachaCsReq req = GachaSystemProto.DoGachaCsReq.parseFrom(payload); // 反序列化
-        GachaSystemProto.DoGachaScRsp rsp = gachaNettyService.handleDoGacha(req, ctx.channel()); // 业务处理
-        ctx.writeAndFlush(new GamePacket(CmdIds.DO_GACHA_SC_RSP, rsp.toByteArray())); // 写回响应
+        int playerId = playerContextResolver.resolvePlayerId(ctx.channel());
+        String ip = resolveIp(ctx);
+        if (!sensitiveApiRateLimiter.tryAcquireGacha(ip, playerId)) {
+            GachaSystemProto.DoGachaScRsp limited = GachaSystemProto.DoGachaScRsp.newBuilder()
+                    .setRetcode(8)
+                    .build();
+            ctx.writeAndFlush(new GamePacket(CmdIds.DO_GACHA_SC_RSP, limited.toByteArray()));
+            return;
+        }
+        byte[] payload = packet.getPayload();
+        GachaSystemProto.DoGachaCsReq req = GachaSystemProto.DoGachaCsReq.parseFrom(
+                payload == null ? new byte[0] : payload);
+        GachaSystemProto.DoGachaScRsp rsp = gachaNettyService.handleDoGacha(req, ctx.channel());
+        ctx.writeAndFlush(new GamePacket(CmdIds.DO_GACHA_SC_RSP, rsp.toByteArray()));
     }
 
-    /**
-     * 兑换天井/保底计数奖励。
-     */
     @PacketCmd(CmdIds.EXCHANGE_GACHA_CEILING_CS_REQ)
     public void onExchangeCeiling(ChannelHandlerContext ctx, GamePacket packet) throws Exception {
-        byte[] payload = packet.getPayload(); // 请求正文
-        GachaSystemProto.ExchangeGachaCeilingCsReq req = GachaSystemProto.ExchangeGachaCeilingCsReq.parseFrom(payload); // 反序列化
-        GachaSystemProto.ExchangeGachaCeilingScRsp rsp = gachaNettyService.handleExchangeCeiling(req, ctx.channel()); // 业务处理
-        ctx.writeAndFlush(new GamePacket(CmdIds.EXCHANGE_GACHA_CEILING_SC_RSP, rsp.toByteArray())); // 写回响应
+        byte[] payload = packet.getPayload();
+        GachaSystemProto.ExchangeGachaCeilingCsReq req =
+                GachaSystemProto.ExchangeGachaCeilingCsReq.parseFrom(
+                        payload == null ? new byte[0] : payload);
+        GachaSystemProto.ExchangeGachaCeilingScRsp rsp =
+                gachaNettyService.handleExchangeCeiling(req, ctx.channel());
+        ctx.writeAndFlush(new GamePacket(CmdIds.EXCHANGE_GACHA_CEILING_SC_RSP, rsp.toByteArray()));
     }
 
-    /**
-     * 查询玩家最近抽卡记录。
-     */
     @PacketCmd(CmdIds.GET_GACHA_HISTORY_CS_REQ)
     public void onGetHistory(ChannelHandlerContext ctx, GamePacket packet) throws Exception {
-        byte[] payload = packet.getPayload(); // 请求正文（分页参数等）
-        GachaSystemProto.GetGachaHistoryCsReq req = GachaSystemProto.GetGachaHistoryCsReq.parseFrom(payload); // 反序列化
-        GachaSystemProto.GetGachaHistoryScRsp rsp = gachaNettyService.handleGetHistory(req, ctx.channel()); // 业务处理
-        ctx.writeAndFlush(new GamePacket(CmdIds.GET_GACHA_HISTORY_SC_RSP, rsp.toByteArray())); // 写回响应
+        byte[] payload = packet.getPayload();
+        GachaSystemProto.GetGachaHistoryCsReq req = GachaSystemProto.GetGachaHistoryCsReq.parseFrom(
+                payload == null ? new byte[0] : payload);
+        GachaSystemProto.GetGachaHistoryScRsp rsp = gachaNettyService.handleGetHistory(req, ctx.channel());
+        ctx.writeAndFlush(new GamePacket(CmdIds.GET_GACHA_HISTORY_SC_RSP, rsp.toByteArray()));
+    }
+
+    @PacketCmd(CmdIds.GACHA_START_CS_REQ)
+    public void onGachaStart(ChannelHandlerContext ctx, GamePacket packet) throws Exception {
+        byte[] payload = packet.getPayload();
+        GachaSystemProto.GachaStartCsReq req = GachaSystemProto.GachaStartCsReq.parseFrom(
+                payload == null ? new byte[0] : payload);
+        GachaSystemProto.GachaStartScRsp rsp = gachaNettyService.handleGachaStart(req, ctx.channel());
+        ctx.writeAndFlush(new GamePacket(CmdIds.GACHA_START_SC_RSP, rsp.toByteArray()));
+    }
+
+    @PacketCmd(CmdIds.GACHA_RESULT_ACK_CS_REQ)
+    public void onGachaResultAck(ChannelHandlerContext ctx, GamePacket packet) throws Exception {
+        byte[] payload = packet.getPayload();
+        GachaSystemProto.GachaResultAckCsReq req = GachaSystemProto.GachaResultAckCsReq.parseFrom(
+                payload == null ? new byte[0] : payload);
+        GachaSystemProto.GachaResultAckScRsp rsp = gachaNettyService.handleGachaResultAck(req, ctx.channel());
+        ctx.writeAndFlush(new GamePacket(CmdIds.GACHA_RESULT_ACK_SC_RSP, rsp.toByteArray()));
+    }
+
+    private static String resolveIp(ChannelHandlerContext ctx) {
+        try {
+            if (ctx.channel().remoteAddress() instanceof java.net.InetSocketAddress isa) {
+                return isa.getAddress().getHostAddress();
+            }
+        } catch (Exception ignored) {
+        }
+        return "unknown";
     }
 }

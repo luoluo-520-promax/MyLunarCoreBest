@@ -1,0 +1,107 @@
+syntax = "proto3";
+
+package cn.itcast.demo.mylunarcore.proto;
+
+option java_package = "cn.itcast.demo.mylunarcore.protocol";
+option java_outer_classname = "ActivitySystemProto";
+
+/** 服务端主动推送活动配置热更新 */
+message ActivityConfigUpdateScNotify {
+  repeated ActivityConfigEntry updated_activities = 1;
+}
+
+message GetActivityInfoCsReq {
+  /** 0 表示拉取全部当前活动 */
+  uint32 activity_id = 1;
+}
+
+message GetActivityInfoScRsp {
+  int32 retcode = 1;
+  repeated ActivityConfigEntry activities = 2;
+}
+
+message ActivityConfigEntry {
+  uint32 activity_id = 1;
+  string name = 2;
+  string activity_type = 3;
+  uint64 module_id = 4;
+  uint64 begin_time = 5;
+  uint64 end_time = 6;
+  uint32 unlock_level = 7;
+  repeated ActivityCondition conditions = 8;
+  string description = 9;
+  string gameplay = 10;
+  string rules = 11;
+  repeated ActivityStage stages = 12;
+  ActivityCostLimit cost_and_limits = 13;
+  repeated ActivityReward rewards = 14;
+  string reward_method = 15;
+  repeated ActivityPointToken points_tokens = 16;
+  uint32 shop_id = 17;
+  repeated ShopProduct shop_products = 18;
+  ActivityUiResources ui_resources = 19;
+  ActivityDisplayText display_text = 20;
+  string extra_json = 21;
+}
+
+message ActivityCondition {
+  string type = 1;
+  string key = 2;
+  int32 int_value = 3;
+  string string_value = 4;
+}
+
+message ActivityStage {
+  uint32 stage_id = 1;
+  string name = 2;
+  string description = 3;
+  uint32 unlock_score = 4;
+  repeated ActivityReward rewards = 5;
+}
+
+message ActivityCostLimit {
+  uint32 cost_item_id = 1;
+  uint32 cost_count = 2;
+  uint32 daily_limit = 3;
+  uint32 total_limit = 4;
+  uint32 cooldown_seconds = 5;
+}
+
+message ActivityReward {
+  uint32 item_id = 1;
+  uint32 count = 2;
+  string type = 3;
+  string grant_timing = 4;
+}
+
+message ActivityPointToken {
+  uint32 token_id = 1;
+  string name = 2;
+  uint32 max_stack = 3;
+  string icon_path = 4;
+}
+
+message ShopProduct {
+  uint32 product_id = 1;
+  uint32 item_id = 2;
+  uint32 price = 3;
+  uint32 currency_id = 4;
+  uint32 daily_limit = 5;
+  uint32 total_limit = 6;
+}
+
+message ActivityUiResources {
+  string banner_image = 1;
+  string background_image = 2;
+  string icon_image = 3;
+  string prefab_path = 4;
+  string theme_color = 5;
+}
+
+message ActivityDisplayText {
+  string title = 1;
+  string subtitle = 2;
+  string banner_text = 3;
+  string tab_label = 4;
+  string help_text = 5;
+}

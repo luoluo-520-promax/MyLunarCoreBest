@@ -9,11 +9,18 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+/**
+ * {@link BattleSceneFactory#createBattleScene}：按 battleId/player/lineup/stage/时间戳与关卡配置装配上下文。
+ */
 @DisplayName("BattleSceneFactory 战斗场景工厂测试")
 class BattleSceneFactoryTest {
 
     private static final Logger log = LoggerFactory.getLogger(BattleSceneFactoryTest.class);
 
+    /**
+     * twoWaveStage 装配后：波次数=2、当前波=1、未结束，且存在玩家实体 88；
+     * 入参 battleId/lineupId/stageId 原样写入上下文。
+     */
     @Test
     @DisplayName("createBattleScene 应返回可用的 BattleContext")
     void createBattleSceneShouldBuildContext() {

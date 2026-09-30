@@ -1,0 +1,10 @@
+﻿C:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\gacha\GachaConfigServiceTest.java
+C:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\gacha\GachaDrawEngineTest.java
+C:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\gacha\GachaNettyServiceTest.java
+C:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\guild\GuildNettyAndPacketTest.java
+C:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\guild\GuildWarServiceTest.java
+C:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\hall\ChatServiceCodecTest.java
+C:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\handbook\HandbookServiceTest.java
+C:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\hardening\ProductionHardeningFlowTest.java
+C:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\item\ItemJsonParserTest.java
+C:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\item\ItemNettyServiceTest.java

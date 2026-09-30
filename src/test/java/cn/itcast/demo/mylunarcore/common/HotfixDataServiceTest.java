@@ -12,6 +12,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+/**
+ * HotfixDataService 热修复加载服务测试。
+ * <p>
+ * 针对相关生产代码的单元/切片测试类 {@code HotfixDataServiceTest}：
+ * 通过 fixture、mock 与断言覆盖关键成功路径、失败码与状态边界。
+ */
 @DisplayName("HotfixDataService 热修复加载服务测试")
 class HotfixDataServiceTest {
 
@@ -27,6 +33,16 @@ class HotfixDataServiceTest {
         log.info("热修复服务初始化: resourcePath={}", properties.getHotfix().getResource());
     }
 
+    /**
+     * 验证点：reload 应从 classpath 加载 hotfix.json。
+     * <p>测试方法 {@code reloadShouldLoadHotfixJson}：
+     * <ul>
+     *   <li>{@code assertTrue(ok);}</li>
+     *   <li>{@code assertEquals("https://cdn.example.com/lunar/static/", data.getClientResourceBaseUrl());}</li>
+     *   <li>{@code assertEquals("1.0.0", data.getHotfixVersion());}</li>
+     *   <li>{@code assertEquals(1L, data.getPatchVersion());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("reload 应从 classpath 加载 hotfix.json")
     void reloadShouldLoadHotfixJson() {
@@ -41,6 +57,16 @@ class HotfixDataServiceTest {
         assertEquals(1L, data.getPatchVersion());
     }
 
+    /**
+     * 验证点：资源不存在时 reload 应返回 false 并保留旧数据。
+     * <p>测试方法 {@code reloadMissingResourceShouldKeepPreviousData}：
+     * <ul>
+     *   <li>{@code assertTrue(reloadableService.reload());}</li>
+     *   <li>{@code assertEquals(before.getHotfixVersion(), after.getHotfixVersion());}</li>
+     *   <li>{@code assertEquals("1.0.0", after.getHotfixVersion());}</li>
+     *   <li>{@code assertFalse(reloadOk);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("资源不存在时 reload 应返回 false 并保留旧数据")
     void reloadMissingResourceShouldKeepPreviousData() {

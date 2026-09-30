@@ -1,0 +1,170 @@
+syntax = "proto3";
+
+package cn.itcast.demo.mylunarcore.proto;
+
+option java_package = "cn.itcast.demo.mylunarcore.protocol";
+option java_outer_classname = "SettingsSystemProto";
+
+// ---------- 画面 ----------
+message DisplaySettings {
+  uint32 graphics_quality = 1;   // 画质档位：0低 1中 2高 3极致
+  uint32 resolution_scale = 2;   // 分辨率缩放百分比 50-100
+  bool vsync = 3;                // 垂直同步
+  uint32 brightness = 4;         // 亮度 0-100
+  bool fullscreen = 5;           // 全屏
+  bool anti_aliasing = 6;        // 抗锯齿
+}
+
+// ---------- 声音 ----------
+message SoundSettings {
+  uint32 master_volume = 1;      // 主音量 0-100
+  uint32 music_volume = 2;       // 音乐 0-100
+  uint32 sfx_volume = 3;         // 音效 0-100
+  uint32 voice_volume = 4;       // 语音 0-100
+  bool muted = 5;                // 全局静音
+}
+
+// ---------- 按键 ----------
+message KeyBinding {
+  string action_id = 1;          // 动作标识，如 move_forward
+  string key_code = 2;           // 键位，如 W / Escape / MouseLeft
+  string device_type = 3;        // pc / mobile / gamepad
+  uint32 scale = 4;              // 手机按钮缩放 50-200
+  float pos_x = 5;               // 手机按钮归一化坐标
+  float pos_y = 6;
+}
+
+message SyncKeyBindCsReq {
+  repeated KeyBinding keybinds = 1;
+  string device_type = 2;
+}
+
+message SyncKeyBindScRsp {
+  int32 retcode = 1; // 0成功 1未登录 2空配置
+  repeated KeyBinding keybinds = 2;
+}
+
+message PushKeyBindScNotify {
+  repeated KeyBinding keybinds = 1;
+  string device_type = 2;
+  string reason = 3; // login | sync | reset
+}
+
+// ---------- 游戏细节 ----------
+message GameplaySettings {
+  string language = 1;           // 语言，如 zh-CN
+  uint32 camera_sensitivity = 2; // 镜头灵敏度 1-100
+  bool auto_battle = 3;          // 自动战斗
+  bool show_damage_numbers = 4;  // 伤害数字
+  bool skip_story_cutscene = 5;  // 跳过剧情演出
+  bool vibration = 6;            // 震动反馈
+  uint32 battle_speed = 7;       // 战斗倍速：1/2/3
+}
+
+message PlayerSettingsSnapshot {
+  DisplaySettings display = 1;
+  SoundSettings sound = 2;
+  repeated KeyBinding keybinds = 3;
+  GameplaySettings gameplay = 4;
+}
+
+message GetPlayerSettingsCsReq {
+}
+
+message GetPlayerSettingsScRsp {
+  int32 retcode = 1;
+  PlayerSettingsSnapshot settings = 2;
+}
+
+message UpdatePlayerSettingsCsReq {
+  PlayerSettingsSnapshot settings = 1;
+  // 仅更新非空分区：客户端可只带需要改的字段；服务端会与现有快照合并
+  bool reset_display = 2;
+  bool reset_sound = 3;
+  bool reset_keybinds = 4;
+  bool reset_gameplay = 5;
+}
+
+message UpdatePlayerSettingsScRsp {
+  int32 retcode = 1;
+  PlayerSettingsSnapshot settings = 2;
+}
+
+message ResetPlayerSettingsCsReq {
+  bool reset_all = 1;            // true=全部恢复默认
+  bool reset_display = 2;
+  bool reset_sound = 3;
+  bool reset_keybinds = 4;
+  bool reset_gameplay = 5;
+}
+
+message ResetPlayerSettingsScRsp {
+  int32 retcode = 1;
+  PlayerSettingsSnapshot settings = 2;
+}
+
+message PlayerSettingsUpdateScNotify {
+  PlayerSettingsSnapshot settings = 1;
+  string reason = 2;
+}
+
+// ---------- 客服工单 ----------
+message SubmitSupportTicketCsReq {
+  string category = 1;           // display / sound / keybind / gameplay / other
+  string subject = 2;
+  string content = 3;
+}
+
+message SubmitSupportTicketScRsp {
+  int32 retcode = 1;
+  uint64 ticket_id = 2;
+}
+
+message SupportTicketInfo {
+  uint64 ticket_id = 1;
+  string category = 2;
+  string subject = 3;
+  string content = 4;
+  int32 status = 5;              // 0待处理 1处理中 2已回复 3已关闭
+  string admin_reply = 6;
+  int64 created_at_ms = 7;
+  int64 updated_at_ms = 8;
+}
+
+message GetSupportTicketListCsReq {
+  uint32 page = 1;
+  uint32 page_size = 2;
+}
+
+message GetSupportTicketListScRsp {
+  int32 retcode = 1;
+  repeated SupportTicketInfo tickets = 2;
+  uint32 total = 3;
+}
+
+/** 设备触觉波形元数据（热更表 DeviceHapticsConfig） */
+message HapticWaveform {
+  uint32 waveform_id = 1;
+  string device_family = 2; // ps5 | xbox | mobile | generic
+  string name = 3;
+  repeated float amplitudes = 4; // 0-1 采样
+  uint32 duration_ms = 5;
+  float trigger_force = 6; // PS5 自适应扳机力度
+}
+
+message GetDeviceHapticsCsReq {
+  string device_id = 1;
+  string device_family = 2; // ps5 | xbox | mobile
+}
+
+message GetDeviceHapticsScRsp {
+  int32 retcode = 1; // 0成功 1未登录
+  string device_family = 2;
+  repeated HapticWaveform waveforms = 3;
+}
+
+message PushDeviceHapticsScNotify {
+  string device_family = 1;
+  repeated HapticWaveform waveforms = 2;
+  string reason = 3; // login | hot_reload
+}

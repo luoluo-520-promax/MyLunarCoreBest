@@ -1,0 +1,54 @@
+syntax = "proto3";
+
+option java_package = "cn.itcast.demo.mylunarcore.protocol";
+option java_outer_classname = "BattlePassSystemProto";
+
+// 战令/通行证协议占位（CmdId 990–995）；与 BattlePassService / BattlePassConfigs.json 对齐。
+
+message GetBattlePassCsReq {
+  uint32 season_id = 1; // 0=当前赛季
+}
+
+message GetBattlePassScRsp {
+  int32 retcode = 1;
+  uint32 season_id = 2;
+  uint32 xp = 3;
+  uint32 level = 4;
+  uint32 max_level = 5;
+  bool premium = 6;
+  repeated uint32 claimed_free = 7;
+  repeated uint32 claimed_premium = 8;
+}
+
+message ClaimBattlePassCsReq {
+  uint32 season_id = 1;
+  uint32 level = 2;
+  bool premium_track = 3;
+}
+
+message ClaimBattlePassScRsp {
+  int32 retcode = 1;
+  uint32 level = 2;
+  bool premium_track = 3;
+}
+
+message BuyBattlePassPremiumCsReq {
+  uint32 season_id = 1;
+  string channel = 2; // 可选：走 IAP 订单号关联
+  string order_id = 3;
+}
+
+message BuyBattlePassPremiumScRsp {
+  int32 retcode = 1;
+  bool premium = 2;
+}
+
+// 战令进度推送（CmdId 1009）
+message BattlePassUpdateScNotify {
+  uint32 season_id = 1;
+  uint32 xp = 2;
+  uint32 level = 3;
+  uint32 max_level = 4;
+  bool premium = 5;
+  string reason = 6; // xp | claim | premium | season
+}

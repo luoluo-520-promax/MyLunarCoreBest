@@ -10,6 +10,12 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
 
+/**
+ * MazeBuffRepository 迷宫 Buff 仓储测试。
+ * <p>
+ * 针对相关生产代码的单元/切片测试类 {@code MazeBuffRepositoryTest}：
+ * 通过 fixture、mock 与断言覆盖关键成功路径、失败码与状态边界。
+ */
 @DisplayName("MazeBuffRepository 迷宫 Buff 仓储测试")
 class MazeBuffRepositoryTest {
 
@@ -25,6 +31,13 @@ class MazeBuffRepositoryTest {
         log.info("仓储初始化: repository={}", repository.getClass().getSimpleName());
     }
 
+    /**
+     * 验证点：findMaxStack 应返回数据库配置的叠层上限。
+     * <p>测试方法 {@code findMaxStackShouldReturnConfiguredValue}：
+     * <ul>
+     *   <li>{@code assertEquals(5, maxStack);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("findMaxStack 应返回数据库配置的叠层上限")
     void findMaxStackShouldReturnConfiguredValue() {
@@ -37,6 +50,14 @@ class MazeBuffRepositoryTest {
         assertEquals(5, maxStack);
     }
 
+    /**
+     * 验证点：findMaxStack 应使用缓存避免重复查库。
+     * <p>测试方法 {@code findMaxStackShouldUseCache}：
+     * <ul>
+     *   <li>{@code assertEquals(3, first);}</li>
+     *   <li>{@code assertEquals(3, second);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("findMaxStack 应使用缓存避免重复查库")
     void findMaxStackShouldUseCache() {
@@ -51,6 +72,14 @@ class MazeBuffRepositoryTest {
         assertEquals(3, second);
     }
 
+    /**
+     * 验证点：非法 buffId 或查库失败时应返回 1。
+     * <p>测试方法 {@code findMaxStackShouldDefaultToOne}：
+     * <ul>
+     *   <li>{@code assertEquals(1, invalid);}</li>
+     *   <li>{@code assertEquals(1, missing);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("非法 buffId 或查库失败时应返回 1")
     void findMaxStackShouldDefaultToOne() {

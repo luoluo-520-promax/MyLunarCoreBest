@@ -1,0 +1,26 @@
+[
+  {
+    "questId": 10001,
+    "title": "初探空间站",
+    "description": "与空间站向导对话并完成一次场景探索。",
+    "objectives": [
+      {"objectiveId": 1, "targetType": 2, "targetId": 1001, "required": 1},
+      {"objectiveId": 2, "targetType": 3, "targetId": 0, "required": 1}
+    ],
+    "rewards": [
+      {"currencyId": 1, "amount": 200},
+      {"itemId": 101, "count": 5}
+    ]
+  },
+  {
+    "questId": 10002,
+    "title": "清理威胁",
+    "description": "在场景中触发一次战斗事件。",
+    "objectives": [
+      {"objectiveId": 1, "targetType": 4, "targetId": 1, "required": 1}
+    ],
+    "rewards": [
+      {"currencyId": 1, "amount": 300}
+    ]
+  }
+]

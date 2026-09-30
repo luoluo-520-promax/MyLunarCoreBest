@@ -1,0 +1,10 @@
+﻿C:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\economy\EconomyTestFixtures.java
+C:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\economy\RewardDistributorTest.java
+C:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\economy\ShopApplicationServiceTest.java
+C:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\economy\ShopConfigRepositoryTest.java
+C:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\economy\WalletApplicationServiceTest.java
+C:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\economy\iap\IapOrderServiceTest.java
+C:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\economy\iap\IapVerifyGatewayTest.java
+C:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\equipment\EquipmentAffixServiceTest.java
+C:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\gacha\GachaBannerHotReloadServiceTest.java
+C:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\gacha\GachaBannerTypeTest.java

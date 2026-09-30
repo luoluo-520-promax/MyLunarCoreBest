@@ -1,0 +1,29 @@
+{
+  "version": "1.0.0",
+  "steps": [
+    {
+      "id": "login",
+      "title": "欢迎开拓者",
+      "hint": "完成首次登录并进入主界面",
+      "assistPrompt": "我刚登录游戏，接下来应该做什么？"
+    },
+    {
+      "id": "first_battle",
+      "title": "初战试炼",
+      "hint": "进入场景并完成一场回合制战斗",
+      "assistPrompt": "如何开始第一场战斗？阵容怎么配？"
+    },
+    {
+      "id": "first_gacha",
+      "title": "星轨跃迁",
+      "hint": "进行至少一次抽卡",
+      "assistPrompt": "抽卡消耗什么货币？保底规则是什么？"
+    },
+    {
+      "id": "first_quest",
+      "title": "开拓任务",
+      "hint": "接取并提交一个主线任务",
+      "assistPrompt": "当前主线任务目标是什么？"
+    }
+  ]
+}

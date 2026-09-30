@@ -1,0 +1,33 @@
+# Chaos Mesh：切服 / Redis 故障注入（需集群已装 Chaos Mesh）
+# kubectl apply -f deploy/chaos/player-migration-chaos.yaml
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: game-node-partition
+  namespace: mylunarcore
+spec:
+  action: partition
+  mode: one
+  selector:
+    labelSelectors:
+      app: mylunarcore-game
+  direction: both
+  duration: "60s"
+---
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: redis-kill
+  namespace: mylunarcore
+spec:
+  action: pod-kill
+  mode: one
+  selector:
+    labelSelectors:
+      app: redis
+  duration: "30s"
+---
+# 验证清单（人工）：
+# 1. 切服中杀源节点：客户端凭 ticket 重连目标，SceneSnapshot/BattleSnapshot 可恢复
+# 2. Redis 短暂不可用：迁移限流/重试不雪崩；恢复后票据可用
+# 3. 观察 retcode 7/8/9 与指标 lunarcore.migration.*

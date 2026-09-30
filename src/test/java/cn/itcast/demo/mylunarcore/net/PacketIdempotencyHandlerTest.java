@@ -17,6 +17,12 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
+/**
+ * PacketIdempotencyHandler 幂等回放测试。
+ * <p>
+ * 针对相关生产代码的单元/切片测试类 {@code PacketIdempotencyHandlerTest}：
+ * 通过 fixture、mock 与断言覆盖关键成功路径、失败码与状态边界。
+ */
 @DisplayName("PacketIdempotencyHandler 幂等回放测试")
 class PacketIdempotencyHandlerTest {
 
@@ -26,6 +32,17 @@ class PacketIdempotencyHandlerTest {
     private static final int MAX_ENTRIES = 64;
     private static final long PLAYER_UID = 90077L;
 
+    /**
+     * 验证点：相同请求在 TTL 内应回放首次响应且不再下发业务。
+     * <p>测试方法 {@code duplicateRequestShouldReplayFirstResponse}：
+     * <ul>
+     *   <li>{@code assertEquals(1, downstreamCount.get());}</li>
+     *   <li>{@code assertEquals(1, downstreamCount.get());}</li>
+     *   <li>{@code assertEquals(response.getCmdId(), replay.getCmdId());}</li>
+     *   <li>{@code assertArrayEquals(response.getPayload(), replay.getPayload());}</li>
+     *   <li>{@code assertNull(channel.readInbound());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("相同请求在 TTL 内应回放首次响应且不再下发业务")
     void duplicateRequestShouldReplayFirstResponse() {
@@ -53,6 +70,14 @@ class PacketIdempotencyHandlerTest {
         assertNull(channel.readInbound());
     }
 
+    /**
+     * 验证点：不同 payload 应视为不同幂等键并分别进入业务。
+     * <p>测试方法 {@code differentPayloadShouldNotReplay}：
+     * <ul>
+     *   <li>{@code assertEquals(2, downstreamCount.get());}</li>
+     *   <li>{@code assertEquals(2, downstream.size());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("不同 payload 应视为不同幂等键并分别进入业务")
     void differentPayloadShouldNotReplay() {
@@ -73,6 +98,14 @@ class PacketIdempotencyHandlerTest {
         assertEquals(2, downstream.size());
     }
 
+    /**
+     * 验证点：已登录 uid 与未登录 channel 应使用不同 principal。
+     * <p>测试方法 {@code loggedInUidShouldIsolateFromAnonymousChannel}：
+     * <ul>
+     *   <li>{@code assertEquals(1, downstreamA.size());}</li>
+     *   <li>{@code assertEquals(1, downstreamB.size());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("已登录 uid 与未登录 channel 应使用不同 principal")
     void loggedInUidShouldIsolateFromAnonymousChannel() {

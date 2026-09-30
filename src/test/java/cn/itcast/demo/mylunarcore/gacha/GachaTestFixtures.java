@@ -60,13 +60,16 @@ final class GachaTestFixtures {
 
     static void injectConfigs(GachaConfigService service, Map<Integer, List<GachaBannerConfig>> configs) {
         try {
-            Field field = GachaConfigService.class.getDeclaredField("configsByType");
+            Field field = GachaConfigService.class.getDeclaredField("configsByTypeRef");
             field.setAccessible(true);
             @SuppressWarnings("unchecked")
-            Map<Integer, List<GachaBannerConfig>> map =
-                    (Map<Integer, List<GachaBannerConfig>>) field.get(service);
-            map.clear();
-            map.putAll(configs);
+            java.util.concurrent.atomic.AtomicReference<Map<Integer, List<GachaBannerConfig>>> ref =
+                    (java.util.concurrent.atomic.AtomicReference<Map<Integer, List<GachaBannerConfig>>>) field.get(service);
+            Map<Integer, List<GachaBannerConfig>> copy = new ConcurrentHashMap<>();
+            if (configs != null) {
+                configs.forEach((k, v) -> copy.put(k, new ArrayList<>(v)));
+            }
+            ref.set(Map.copyOf(copy));
         } catch (ReflectiveOperationException e) {
             throw new IllegalStateException("failed to inject gacha configs", e);
         }

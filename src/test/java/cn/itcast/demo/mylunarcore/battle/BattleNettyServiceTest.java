@@ -3,6 +3,7 @@ package cn.itcast.demo.mylunarcore.battle;
 import cn.itcast.demo.mylunarcore.common.BattleEndedEvent;
 import cn.itcast.demo.mylunarcore.common.BattleStartedEvent;
 import cn.itcast.demo.mylunarcore.common.GameEventPublisher;
+import cn.itcast.demo.mylunarcore.economy.RewardDistributor;
 import cn.itcast.demo.mylunarcore.net.GamePacket;
 import cn.itcast.demo.mylunarcore.protocol.BattleSystemProto;
 import cn.itcast.demo.mylunarcore.repo.BattleMonsterWaveRepository;
@@ -10,9 +11,8 @@ import cn.itcast.demo.mylunarcore.repo.BattleRepository;
 import cn.itcast.demo.mylunarcore.repo.MazeBuffRepository;
 import cn.itcast.demo.mylunarcore.repo.MazeSkillActionRepository;
 import cn.itcast.demo.mylunarcore.repo.MazeSkillRepository;
+import cn.itcast.demo.mylunarcore.player.PlayerContextResolver;
 import io.netty.channel.Channel;
-import io.netty.util.Attribute;
-import io.netty.util.AttributeKey;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -21,7 +21,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.Timestamp;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.OptionalLong;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -39,12 +41,17 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * BattleNettyService 战斗协议服务测试。
+ * <p>
+ * 针对相关生产代码的单元/切片测试类 {@code BattleNettyServiceTest}：
+ * 通过 fixture、mock 与断言覆盖关键成功路径、失败码与状态边界。
+ */
 @DisplayName("BattleNettyService 战斗协议服务测试")
 class BattleNettyServiceTest {
 
     private static final Logger log = LoggerFactory.getLogger(BattleNettyServiceTest.class);
 
-    private static final AttributeKey<Long> UID_KEY = AttributeKey.valueOf("playerUid");
     private static final long PLAYER_UID = 77L;
     private static final int PLAYER_ID = 77;
     private static final long BATTLE_ID = 88001L;
@@ -56,18 +63,25 @@ class BattleNettyServiceTest {
     private MazeSkillActionRepository skillActionRepository;
     private MazeBuffRepository buffRepository;
     private GameEventPublisher gameEventPublisher;
+    private PlayerContextResolver contextResolver;
     private BattleNettyService service;
 
     @BeforeEach
     void setUp() {
-        battleManager = new BattleManager();
+        battleManager = new BattleManager(org.mockito.Mockito.mock(BattleSnapshotService.class));
         battleRepository = mock(BattleRepository.class);
         waveRepository = mock(BattleMonsterWaveRepository.class);
         skillRepository = mock(MazeSkillRepository.class);
         skillActionRepository = mock(MazeSkillActionRepository.class);
         buffRepository = mock(MazeBuffRepository.class);
         gameEventPublisher = mock(GameEventPublisher.class);
+        contextResolver = mock(PlayerContextResolver.class);
         BattleSceneFactory battleSceneFactory = new BattleSceneFactory();
+        EncounterConfigRepository encounterRepo = mock(EncounterConfigRepository.class);
+        when(encounterRepo.current()).thenReturn(EncounterConfig.empty());
+        RewardDistributor rewardDistributor = mock(RewardDistributor.class);
+        when(rewardDistributor.grantBattleRewards(anyInt(), any(), anyInt(), anyString()))
+                .thenReturn(List.of());
 
         service = new BattleNettyService(
                 battleManager,
@@ -76,10 +90,52 @@ class BattleNettyServiceTest {
                 skillRepository,
                 skillActionRepository,
                 buffRepository,
+                mock(cn.itcast.demo.mylunarcore.repo.SummonUnitConfigRepository.class),
                 battleSceneFactory,
-                gameEventPublisher);
+                gameEventPublisher,
+                contextResolver,
+                new cn.itcast.demo.mylunarcore.battle.assist.HeuristicBattleAssistPolicy(
+                        new cn.itcast.demo.mylunarcore.config.LunarCoreProperties(),
+                        mock(cn.itcast.demo.mylunarcore.assist.AssistFeatureContentRepository.class)),
+                new cn.itcast.demo.mylunarcore.config.LunarCoreProperties(),
+                mock(cn.itcast.demo.mylunarcore.scene.SceneManager.class),
+                mock(cn.itcast.demo.mylunarcore.scene.SceneSyncBroadcaster.class),
+                mock(cn.itcast.demo.mylunarcore.player.GameSessionManager.class),
+                encounterRepo,
+                rewardDistributor,
+                mock(cn.itcast.demo.mylunarcore.scene.ZoneWorldService.class),
+                mock(cn.itcast.demo.mylunarcore.scene.ZoneManager.class),
+                mock(cn.itcast.demo.mylunarcore.anticheat.BattleAuditService.class),
+                mock(cn.itcast.demo.mylunarcore.party.PartyService.class),
+                new cn.itcast.demo.mylunarcore.anticheat.BattleDeterministicValidator(
+                        mock(cn.itcast.demo.mylunarcore.anticheat.BattleAuditService.class)),
+                emptyProvider(),
+                emptyProvider(),
+                emptyProvider(),
+                emptyProvider(),
+                emptyProvider());
     }
 
+    @SuppressWarnings("unchecked")
+    private static <T> org.springframework.beans.factory.ObjectProvider<T> emptyProvider() {
+        org.springframework.beans.factory.ObjectProvider<T> p =
+                mock(org.springframework.beans.factory.ObjectProvider.class);
+        when(p.getIfAvailable()).thenReturn(null);
+        return p;
+    }
+
+    /**
+     * 验证点：开战成功应注册战局并返回敌方信息。
+     * <p>测试方法 {@code fightStartSuccessShouldRegisterBattle}：
+     * <ul>
+     *   <li>{@code when(battleRepository.insertBattle(eq(PLAYER_ID), eq(1), eq(100), any(Timestamp.class)))}</li>
+     *   <li>{@code when(waveRepository.loadWavesByStageId(100)).thenReturn(BattleTestFixtures.twoWaveStage());}</li>
+     *   <li>{@code verify(gameEventPublisher).publish(eventCaptor.capture());}</li>
+     *   <li>{@code assertEquals(0, rsp.getRetcode());}</li>
+     *   <li>{@code assertEquals(BATTLE_ID, rsp.getBattleId());}</li>
+     *   <li>{@code assertEquals(2, rsp.getStageInfo().getWaveCount());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("开战成功应注册战局并返回敌方信息")
     void fightStartSuccessShouldRegisterBattle() throws Exception {
@@ -110,13 +166,21 @@ class BattleNettyServiceTest {
         assertTrue(eventCaptor.getValue() instanceof BattleStartedEvent);
     }
 
+    /**
+     * 验证点：未登录开战应返回 retcode=1。
+     * <p>测试方法 {@code fightStartWithoutLoginShouldFail}：
+     * <ul>
+     *   <li>{@code when(contextResolver.resolvePlayerId(channel)).thenReturn(0);}</li>
+     *   <li>{@code when(contextResolver.resolveUid(channel)).thenReturn(OptionalLong.empty());}</li>
+     *   <li>{@code assertEquals(1, rsp.getRetcode());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("未登录开战应返回 retcode=1")
     void fightStartWithoutLoginShouldFail() {
         Channel channel = mock(Channel.class);
-        Attribute<Long> uidAttr = mock(Attribute.class);
-        when(channel.attr(UID_KEY)).thenReturn(uidAttr);
-        when(uidAttr.get()).thenReturn(null);
+        when(contextResolver.resolvePlayerId(channel)).thenReturn(0);
+        when(contextResolver.resolveUid(channel)).thenReturn(OptionalLong.empty());
 
         BattleSystemProto.FightStartScRsp rsp = service.handleFightStart(
                 BattleSystemProto.FightStartCsReq.newBuilder()
@@ -128,6 +192,13 @@ class BattleNettyServiceTest {
         assertEquals(1, rsp.getRetcode());
     }
 
+    /**
+     * 验证点：非法关卡或阵容 ID 开战应返回 retcode=2。
+     * <p>测试方法 {@code fightStartWithInvalidParamsShouldFail}：
+     * <ul>
+     *   <li>{@code assertEquals(2, rsp.getRetcode());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("非法关卡或阵容 ID 开战应返回 retcode=2")
     void fightStartWithInvalidParamsShouldFail() {
@@ -143,6 +214,14 @@ class BattleNettyServiceTest {
         assertEquals(2, rsp.getRetcode());
     }
 
+    /**
+     * 验证点：写库失败开战应返回 retcode=3。
+     * <p>测试方法 {@code fightStartInsertFailedShouldReturnRetcode3}：
+     * <ul>
+     *   <li>{@code when(battleRepository.insertBattle(anyInt(), anyInt(), anyInt(), any(Timestamp.class)))}</li>
+     *   <li>{@code assertEquals(3, rsp.getRetcode());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("写库失败开战应返回 retcode=3")
     void fightStartInsertFailedShouldReturnRetcode3() throws Exception {
@@ -160,6 +239,15 @@ class BattleNettyServiceTest {
         assertEquals(3, rsp.getRetcode());
     }
 
+    /**
+     * 验证点：波次配置加载失败应返回 retcode=4。
+     * <p>测试方法 {@code fightStartLoadWavesFailedShouldReturnRetcode4}：
+     * <ul>
+     *   <li>{@code when(battleRepository.insertBattle(anyInt(), anyInt(), anyInt(), any(Timestamp.class)))}</li>
+     *   <li>{@code when(waveRepository.loadWavesByStageId(100)).thenThrow(new RuntimeException("wave error"));}</li>
+     *   <li>{@code assertEquals(4, rsp.getRetcode());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("波次配置加载失败应返回 retcode=4")
     void fightStartLoadWavesFailedShouldReturnRetcode4() throws Exception {
@@ -179,11 +267,24 @@ class BattleNettyServiceTest {
         assertEquals(4, rsp.getRetcode());
     }
 
+    /**
+     * 验证点：技能释放应扣血并推进回合。
+     * <p>测试方法 {@code fightActionSkillShouldDealDamageAndAdvanceTurn}：
+     * <ul>
+     *   <li>{@code when(skillRepository.findById(1001)).thenReturn(new MazeSkillRepository.MazeSkill(}</li>
+     *   <li>{@code when(skillActionRepository.findBySkillId(1001)).thenReturn(List.of(}</li>
+     *   <li>{@code assertEquals(0, rsp.getRetcode());}</li>
+     *   <li>{@code assertEquals(2, rsp.getCurrentState().getTurn());}</li>
+     *   <li>{@code assertEquals(-200, rsp.getActionResults(0).getHpChange());}</li>
+     *   <li>{@code assertEquals(0, target.getHp());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("技能释放应扣血并推进回合")
     void fightActionSkillShouldDealDamageAndAdvanceTurn() {
         BattleContext context = registerBattle(BattleTestFixtures.twoWaveStage());
         Channel channel = loggedInChannel(PLAYER_UID);
+        int targetId = firstMonsterRuntimeId(context);
 
         when(skillRepository.findById(1001)).thenReturn(new MazeSkillRepository.MazeSkill(
                 1001, "slash", "desc", 1, 1, 0));
@@ -196,13 +297,13 @@ class BattleNettyServiceTest {
                         .setBattleId(BATTLE_ID)
                         .setActionType(1)
                         .setSkillId(1001)
-                        .addTargetIds(101)
+                        .addTargetIds(targetId)
                         .build(),
                 channel);
 
-        EntityState target = context.getEntity(101);
-        log.info("技能扣血校验: skillId=1001, targetId=101, retcode={}, turn={}, hpChange={}, targetHp={}, targetDead={}",
-                rsp.getRetcode(), rsp.getCurrentState().getTurn(),
+        EntityState target = context.getEntity(targetId);
+        log.info("技能扣血校验: skillId=1001, targetId={}, retcode={}, turn={}, hpChange={}, targetHp={}, targetDead={}",
+                targetId, rsp.getRetcode(), rsp.getCurrentState().getTurn(),
                 rsp.getActionResults(0).getHpChange(), target.getHp(), target.isDead());
 
         assertEquals(0, rsp.getRetcode());
@@ -212,11 +313,24 @@ class BattleNettyServiceTest {
         assertTrue(target.isDead());
     }
 
+    /**
+     * 验证点：清场后应自动切换下一波并推送状态通知。
+     * <p>测试方法 {@code fightActionShouldAdvanceWaveWhenAllMonstersDead}：
+     * <ul>
+     *   <li>{@code when(skillRepository.findById(9001)).thenReturn(new MazeSkillRepository.MazeSkill(}</li>
+     *   <li>{@code when(skillActionRepository.findBySkillId(9001)).thenReturn(List.of(}</li>
+     *   <li>{@code assertEquals(0, rsp.getRetcode());}</li>
+     *   <li>{@code assertEquals(2, rsp.getCurrentState().getCurrentWave());}</li>
+     *   <li>{@code assertFalse(monsterRuntimeIds(context).isEmpty());}</li>
+     *   <li>{@code verify(channel).writeAndFlush(any(GamePacket.class));}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("清场后应自动切换下一波并推送状态通知")
     void fightActionShouldAdvanceWaveWhenAllMonstersDead() {
         BattleContext context = registerBattle(BattleTestFixtures.twoWaveStage());
         Channel channel = loggedInChannel(PLAYER_UID);
+        List<Integer> wave1Ids = monsterRuntimeIds(context);
 
         when(skillRepository.findById(9001)).thenReturn(new MazeSkillRepository.MazeSkill(
                 9001, "kill", "desc", 1, 1, 0));
@@ -224,31 +338,43 @@ class BattleNettyServiceTest {
                 BattleTestFixtures.skillActionRow(1, 9001, 5, 1, "{\"kill\":true}")
         ));
 
-        BattleSystemProto.FightActionScRsp rsp = service.handleFightAction(
-                BattleSystemProto.FightActionCsReq.newBuilder()
-                        .setBattleId(BATTLE_ID)
-                        .setActionType(1)
-                        .setSkillId(9001)
-                        .addTargetIds(101)
-                        .addTargetIds(102)
-                        .build(),
-                channel);
+        BattleSystemProto.FightActionCsReq.Builder req = BattleSystemProto.FightActionCsReq.newBuilder()
+                .setBattleId(BATTLE_ID)
+                .setActionType(1)
+                .setSkillId(9001);
+        for (Integer id : wave1Ids) {
+            req.addTargetIds(id);
+        }
 
-        log.info("波次切换校验: skillId=9001, targets=[101,102], retcode={}, currentWave={}, turn={}, nextWaveMonster201Exists={}",
-                rsp.getRetcode(), rsp.getCurrentState().getCurrentWave(), rsp.getCurrentState().getTurn(),
-                context.getEntity(201) != null);
+        BattleSystemProto.FightActionScRsp rsp = service.handleFightAction(req.build(), channel);
+
+        log.info("波次切换校验: skillId=9001, targets={}, retcode={}, currentWave={}, turn={}, wave2Alive={}",
+                wave1Ids, rsp.getRetcode(), rsp.getCurrentState().getCurrentWave(), rsp.getCurrentState().getTurn(),
+                monsterRuntimeIds(context).size());
 
         assertEquals(0, rsp.getRetcode());
         assertEquals(2, rsp.getCurrentState().getCurrentWave());
-        assertNotNull(context.getEntity(201));
+        assertFalse(monsterRuntimeIds(context).isEmpty());
         verify(channel).writeAndFlush(any(GamePacket.class));
     }
 
+    /**
+     * 验证点：Buff 技能应叠加层数。
+     * <p>测试方法 {@code fightActionShouldApplyBuffStacks}：
+     * <ul>
+     *   <li>{@code when(skillRepository.findById(2001)).thenReturn(new MazeSkillRepository.MazeSkill(}</li>
+     *   <li>{@code when(skillActionRepository.findBySkillId(2001)).thenReturn(List.of(}</li>
+     *   <li>{@code when(buffRepository.findMaxStack(5)).thenReturn(3);}</li>
+     *   <li>{@code assertEquals(0, rsp.getRetcode());}</li>
+     *   <li>{@code assertEquals(List.of(5), rsp.getActionResults(0).getAddedBuffsList());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("Buff 技能应叠加层数")
     void fightActionShouldApplyBuffStacks() {
-        registerBattle(BattleTestFixtures.singleWaveStage());
+        BattleContext context = registerBattle(BattleTestFixtures.singleWaveStage());
         Channel channel = loggedInChannel(PLAYER_UID);
+        int targetId = firstMonsterRuntimeId(context);
 
         when(skillRepository.findById(2001)).thenReturn(new MazeSkillRepository.MazeSkill(
                 2001, "buff", "desc", 1, 1, 0));
@@ -262,16 +388,23 @@ class BattleNettyServiceTest {
                         .setBattleId(BATTLE_ID)
                         .setActionType(1)
                         .setSkillId(2001)
-                        .addTargetIds(301)
+                        .addTargetIds(targetId)
                         .build(),
                 channel);
 
-        log.info("Buff 叠加校验: skillId=2001, targetId=301, buffId=5, maxStack=3, retcode={}, addedBuffs={}",
-                rsp.getRetcode(), rsp.getActionResults(0).getAddedBuffsList());
+        log.info("Buff 叠加校验: skillId=2001, targetId={}, buffId=5, maxStack=3, retcode={}, addedBuffs={}",
+                targetId, rsp.getRetcode(), rsp.getActionResults(0).getAddedBuffsList());
         assertEquals(0, rsp.getRetcode());
         assertEquals(List.of(5), rsp.getActionResults(0).getAddedBuffsList());
     }
 
+    /**
+     * 验证点：战局不存在时行动应返回 retcode=1。
+     * <p>测试方法 {@code fightActionMissingBattleShouldFail}：
+     * <ul>
+     *   <li>{@code assertEquals(1, rsp.getRetcode());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("战局不存在时行动应返回 retcode=1")
     void fightActionMissingBattleShouldFail() {
@@ -288,6 +421,13 @@ class BattleNettyServiceTest {
         assertEquals(1, rsp.getRetcode());
     }
 
+    /**
+     * 验证点：非本人战局行动应返回 retcode=7。
+     * <p>测试方法 {@code fightActionWrongOwnerShouldFail}：
+     * <ul>
+     *   <li>{@code assertEquals(7, rsp.getRetcode());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("非本人战局行动应返回 retcode=7")
     void fightActionWrongOwnerShouldFail() {
@@ -307,6 +447,13 @@ class BattleNettyServiceTest {
         assertEquals(7, rsp.getRetcode());
     }
 
+    /**
+     * 验证点：已结束战局行动应返回 retcode=2。
+     * <p>测试方法 {@code fightActionOnEndedBattleShouldFail}：
+     * <ul>
+     *   <li>{@code assertEquals(2, rsp.getRetcode());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("已结束战局行动应返回 retcode=2")
     void fightActionOnEndedBattleShouldFail() {
@@ -327,6 +474,14 @@ class BattleNettyServiceTest {
         assertEquals(2, rsp.getRetcode());
     }
 
+    /**
+     * 验证点：技能不存在应返回 retcode=4。
+     * <p>测试方法 {@code fightActionUnknownSkillShouldFail}：
+     * <ul>
+     *   <li>{@code when(skillRepository.findById(404)).thenReturn(null);}</li>
+     *   <li>{@code assertEquals(4, rsp.getRetcode());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("技能不存在应返回 retcode=4")
     void fightActionUnknownSkillShouldFail() {
@@ -346,10 +501,25 @@ class BattleNettyServiceTest {
         assertEquals(4, rsp.getRetcode());
     }
 
+    /**
+     * 验证点：战斗结果上报成功应清理战局并发布结束事件。
+     * <p>测试方法 {@code fightResultSuccessShouldCleanupBattle}：
+     * <ul>
+     *   <li>{@code verify(gameEventPublisher).publish(eventCaptor.capture());}</li>
+     *   <li>{@code assertEquals(0, rsp.getRetcode());}</li>
+     *   <li>{@code assertNull(battleManager.get(BATTLE_ID));}</li>
+     *   <li>{@code assertTrue(eventCaptor.getValue() instanceof BattleEndedEvent);}</li>
+     *   <li>{@code verify(battleRepository).updateBattleResult(eq(BATTLE_ID), eq(1), anyString(), any(Timestamp.class));}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("战斗结果上报成功应清理战局并发布结束事件")
     void fightResultSuccessShouldCleanupBattle() throws Exception {
-        registerBattle(BattleTestFixtures.singleWaveStage());
+        BattleContext context = registerBattle(BattleTestFixtures.singleWaveStage());
+        // 清场后服务端权威判定为胜
+        int monsterId = firstMonsterRuntimeId(context);
+        context.getEntity(monsterId).setHp(0);
+        context.getEntity(monsterId).setDead(true);
         Channel channel = loggedInChannel(PLAYER_UID);
 
         BattleSystemProto.FightResultScRsp rsp = service.handleFightResult(
@@ -375,6 +545,45 @@ class BattleNettyServiceTest {
         verify(battleRepository).updateBattleResult(eq(BATTLE_ID), eq(1), anyString(), any(Timestamp.class));
     }
 
+    /**
+     * 验证点：客户端假胜利未清场时应按失败结算。
+     * <p>测试方法 {@code fightResultFakeWinShouldBecomeDefeat}：
+     * <ul>
+     *   <li>{@code assertEquals(0, rsp.getRetcode());}</li>
+     *   <li>{@code assertNull(battleManager.get(BATTLE_ID));}</li>
+     *   <li>{@code verify(battleRepository).updateBattleResult(eq(BATTLE_ID), eq(2), anyString(), any(Timestamp.class));}</li>
+     *   <li>{@code assertEquals(0, rsp.getRewardItemsCount());}</li>
+     * </ul>
+     */
+    @Test
+    @DisplayName("客户端假胜利未清场时应按失败结算")
+    void fightResultFakeWinShouldBecomeDefeat() throws Exception {
+        registerBattle(BattleTestFixtures.singleWaveStage());
+        Channel channel = loggedInChannel(PLAYER_UID);
+
+        BattleSystemProto.FightResultScRsp rsp = service.handleFightResult(
+                BattleSystemProto.FightResultCsReq.newBuilder()
+                        .setBattleId(BATTLE_ID)
+                        .setEndStatus(1)
+                        .build(),
+                channel);
+
+        assertEquals(0, rsp.getRetcode());
+        assertNull(battleManager.get(BATTLE_ID));
+        verify(battleRepository).updateBattleResult(eq(BATTLE_ID), eq(2), anyString(), any(Timestamp.class));
+        assertEquals(0, rsp.getRewardItemsCount());
+    }
+
+    /**
+     * 验证点：战斗结果写库失败应保留战局。
+     * <p>测试方法 {@code fightResultDbFailureShouldKeepBattle}：
+     * <ul>
+     *   <li>{@code .when(battleRepository).updateBattleResult(anyLong(), anyInt(), anyString(), any(Timestamp.class));}</li>
+     *   <li>{@code assertEquals(2, rsp.getRetcode());}</li>
+     *   <li>{@code assertNotNull(battleManager.get(BATTLE_ID));}</li>
+     *   <li>{@code verify(gameEventPublisher, never()).publish(any());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("战斗结果写库失败应保留战局")
     void fightResultDbFailureShouldKeepBattle() throws Exception {
@@ -397,6 +606,16 @@ class BattleNettyServiceTest {
         verify(gameEventPublisher, never()).publish(any());
     }
 
+    /**
+     * 验证点：主动退出战斗应清理战局。
+     * <p>测试方法 {@code fightQuitSuccessShouldCleanupBattle}：
+     * <ul>
+     *   <li>{@code assertEquals(0, rsp.getRetcode());}</li>
+     *   <li>{@code assertEquals(0, rsp.getTeleportSceneId());}</li>
+     *   <li>{@code assertNull(battleManager.get(BATTLE_ID));}</li>
+     *   <li>{@code verify(battleRepository).updateBattleResult(eq(BATTLE_ID), eq(3), eq("{}"), any(Timestamp.class));}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("主动退出战斗应清理战局")
     void fightQuitSuccessShouldCleanupBattle() throws Exception {
@@ -417,6 +636,17 @@ class BattleNettyServiceTest {
         verify(battleRepository).updateBattleResult(eq(BATTLE_ID), eq(3), eq("{}"), any(Timestamp.class));
     }
 
+    /**
+     * 验证点：查询战局信息应返回当前快照。
+     * <p>测试方法 {@code getBattleInfoShouldReturnSnapshot}：
+     * <ul>
+     *   <li>{@code assertEquals(0, rsp.getRetcode());}</li>
+     *   <li>{@code assertEquals(BATTLE_ID, rsp.getBattleId());}</li>
+     *   <li>{@code assertEquals(2, rsp.getStageInfo().getWaveCount());}</li>
+     *   <li>{@code assertEquals(2, rsp.getCurrentState().getTurn());}</li>
+     *   <li>{@code assertFalse(rsp.getCurrentState().getEntitiesList().isEmpty());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("查询战局信息应返回当前快照")
     void getBattleInfoShouldReturnSnapshot() {
@@ -442,6 +672,13 @@ class BattleNettyServiceTest {
         assertFalse(rsp.getCurrentState().getEntitiesList().isEmpty());
     }
 
+    /**
+     * 验证点：非本人查询战局应返回 retcode=3。
+     * <p>测试方法 {@code getBattleInfoWrongOwnerShouldFail}：
+     * <ul>
+     *   <li>{@code assertEquals(3, rsp.getRetcode());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("非本人查询战局应返回 retcode=3")
     void getBattleInfoWrongOwnerShouldFail() {
@@ -466,12 +703,25 @@ class BattleNettyServiceTest {
         return context;
     }
 
-    @SuppressWarnings("unchecked")
+    private static int firstMonsterRuntimeId(BattleContext context) {
+        return monsterRuntimeIds(context).get(0);
+    }
+
+    private static List<Integer> monsterRuntimeIds(BattleContext context) {
+        List<Integer> ids = new ArrayList<>();
+        for (Integer id : context.getEntities().keySet()) {
+            if (id != null && id != context.getPlayerId()) {
+                ids.add(id);
+            }
+        }
+        ids.sort(Integer::compareTo);
+        return ids;
+    }
+
     private Channel loggedInChannel(long uid) {
         Channel channel = mock(Channel.class);
-        Attribute<Long> uidAttr = mock(Attribute.class);
-        when(channel.attr(UID_KEY)).thenReturn(uidAttr);
-        when(uidAttr.get()).thenReturn(uid);
+        when(contextResolver.resolvePlayerId(channel)).thenReturn((int) (uid & 0xffffffffL));
+        when(contextResolver.resolveUid(channel)).thenReturn(OptionalLong.of(uid));
         log.info("模拟登录 Channel: uid={}, playerId={}", uid, (int) (uid & 0xffffffffL));
         return channel;
     }

@@ -1,0 +1,58 @@
+# ShardingSphere-JDBC 分片规划（默认关闭；生产通过 spring.shardingsphere 启用）
+# 目标表：player_wallet / gacha_history —— 16 逻辑库 × 64 表，按 uid 取模透明路由
+
+mode:
+  type: Standalone
+  repository:
+    type: JDBC
+
+dataSources:
+  ds_0:
+    dataSourceClassName: com.zaxxer.hikari.HikariDataSource
+    jdbcUrl: jdbc:mysql://127.0.0.1:3306/lunar_shard_00
+    username: ${SHARD_DB_USER:root}
+    password: ${SHARD_DB_PASSWORD:}
+
+rules:
+  - !SHARDING
+    tables:
+      player_wallet:
+        actualDataNodes: ds_${0..15}.player_wallet_${0..15}_${0..63}
+        tableStrategy:
+          standard:
+            shardingColumn: uid
+            shardingAlgorithmName: wallet-table-inline
+        databaseStrategy:
+          standard:
+            shardingColumn: uid
+            shardingAlgorithmName: wallet-db-inline
+      gacha_history:
+        actualDataNodes: ds_${0..15}.gacha_history_${0..15}_${0..63}
+        tableStrategy:
+          standard:
+            shardingColumn: uid
+            shardingAlgorithmName: gacha-table-inline
+        databaseStrategy:
+          standard:
+            shardingColumn: uid
+            shardingAlgorithmName: gacha-db-inline
+    shardingAlgorithms:
+      wallet-db-inline:
+        type: INLINE
+        props:
+          algorithm-expression: ds_${uid % 16}
+      wallet-table-inline:
+        type: INLINE
+        props:
+          algorithm-expression: player_wallet_${uid % 16}_${(uid / 16) % 64}
+      gacha-db-inline:
+        type: INLINE
+        props:
+          algorithm-expression: ds_${uid % 16}
+      gacha-table-inline:
+        type: INLINE
+        props:
+          algorithm-expression: gacha_history_${uid % 16}_${(uid / 16) % 64}
+
+props:
+  sql-show: false

@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "entries": [
+    {
+      "lineKey": "tree_1001_n1",
+      "audioKey": "vo/story/1001_n1.wem",
+      "voiceId": "tingyun_zh",
+      "durationMs": 3200,
+      "lipSyncTimestamps": [120, 280, 450, 620, 800, 1100, 1400, 1800, 2200, 2800]
+    },
+    {
+      "lineKey": "tree_1001_n2",
+      "audioKey": "vo/story/1001_n2.wem",
+      "voiceId": "tingyun_zh",
+      "durationMs": 4100,
+      "lipSyncTimestamps": [100, 260, 480, 700, 950, 1300, 1700, 2100, 2600, 3200, 3800]
+    }
+  ]
+}

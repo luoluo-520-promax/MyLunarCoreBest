@@ -11,6 +11,8 @@ message StartChallengeCsReq {
   uint32 challenge_type = 1; // 1-记忆，2-故事，3-Boss
   uint32 challenge_id = 2;
   uint32 lineup_id = 3;
+  bool use_matchmaking = 4;
+  uint64 room_id = 5;
 }
 
 message ChallengeStageInfo {

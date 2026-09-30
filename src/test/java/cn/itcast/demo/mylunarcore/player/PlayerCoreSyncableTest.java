@@ -12,6 +12,12 @@ import org.slf4j.LoggerFactory;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
+/**
+ * PlayerCoreSyncable 核心数值同步切片测试。
+ * <p>
+ * 针对相关生产代码的单元/切片测试类 {@code PlayerCoreSyncableTest}：
+ * 通过 fixture、mock 与断言覆盖关键成功路径、失败码与状态边界。
+ */
 @DisplayName("PlayerCoreSyncable 核心数值同步切片测试")
 class PlayerCoreSyncableTest {
 
@@ -25,6 +31,18 @@ class PlayerCoreSyncableTest {
         log.info("核心同步切片初始化完成");
     }
 
+    /**
+     * 验证点：onSync 应将 PlayerEntity 写入 builder。
+     * <p>测试方法 {@code onSyncShouldWriteCoreFields}：
+     * <ul>
+     *   <li>{@code assertEquals(45, notify.getLevel());}</li>
+     *   <li>{@code assertEquals(12_000, notify.getExp());}</li>
+     *   <li>{@code assertEquals(180, notify.getStamina());}</li>
+     *   <li>{@code assertEquals(5, notify.getWorldLevel());}</li>
+     *   <li>{@code assertEquals(PlayerTestFixtures.NICKNAME, notify.getNickname());}</li>
+     *   <li>{@code assertEquals(1000, notify.getCurrencyOrDefault(1, 0));}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("onSync 应将 PlayerEntity 写入 builder")
     void onSyncShouldWriteCoreFields() {
@@ -47,6 +65,14 @@ class PlayerCoreSyncableTest {
         assertEquals(50, notify.getCurrencyOrDefault(2, 0));
     }
 
+    /**
+     * 验证点：player 为 null 时不应写入业务字段。
+     * <p>测试方法 {@code onSyncWithNullPlayerShouldSkip}：
+     * <ul>
+     *   <li>{@code assertEquals(0, notify.getLevel());}</li>
+     *   <li>{@code assertFalse(notify.getCurrencyMap().containsKey(1));}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("player 为 null 时不应写入业务字段")
     void onSyncWithNullPlayerShouldSkip() {
@@ -62,6 +88,16 @@ class PlayerCoreSyncableTest {
         assertFalse(notify.getCurrencyMap().containsKey(1));
     }
 
+    /**
+     * 验证点：负值字段应钳制为非负。
+     * <p>测试方法 {@code onSyncShouldClampNegativeValues}：
+     * <ul>
+     *   <li>{@code assertEquals(0, notify.getLevel());}</li>
+     *   <li>{@code assertEquals(0, notify.getExp());}</li>
+     *   <li>{@code assertEquals(0, notify.getStamina());}</li>
+     *   <li>{@code assertEquals(0, notify.getWorldLevel());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("负值字段应钳制为非负")
     void onSyncShouldClampNegativeValues() {

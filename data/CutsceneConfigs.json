@@ -1,0 +1,15 @@
+[
+  {
+    "cutsceneId": "cs_intro_01",
+    "timelineAsset": "cutscenes/intro_01.timeline",
+    "unlockCgId": 10001,
+    "skippable": true,
+    "client_ui_params": {
+      "fxId": "fx_cutscene_intro",
+      "cameraPreset": "cinematic_wide",
+      "sfxId": "sfx_cutscene_intro",
+      "timelineId": "timeline_intro_01",
+      "textPlaceholders": { "title": "启程" }
+    }
+  }
+]

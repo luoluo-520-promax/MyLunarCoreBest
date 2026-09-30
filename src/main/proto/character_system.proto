@@ -1,0 +1,155 @@
+syntax = "proto3";
+
+package cn.itcast.demo.mylunarcore.proto;
+
+option java_package = "cn.itcast.demo.mylunarcore.protocol";
+option java_outer_classname = "CharacterSystemProto";
+
+message AvatarInfo {
+  uint32 avatar_id = 1;
+  uint32 level = 2;
+  uint64 exp = 3;
+  uint32 promotion = 4;
+  uint32 rank = 5;
+  uint32 equipped_skin_id = 6; // 0 = 默认皮肤
+}
+
+message AvatarAttributes {
+  uint32 avatar_id = 1;
+  uint32 hp = 2;
+  uint32 atk = 3;
+  uint32 def = 4;
+  uint32 spd = 5;
+}
+
+message CreateCharacterCsReq {
+  string nickname = 1;
+  uint32 starter_avatar_id = 2;
+}
+
+message CreateCharacterScRsp {
+  int32 retcode = 1;
+  string nickname = 2;
+  AvatarInfo starter_avatar = 3;
+}
+
+message PromoteAvatarCsReq {
+  uint32 avatar_id = 1;
+}
+
+message PromoteAvatarScRsp {
+  int32 retcode = 1;
+  AvatarInfo avatar = 2;
+}
+
+message GetAvatarAttributesCsReq {
+  uint32 avatar_id = 1;
+}
+
+message GetAvatarAttributesScRsp {
+  int32 retcode = 1;
+  AvatarAttributes attributes = 2;
+}
+
+message TalentInfo {
+  uint32 talent_id = 1;
+  uint32 level = 2;
+  bool activated = 3;
+}
+
+message UpgradeTalentCsReq {
+  uint32 avatar_id = 1;
+  uint32 talent_id = 2;
+  uint32 target_level = 3;
+}
+
+message UpgradeTalentScRsp {
+  int32 retcode = 1;
+  TalentInfo talent = 2;
+}
+
+message GetTalentListCsReq {
+  uint32 avatar_id = 1;
+}
+
+message GetTalentListScRsp {
+  int32 retcode = 1;
+  repeated TalentInfo talents = 2;
+}
+
+/** 养成计划：目标导向材料计算器 */
+enum AutoSweepMode {
+  AUTO_SWEEP_UNSPECIFIED = 0;
+  AUTO_SWEEP_CONFIRM_THEN_RUN = 1;
+}
+
+message UpgradeMaterialNeed {
+  uint32 item_id = 1;
+  uint32 required_count = 2;
+  uint32 owned_count = 3;
+  uint32 deficit = 4;
+}
+
+message RecommendedStage {
+  uint32 stage_id = 1;
+  string stage_name = 2;
+  uint32 drop_item_id = 3;
+  uint32 estimated_drops = 4;
+  uint32 stamina_cost = 5;
+  /** 掉落效率：每点体力期望掉落（万分比） */
+  uint32 efficiency_bp = 6;
+  uint32 recommended_times = 7;
+  bool sweep_unlocked = 8;
+}
+
+message CalculateUpgradeMaterialsCsReq {
+  uint32 avatar_id = 1;
+  uint32 target_level = 2;
+}
+
+message CalculateUpgradeMaterialsScRsp {
+  int32 retcode = 1; // 0成功 1未登录 2角色不存在 3目标非法
+  uint32 avatar_id = 2;
+  uint32 current_level = 3;
+  uint32 target_level = 4;
+  repeated UpgradeMaterialNeed materials = 5;
+  repeated RecommendedStage recommended_stages = 6;
+  int32 total_stamina_cost = 7;
+  int32 stamina_current = 8;
+  int32 stamina_deficit = 9;
+  bool can_one_click_sweep = 10;
+  // AI 养成优先级：相对另一候选角色的预期伤害提升百分比（如 15 表示 +15%）
+  uint32 expected_dmg_increase_percent = 11;
+  // 推荐优先养成的 avatar_id（结合背包遗器与深渊环境）
+  uint32 recommended_priority_avatar_id = 12;
+  string cultivation_reason = 13;
+}
+
+/** 养成日程表：结合体力上限/储备/日购/自然恢复，输出今日可完成进度 */
+message CalculateOptimalScheduleCsReq {
+  uint32 avatar_id = 1;
+  uint32 target_level = 2;
+}
+
+message CalculateOptimalScheduleScRsp {
+  int32 retcode = 1; // 0成功 1未登录 2角色不存在 3目标非法
+  uint32 avatar_id = 2;
+  uint32 target_level = 3;
+  /** 今日可完成进度（万分比，10000=100%） */
+  uint32 today_progress_bp = 4;
+  /** 预计自然回体达标时间（Unix 毫秒；0=已可完成或无需等待） */
+  int64 natural_ready_at_ms = 5;
+  int32 stamina_available_today = 6;
+  int32 stamina_needed = 7;
+  int32 reserve_stamina = 8;
+  int32 daily_buy_remaining = 9;
+  string summary = 10;
+}
+
+/** 养成日程推送（计算后或体力变化时） */
+message DevelopmentScheduleScNotify {
+  uint32 avatar_id = 1;
+  uint32 today_progress_bp = 2;
+  int64 natural_ready_at_ms = 3;
+  string summary = 4;
+}

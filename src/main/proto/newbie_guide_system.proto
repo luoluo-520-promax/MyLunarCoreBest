@@ -1,0 +1,55 @@
+syntax = "proto3";
+
+package cn.itcast.demo.mylunarcore.proto;
+
+option java_package = "cn.itcast.demo.mylunarcore.protocol";
+option java_outer_classname = "NewbieGuideSystemProto";
+
+// 新手引导（CmdId 960–967）：检查点落库 + 断线重连恢复 + 强制跳过
+
+message NewbieGuideStep {
+  string id = 1;
+  string title = 2;
+  string hint = 3;
+  bool committed = 4; // 该步是否已作为检查点落库
+}
+
+message GetNewbieGuideCsReq {}
+
+message GetNewbieGuideScRsp {
+  int32 retcode = 1; // 0成功 1未登录
+  string current_step_id = 2;
+  string checkpoint_step_id = 3; // 最近已提交检查点；重连从此恢复
+  bool completed = 4;
+  bool skipped = 5;
+  repeated NewbieGuideStep steps = 6;
+}
+
+message AdvanceNewbieGuideCsReq {
+  string step_id = 1; // 刚完成的原子步骤
+  bool commit_checkpoint = 2; // true=立即落库检查点
+}
+
+message AdvanceNewbieGuideScRsp {
+  int32 retcode = 1; // 0成功 1未登录 2未知步骤 3已跳过/已完成
+  string current_step_id = 2;
+  string checkpoint_step_id = 3;
+  bool completed = 4;
+}
+
+message SkipNewbieGuideCsReq {
+  /** 创角/老玩家显式选择跳过全部强制教学 */
+  bool confirm = 1;
+}
+
+message SkipNewbieGuideScRsp {
+  int32 retcode = 1; // 0成功 1未登录 2未确认
+  bool skipped = 2;
+}
+
+message NewbieGuideUpdateScNotify {
+  string current_step_id = 1;
+  string checkpoint_step_id = 2;
+  bool completed = 3;
+  bool skipped = 4;
+}

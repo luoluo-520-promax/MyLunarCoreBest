@@ -22,4 +22,46 @@ public class PlayerData {
     private List<ChallengeEntity> challenges;   // 挑战进度列表
     private List<RogueEntity> rogues;           // 模拟宇宙进度列表
     private List<GameItemEntity> items;         // 背包物品列表
+
+    /**
+     * 创建不可变快照，供异步落盘等场景在锁外安全读取。
+     */
+    public PlayerData deepCopy() {
+        PlayerData copy = new PlayerData();
+        copy.setPlayer(deepCopyPlayer(this.player));
+        copy.setAvatars(copyList(this.avatars));
+        copy.setLineups(copyList(this.lineups));
+        copy.setFriends(copyList(this.friends));
+        copy.setChallenges(copyList(this.challenges));
+        copy.setRogues(copyList(this.rogues));
+        copy.setItems(copyList(this.items));
+        return copy;
+    }
+
+    private static PlayerEntity deepCopyPlayer(PlayerEntity src) {
+        if (src == null) {
+            return null;
+        }
+        PlayerEntity p = new PlayerEntity();
+        p.setUid(src.getUid());
+        p.setAccountId(src.getAccountId());
+        p.setNickname(src.getNickname());
+        p.setLevel(src.getLevel());
+        p.setExp(src.getExp());
+        p.setWorldLevel(src.getWorldLevel());
+        p.setStamina(src.getStamina());
+        p.setCurrencyJson(src.getCurrencyJson());
+        p.setSceneId(src.getSceneId());
+        p.setPosX(src.getPosX());
+        p.setPosY(src.getPosY());
+        p.setPosZ(src.getPosZ());
+        p.setLastLogin(src.getLastLogin());
+        p.setLastLogout(src.getLastLogout());
+        p.setDataVersion(src.getDataVersion());
+        return p;
+    }
+
+    private static <T> List<T> copyList(List<T> src) {
+        return src == null ? null : List.copyOf(src);
+    }
 }

@@ -1,0 +1,27 @@
+{
+  "mainAffixes": [
+    {"id": 1001, "stat": "HP_PCT", "baseValue": 12.0, "slots": ["HEAD", "BODY"]},
+    {"id": 1002, "stat": "ATK_PCT", "baseValue": 12.0, "slots": ["HANDS", "BODY"]},
+    {"id": 1003, "stat": "DEF_PCT", "baseValue": 15.0, "slots": ["FEET", "BODY"]},
+    {"id": 1004, "stat": "SPD", "baseValue": 25.0, "slots": ["FEET"]},
+    {"id": 1005, "stat": "CRIT_RATE", "baseValue": 8.0, "slots": ["BODY"]},
+    {"id": 1006, "stat": "CRIT_DMG", "baseValue": 16.0, "slots": ["BODY"]},
+    {"id": 1101, "stat": "ATK_FLAT", "baseValue": 28.0, "slots": ["LIGHT_CONE"]}
+  ],
+  "subAffixes": [
+    {"id": 2001, "stat": "HP_FLAT", "min": 30, "max": 80},
+    {"id": 2002, "stat": "ATK_FLAT", "min": 10, "max": 30},
+    {"id": 2003, "stat": "DEF_FLAT", "min": 10, "max": 30},
+    {"id": 2004, "stat": "HP_PCT", "min": 2.5, "max": 5.5},
+    {"id": 2005, "stat": "ATK_PCT", "min": 2.5, "max": 5.5},
+    {"id": 2006, "stat": "SPD", "min": 2, "max": 5},
+    {"id": 2007, "stat": "CRIT_RATE", "min": 1.5, "max": 3.5},
+    {"id": 2008, "stat": "CRIT_DMG", "min": 3.0, "max": 7.0}
+  ],
+  "rollRules": {
+    "initialSubCount": 3,
+    "maxSubCount": 4,
+    "enhanceLevelsPerSubUpgrade": 3,
+    "decomposeReturnRatio": 0.4
+  }
+}

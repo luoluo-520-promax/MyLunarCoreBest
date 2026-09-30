@@ -10,6 +10,12 @@ import org.springframework.core.io.ResourceLoader;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+/**
+ * GameResourceFactory 静态资源工厂测试。
+ * <p>
+ * 针对相关生产代码的单元/切片测试类 {@code GameResourceFactoryTest}：
+ * 通过 fixture、mock 与断言覆盖关键成功路径、失败码与状态边界。
+ */
 @DisplayName("GameResourceFactory 静态资源工厂测试")
 class GameResourceFactoryTest {
 
@@ -26,6 +32,14 @@ class GameResourceFactoryTest {
                 factory.getClass().getSimpleName(), resourceLoader.getClass().getSimpleName());
     }
 
+    /**
+     * 验证点：createTabularResource 应创建 TabularStaticResource。
+     * <p>测试方法 {@code createTabularResourceShouldReturnTabularInstance}：
+     * <ul>
+     *   <li>{@code assertNotNull(resource);}</li>
+     *   <li>{@code assertEquals(CommonTestFixtures.ITEM_CONFIG_CSV, resource.getResourceLocation());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("createTabularResource 应创建 TabularStaticResource")
     void createTabularResourceShouldReturnTabularInstance() {
@@ -38,6 +52,14 @@ class GameResourceFactoryTest {
         assertEquals(CommonTestFixtures.ITEM_CONFIG_CSV, resource.getResourceLocation());
     }
 
+    /**
+     * 验证点：createGameResource TABULAR 分支应委托表格工厂。
+     * <p>测试方法 {@code createGameResourceTabularShouldDelegate}：
+     * <ul>
+     *   <li>{@code assertNotNull(resource);}</li>
+     *   <li>{@code assertEquals(2, resource.getRows().size());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("createGameResource TABULAR 分支应委托表格工厂")
     void createGameResourceTabularShouldDelegate() {

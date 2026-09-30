@@ -3,11 +3,9 @@ package cn.itcast.demo.mylunarcore.net;
 
 // 战斗业务 Netty 门面
 import cn.itcast.demo.mylunarcore.battle.BattleNettyService;
-// 战斗相关 cmdId
 import cn.itcast.demo.mylunarcore.net.CmdIds;
-// 解码后的业务包
 import cn.itcast.demo.mylunarcore.net.GamePacket;
-// 战斗系统 Protobuf
+import cn.itcast.demo.mylunarcore.protocol.AssistSystemProto;
 import cn.itcast.demo.mylunarcore.protocol.BattleSystemProto;
 // Netty 上下文
 import io.netty.channel.ChannelHandlerContext;
@@ -82,5 +80,49 @@ public class BattlePacketHandlers {
         BattleSystemProto.GetBattleInfoCsReq req = BattleSystemProto.GetBattleInfoCsReq.parseFrom(payload); // 反序列化
         BattleSystemProto.GetBattleInfoScRsp rsp = battleNettyService.handleGetBattleInfo(req, ctx.channel()); // 业务处理
         ctx.writeAndFlush(new GamePacket(CmdIds.GET_BATTLE_INFO_SC_RSP, rsp.toByteArray())); // 写回响应
+    }
+
+    @PacketCmd(CmdIds.ASK_BATTLE_HINT_CS_REQ)
+    public void onAskBattleHint(ChannelHandlerContext ctx, GamePacket packet) throws Exception {
+        AssistSystemProto.AskBattleHintCsReq req = AssistSystemProto.AskBattleHintCsReq.parseFrom(packet.getPayload());
+        AssistSystemProto.AskBattleHintScRsp rsp = battleNettyService.handleAskBattleHint(req, ctx.channel());
+        ctx.writeAndFlush(new GamePacket(CmdIds.ASK_BATTLE_HINT_SC_RSP, rsp.toByteArray()));
+    }
+
+    @PacketCmd(CmdIds.SET_BATTLE_AUTO_CS_REQ)
+    public void onSetBattleAuto(ChannelHandlerContext ctx, GamePacket packet) throws Exception {
+        BattleSystemProto.SetBattleAutoCsReq req =
+                BattleSystemProto.SetBattleAutoCsReq.parseFrom(
+                        packet.getPayload() == null ? new byte[0] : packet.getPayload());
+        BattleSystemProto.SetBattleAutoScRsp rsp = battleNettyService.handleSetBattleAuto(req, ctx.channel());
+        ctx.writeAndFlush(new GamePacket(CmdIds.SET_BATTLE_AUTO_SC_RSP, rsp.toByteArray()));
+    }
+
+    @PacketCmd(CmdIds.SET_BATTLE_SPEED_CS_REQ)
+    public void onSetBattleSpeed(ChannelHandlerContext ctx, GamePacket packet) throws Exception {
+        BattleSystemProto.SetBattleSpeedCsReq req =
+                BattleSystemProto.SetBattleSpeedCsReq.parseFrom(
+                        packet.getPayload() == null ? new byte[0] : packet.getPayload());
+        BattleSystemProto.SetBattleSpeedScRsp rsp = battleNettyService.handleSetBattleSpeed(req, ctx.channel());
+        ctx.writeAndFlush(new GamePacket(CmdIds.SET_BATTLE_SPEED_SC_RSP, rsp.toByteArray()));
+    }
+
+    @PacketCmd(CmdIds.BATTLE_MANUAL_ULT_CS_REQ)
+    public void onBattleManualUlt(ChannelHandlerContext ctx, GamePacket packet) throws Exception {
+        BattleSystemProto.BattleManualUltCsReq req =
+                BattleSystemProto.BattleManualUltCsReq.parseFrom(
+                        packet.getPayload() == null ? new byte[0] : packet.getPayload());
+        BattleSystemProto.BattleManualUltScRsp rsp = battleNettyService.handleBattleManualUlt(req, ctx.channel());
+        ctx.writeAndFlush(new GamePacket(CmdIds.BATTLE_MANUAL_ULT_SC_RSP, rsp.toByteArray()));
+    }
+
+    @PacketCmd(CmdIds.APPLY_AI_SUGGESTION_CS_REQ)
+    public void onApplyAiSuggestion(ChannelHandlerContext ctx, GamePacket packet) throws Exception {
+        AssistSystemProto.ApplyAiSuggestionCsReq req =
+                AssistSystemProto.ApplyAiSuggestionCsReq.parseFrom(
+                        packet.getPayload() == null ? new byte[0] : packet.getPayload());
+        AssistSystemProto.ApplyAiSuggestionScRsp rsp =
+                battleNettyService.handleApplyAiSuggestion(req, ctx.channel());
+        ctx.writeAndFlush(new GamePacket(CmdIds.APPLY_AI_SUGGESTION_SC_RSP, rsp.toByteArray()));
     }
 }

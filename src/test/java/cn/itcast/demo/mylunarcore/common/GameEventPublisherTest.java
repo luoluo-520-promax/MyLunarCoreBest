@@ -9,11 +9,24 @@ import org.springframework.context.ApplicationEventPublisher;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
+/**
+ * GameEventPublisher 事件发布器测试。
+ * <p>
+ * 针对相关生产代码的单元/切片测试类 {@code GameEventPublisherTest}：
+ * 通过 fixture、mock 与断言覆盖关键成功路径、失败码与状态边界。
+ */
 @DisplayName("GameEventPublisher 事件发布器测试")
 class GameEventPublisherTest {
 
     private static final Logger log = LoggerFactory.getLogger(GameEventPublisherTest.class);
 
+    /**
+     * 验证点：publish 应委托 Spring ApplicationEventPublisher。
+     * <p>测试方法 {@code publishShouldDelegateToSpringPublisher}：
+     * <ul>
+     *   <li>{@code verify(delegate).publishEvent(event);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("publish 应委托 Spring ApplicationEventPublisher")
     void publishShouldDelegateToSpringPublisher() {

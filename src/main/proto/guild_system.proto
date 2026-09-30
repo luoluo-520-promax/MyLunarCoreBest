@@ -1,0 +1,144 @@
+syntax = "proto3";
+
+package cn.itcast.demo.mylunarcore.proto;
+
+option java_package = "cn.itcast.demo.mylunarcore.protocol";
+option java_outer_classname = "GuildSystemProto";
+
+message GuildSummary {
+  uint64 guild_id = 1;
+  string name = 2;
+  string notice = 3;
+  uint32 level = 4;
+  uint32 member_count = 5;
+  uint32 max_members = 6;
+  uint32 leader_id = 7;
+}
+
+message GuildMemberInfo {
+  uint32 player_id = 1;
+  uint32 role = 2;
+  uint32 contribution = 3;
+  uint32 weekly_contrib = 4;
+}
+
+message CreateGuildCsReq {
+  string name = 1;
+  string notice = 2;
+}
+
+message CreateGuildScRsp {
+  int32 retcode = 1;
+  GuildSummary guild = 2;
+}
+
+message JoinGuildCsReq {
+  uint64 guild_id = 1;
+}
+
+message JoinGuildScRsp {
+  int32 retcode = 1;
+  GuildSummary guild = 2;
+}
+
+message LeaveGuildCsReq {}
+
+message LeaveGuildScRsp {
+  int32 retcode = 1;
+}
+
+message GetGuildInfoCsReq {}
+
+message GetGuildInfoScRsp {
+  int32 retcode = 1;
+  GuildSummary guild = 2;
+  repeated GuildMemberInfo members = 3;
+  uint32 my_contribution = 4;
+}
+
+message ContributeGuildCsReq {
+  uint32 amount = 1;
+}
+
+message ContributeGuildScRsp {
+  int32 retcode = 1;
+  uint32 contribution = 2;
+  uint32 weekly_contrib = 3;
+  uint32 guild_exp = 4;
+}
+
+message GetGuildShopCsReq {}
+
+message GuildShopProduct {
+  uint32 product_id = 1;
+  uint32 item_id = 2;
+  uint32 count = 3;
+  uint32 contribution_cost = 4;
+  uint32 weekly_limit = 5;
+  string name = 6;
+  uint32 bought_this_week = 7;
+}
+
+message GetGuildShopScRsp {
+  int32 retcode = 1;
+  repeated GuildShopProduct products = 2;
+}
+
+message BuyGuildShopCsReq {
+  uint32 product_id = 1;
+}
+
+message BuyGuildShopScRsp {
+  int32 retcode = 1;
+  uint32 product_id = 2;
+  uint32 bought_this_week = 3;
+}
+
+/** 公会战对局摘要 */
+message GuildWarMatchInfo {
+  uint64 match_id = 1;
+  uint64 season_id = 2;
+  uint64 guild_a_id = 3;
+  uint64 guild_b_id = 4;
+  string status = 5;
+  int32 score_a = 6;
+  int32 score_b = 7;
+  uint64 winner_guild_id = 8;
+}
+
+message GuildWarMatchCsReq {}
+
+message GuildWarMatchScRsp {
+  int32 retcode = 1;
+  GuildWarMatchInfo match = 2;
+}
+
+message GuildWarReportCsReq {
+  uint64 match_id = 1;
+  int32 score_self = 2;
+  int32 score_opponent = 3;
+}
+
+message GuildWarReportScRsp {
+  int32 retcode = 1;
+  GuildWarMatchInfo match = 2;
+}
+
+message GuildWarRankEntry {
+  uint64 guild_id = 1;
+  int32 points = 2;
+  int32 wins = 3;
+  int32 losses = 4;
+  int32 rank = 5;
+}
+
+message GuildWarRankCsReq {
+  uint64 season_id = 1;
+  uint32 top_n = 2;
+}
+
+message GuildWarRankScRsp {
+  int32 retcode = 1;
+  uint64 season_id = 2;
+  repeated GuildWarRankEntry ranks = 3;
+}

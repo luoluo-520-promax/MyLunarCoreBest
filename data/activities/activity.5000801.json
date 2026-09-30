@@ -1,0 +1,31 @@
+{
+  "activityId": 5000801,
+  "name": "七日签到",
+  "activityType": "signin",
+  "moduleId": 50008,
+  "beginTime": 1782835200,
+  "endTime": 1785513600,
+  "unlockLevel": 1,
+  "description": "每日登录领取奖励，累计签到额外大奖。",
+  "gameplay": "每日打开活动面板领取；漏签不可补（示例）。",
+  "rules": "活动期间每日限领 1 次。",
+  "stages": [
+    {
+      "stageId": 1,
+      "name": "第1天",
+      "description": "登录领取",
+      "unlockScore": 0,
+      "rewards": [{ "itemId": 101, "count": 50, "type": "currency", "grantTiming": "claim" }]
+    }
+  ],
+  "costAndLimits": {
+    "dailyLimit": 1,
+    "totalLimit": 7,
+    "cooldownSeconds": 0
+  },
+  "rewardMethod": "daily_claim",
+  "uiResources": {
+    "bannerImage": "ui/activity/signin_banner.png",
+    "iconImage": "ui/activity/signin_icon.png"
+  }
+}

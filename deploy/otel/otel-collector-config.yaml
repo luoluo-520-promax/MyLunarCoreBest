@@ -1,0 +1,34 @@
+# OpenTelemetry Collector → Tempo/Jaeger
+# 用法：docker compose -f deploy/otel/docker-compose.otel.yml up -d
+# 应用侧：JAVA_TOOL_OPTIONS=-javaagent:/otel/opentelemetry-javaagent.jar
+#          OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+#          OTEL_SERVICE_NAME=mylunarcore
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+      http:
+
+processors:
+  batch:
+  attributes:
+    actions:
+      - key: deployment.environment
+        value: staging
+        action: upsert
+
+exporters:
+  otlp/tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+  logging:
+    loglevel: warn
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch, attributes]
+      exporters: [otlp/tempo, logging]

@@ -1,0 +1,44 @@
+[
+  {
+    "treeId": "1001",
+    "entryNodeId": "n1",
+    "title": "列车长初见",
+    "nodes": [
+      {
+        "nodeId": "n1",
+        "speaker": "列车长",
+        "text": "欢迎登上星穹列车。准备好开始旅程了吗？",
+        "choices": [
+          { "choiceId": "1", "text": "准备好了", "nextNodeId": "n2", "requireFlag": "", "impactTags": ["+Affinity", "UnlockRoute"] },
+          { "choiceId": "2", "text": "再等等", "nextNodeId": "n3", "requireFlag": "", "impactTags": ["-Morality"] }
+        ],
+        "nextNodeId": "",
+        "cutsceneId": "",
+        "unlockCgId": 0,
+        "questFlag": "",
+        "performanceId": "perf_intro_climax",
+        "voiceLineKey": "tree_1001_n1"
+      },
+      {
+        "nodeId": "n2",
+        "speaker": "列车长",
+        "text": "很好。前方有一段回忆影像，请留意。",
+        "choices": [],
+        "nextNodeId": "",
+        "cutsceneId": "cs_intro_01",
+        "unlockCgId": 10001,
+        "questFlag": "intro_accepted"
+      },
+      {
+        "nodeId": "n3",
+        "speaker": "列车长",
+        "text": "不着急，车厢随时欢迎你。",
+        "choices": [],
+        "nextNodeId": "",
+        "cutsceneId": "",
+        "unlockCgId": 0,
+        "questFlag": ""
+      }
+    ]
+  }
+]

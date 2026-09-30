@@ -8,11 +8,25 @@ import org.slf4j.LoggerFactory;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+/**
+ * GamePacket 业务包模型测试。
+ * <p>
+ * 针对相关生产代码的单元/切片测试类 {@code GamePacketTest}：
+ * 通过 fixture、mock 与断言覆盖关键成功路径、失败码与状态边界。
+ */
 @DisplayName("GamePacket 业务包模型测试")
 class GamePacketTest {
 
     private static final Logger log = LoggerFactory.getLogger(GamePacketTest.class);
 
+    /**
+     * 验证点：构造器应保留 cmdId 与 payload 副本语义。
+     * <p>测试方法 {@code constructorShouldExposeCmdIdAndPayload}：
+     * <ul>
+     *   <li>{@code assertEquals(cmdId, packet.getCmdId());}</li>
+     *   <li>{@code assertArrayEquals(payload, packet.getPayload());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("构造器应保留 cmdId 与 payload 副本语义")
     void constructorShouldExposeCmdIdAndPayload() {
@@ -26,6 +40,14 @@ class GamePacketTest {
         assertArrayEquals(payload, packet.getPayload());
     }
 
+    /**
+     * 验证点：空负载应表示为零长度数组。
+     * <p>测试方法 {@code emptyPayloadShouldBeZeroLengthArray}：
+     * <ul>
+     *   <li>{@code assertEquals(CmdIds.GET_SESSION_INFO_CS_REQ, packet.getCmdId());}</li>
+     *   <li>{@code assertEquals(0, packet.getPayload().length);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("空负载应表示为零长度数组")
     void emptyPayloadShouldBeZeroLengthArray() {

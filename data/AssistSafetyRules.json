@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "maxAnswerLength": 800,
+  "blockedQuestionReply": "该问题涉及其他玩家隐私或不当请求，助手无法回答。",
+  "softBlockReply": "充值与概率相关问题请以游戏内官方说明为准，助手可帮你查看活动、任务与养成进度。",
+  "rechargeSanitizeReply": "概率与获取方式请以游戏内官方说明为准，助手不会给出充值诱导或必出承诺。",
+  "gachaDisclaimer": "抽卡概率与保底规则以游戏内官方说明为准。",
+  "blockPatterns": [
+    "(别人账号|他人密码|偷看.*背包|查一下.*uid\\s*\\d{3,})",
+    "(他人账号|别人密码|窥探.*背包|查\\s*uid\\s*\\d{3,})",
+    "(other\\s*player.*(password|inventory)|peek.*bag)"
+  ],
+  "softBlockPatterns": [
+    "(怎么充才划算|推荐充值|氪多少|冲多少钱|必出吗|稳出吗)"
+  ],
+  "outboundBlockPatterns": [
+    "(必出|必中|稳出|充钱就能|快去充|立即充值|氪金必|不充就亏)"
+  ],
+  "outboundSentenceKillPatterns": [
+    ".*(必出|必中|稳出).*"
+  ]
+}

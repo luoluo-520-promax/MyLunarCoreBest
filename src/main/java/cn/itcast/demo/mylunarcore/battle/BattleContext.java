@@ -15,10 +15,14 @@ import java.util.ArrayList;
 import java.util.Collections;
 // 哈希映射
 import java.util.HashMap;
+// 有序参战集合
+import java.util.LinkedHashSet;
 // 列表接口
 import java.util.List;
 // 键值映射接口
 import java.util.Map;
+// 参战玩家集合视图
+import java.util.Set;
 
 /**
  * 战斗上下文。
@@ -37,6 +41,8 @@ public class BattleContext {
     private final int lineupId; // 本场战斗使用的阵容配置 ID，表示玩家进入战斗时采用的是哪一套上阵方案。
     private final int battleStageId; // 当前战斗所属关卡 ID，用来标识战斗对应的剧情/副本/关卡进度。
     private final long startTimeSeconds; // 战斗开始时间戳（秒），可用于统计战斗耗时或判断是否超时。
+    /** 多人共战参与者（含发起者）；Party 成员开战时扇入。 */
+    private final Set<Integer> participantPlayerIds = new LinkedHashSet<>();
 
     private boolean ended; // 战斗是否已经结束；结束后通常不再继续推进回合或波次。
 
@@ -45,7 +51,49 @@ public class BattleContext {
     private final int waveCount; // 战斗总波次数，用来判断是否还有后续怪物波次需要切换。
 
     private final Map<Integer, EntityState> entities = new HashMap<>(); // 运行时实体表，保存玩家和怪物的当前生命、死亡状态等信息，战斗结算都依赖这份数据。
+    /** 运行时实体 ID 分配（与配置怪 ID 分离，避免同波次同模板互相覆盖）。 */
+    private int nextRuntimeEntityId = 1_000_000;
     private final List<WaveRuntime> waves; // 战斗的全部波次运行时数据，保存每一波怪物的配置结果，供切波和判定使用。
+
+    /** 绑定的场景怪物 entityId；0 表示非场景遭遇战（直接 stage 开战）。 */
+    private int sceneEntityUid;
+    /** 场景怪物配置模板 ID，用于掉落查表。 */
+    private int sceneMonsterId;
+    /** 开战时玩家 uid，用于战后回场景。 */
+    private long playerUid;
+    private int returnPlaneId;
+    private int returnFloorId;
+    private int returnEntryId;
+    private float returnPosX;
+    private float returnPosY;
+    private float returnPosZ;
+
+    /** 自动战斗：掉线或玩家开启后由服务端代操作。 */
+    private volatile boolean autoBattle;
+    /** auto | disconnect | player */
+    private volatile String autoReason = "";
+    /** 1=PRIORITY_SKILL 2=PRIORITY_BASIC 3=SAVE_ENERGY */
+    private volatile int autoStrategy = 1;
+    /** 0默认 1集火精英 2优先破盾 */
+    private volatile int targetFocus = 0;
+    /** 玩家手动大招覆盖：>0 时下一拍 AI 优先执行该技能。 */
+    private volatile int pendingManualSkillId;
+    private volatile int pendingManualCasterId;
+    private final java.util.List<Integer> pendingManualTargets = new java.util.ArrayList<>();
+    /** 战斗倍速：仅允许 1/2/3，服务端压缩等待时间。 */
+    private volatile int speedMultiplier = 1;
+    /** 下一拍自动行动的最早时间（毫秒）。 */
+    private volatile long nextActionAtMs;
+    /** 队伍战技点（0~5 简化模型）。 */
+    private volatile int teamSkillPoints = 3;
+    /** 终结技充能百分比（0~100）。 */
+    private volatile int ultEnergyPercent = 0;
+    /** 微观干预后是否恢复 Auto 策略。 */
+    private volatile boolean revertAutoAfterMicro = false;
+    private volatile int savedAutoStrategy = 1;
+    private volatile int savedTargetFocus = 0;
+    /** 服务端权威顿帧结束墙钟（毫秒）；0=无进行中的 Hit-stop。 */
+    private volatile long expectedHitStopEndMs;
 
     private BattleContext(long battleId,
                             int playerId,
@@ -61,6 +109,7 @@ public class BattleContext {
         this.waves = waves == null ? Collections.<WaveRuntime>emptyList() : waves; // 保存所有波次的运行时结果；如果没有波次则使用空列表，避免空指针。
         this.waveCount = this.waves.size(); // 统计总波次数，供后续切波和结束判定使用。
         this.ended = false; // 刚创建战斗时默认处于进行中状态。
+        this.participantPlayerIds.add(playerId);
 
         // 把玩家先加入实体表，这样后续技能、伤害和结算逻辑都可以直接通过 playerId 找到玩家状态。
         entities.put(playerId, new EntityState(playerId, 1000, false));
@@ -68,6 +117,60 @@ public class BattleContext {
         if (waveCount > 0) {
             switchToWave(1);
         }
+    }
+
+    /**
+     * 绑定场景回落点与遭遇实体，供战后回世界与删怪。
+     */
+    public void bindWorldAnchor(long playerUid,
+                                int sceneEntityUid,
+                                int sceneMonsterId,
+                                int planeId,
+                                int floorId,
+                                int entryId,
+                                float posX,
+                                float posY,
+                                float posZ) {
+        this.playerUid = playerUid;
+        this.sceneEntityUid = sceneEntityUid;
+        this.sceneMonsterId = sceneMonsterId;
+        this.returnPlaneId = planeId;
+        this.returnFloorId = floorId;
+        this.returnEntryId = entryId;
+        this.returnPosX = posX;
+        this.returnPosY = posY;
+        this.returnPosZ = posZ;
+    }
+
+    public boolean hasWorldAnchor() {
+        return sceneEntityUid > 0 || returnPlaneId > 0;
+    }
+
+    /** 全部波次清剿完成（最后一波怪物全灭）。 */
+    public boolean isAllWavesCleared() {
+        if (waveCount <= 0) {
+            return false;
+        }
+        return currentWave >= waveCount && isAllMonstersDeadInWave(currentWave);
+    }
+
+    /** 玩家实体已死亡。 */
+    public boolean isPlayerDefeated() {
+        EntityState player = entities.get(playerId);
+        return player != null && player.isDead();
+    }
+
+    /**
+     * 服务端权威胜负：1=胜，2=负，0=尚无法判定（不可采信客户端胜利）。
+     */
+    public int resolveAuthoritativeEndStatus() {
+        if (isAllWavesCleared()) {
+            return 1;
+        }
+        if (isPlayerDefeated()) {
+            return 2;
+        }
+        return 0;
     }
 
     /**
@@ -90,9 +193,59 @@ public class BattleContext {
         return new BattleContext(battleId, playerId, lineupId, battleStageId, startTimeSeconds, waveRuntimes); // 返回构建好的战斗上下文。
     }
 
+    /**
+     * 从断线/跨节点快照重建战局骨架（波次用占位，实体 HP/韧性按快照覆盖）。
+     */
+    public static BattleContext fromSnapshot(BattleSnapshot snap) {
+        if (snap == null) {
+            return null;
+        }
+        int waves = Math.max(1, snap.waveCount());
+        List<WaveRuntime> placeholders = new ArrayList<>(waves);
+        for (int i = 1; i <= waves; i++) {
+            placeholders.add(new WaveRuntime(i, Collections.emptyList()));
+        }
+        BattleContext ctx = new BattleContext(
+                snap.battleId(),
+                snap.playerId(),
+                snap.lineupId(),
+                snap.battleStageId(),
+                snap.startTimeSeconds(),
+                placeholders);
+        ctx.entities.clear();
+        if (snap.entities() != null) {
+            for (BattleSnapshot.EntitySnap e : snap.entities().values()) {
+                EntityState state = new EntityState(e.id(), e.hp(), e.dead());
+                state.setToughness(e.toughness(), Math.max(e.toughness(), 1));
+                if (e.broken()) {
+                    state.setToughness(0, Math.max(e.toughness(), 1));
+                }
+                state.setSkinId(e.skinId());
+                ctx.entities.put(e.id(), state);
+            }
+        }
+        if (snap.participantPlayerIds() != null) {
+            for (Integer pid : snap.participantPlayerIds()) {
+                if (pid != null && pid > 0) {
+                    ctx.participantPlayerIds.add(pid);
+                }
+            }
+        }
+        ctx.turn = Math.max(1, snap.turn());
+        ctx.currentWave = Math.max(1, Math.min(waves, snap.currentWave()));
+        ctx.ended = snap.ended();
+        return ctx;
+    }
+
     /** 根据实体 ID 查询当前状态；如果实体不存在，返回 null。 */
     public EntityState getEntity(int entityId) {
         return entities.get(entityId); // 从实体表中读取玩家或怪物的实时状态。
+    }
+
+    /** 读取实体增量属性表；实体不存在时返回 null。 */
+    public CombatAttributeSheet attributeSheetOf(int entityId) {
+        EntityState e = entities.get(entityId);
+        return e == null ? null : e.getAttributeSheet();
     }
 
     /** 回合数加 1，用于表示战斗已经推进到下一步。 */
@@ -110,9 +263,24 @@ public class BattleContext {
         if (wave == null) { // 如果波次不存在，说明配置有问题或已经越界，直接返回。
             return;
         }
-        for (MonsterRuntime monster : wave.getMonsters()) { // 将本波次的每个怪物注册到实体表中。
-            EntityState entity = new EntityState(monster.getConfigMonsterId(), monster.getMaxHp(), false); // 以配置怪物 ID 作为实体 ID，初始化满血且未死亡状态。
-            entities.put(entity.getId(), entity); // 放入实体表，供后续伤害和死亡判定使用。
+        for (MonsterRuntime monster : wave.getMonsters()) {
+            int runtimeId = allocateRuntimeEntityId();
+            monster.bindRuntimeEntityId(runtimeId);
+            EntityState entity = new EntityState(runtimeId, monster.getMaxHp(), false);
+            int toughness = Math.max(30, monster.getLevel() * 15);
+            entity.setToughness(toughness, toughness);
+            entities.put(runtimeId, entity);
+        }
+    }
+
+    private int allocateRuntimeEntityId() {
+        return nextRuntimeEntityId++;
+    }
+
+    /** 在锁内注册实体（禁止外部直接 mutate {@link #getEntities()}）。 */
+    public void putEntity(EntityState entity) {
+        if (entity != null) {
+            entities.put(entity.getId(), entity);
         }
     }
 
@@ -123,7 +291,7 @@ public class BattleContext {
             return true;
         }
         for (MonsterRuntime monster : wave.getMonsters()) { // 逐个检查本波次怪物的当前状态。
-            EntityState entity = entities.get(monster.getConfigMonsterId()); // 从实体表中拿到该怪物的实时状态。
+            EntityState entity = entities.get(monster.getRuntimeEntityId()); // 从实体表中拿到该怪物的实时状态。
             if (entity != null && !entity.isDead()) { // 只要有任意一个怪物还活着，就说明这一波还没打完。
                 return false;
             }
@@ -172,9 +340,16 @@ public class BattleContext {
         return runtime; // 返回该技能完整的运行时动作链。
     }
 
-    /** 返回当前实体表，供战斗逻辑读取玩家和怪物的最新状态。 */
+    /**
+     * 返回实体表不可变视图；变更请走 {@link #putEntity} 并持有 {@link #getLock()}。
+     */
     public Map<Integer, EntityState> getEntities() {
-        return entities; // 提供实体状态视图，战斗中的伤害、治疗、死亡判定都依赖它。
+        return Collections.unmodifiableMap(entities);
+    }
+
+    /** 实体表快照副本（可安全跨线程只读遍历）。 */
+    public Map<Integer, EntityState> snapshotEntities() {
+        return Map.copyOf(entities);
     }
 
     /** 单条已解析的技能行为：包含行为类型以及已经解析好的 JSON 参数。 */
@@ -259,7 +434,25 @@ public class BattleContext {
                     return "true".equalsIgnoreCase(v.asText()) || "1".equals(v.asText());
                 }
             }
-            return false;
+            // 兼容种子数据 {"ratio":1.0} 作为击杀意图
+            JsonNode ratio = first(paramsNode, "ratio", "kill_ratio");
+            return ratio != null && ratio.isNumber() && ratio.asDouble() > 0;
+        }
+
+        /** 解析召唤物配置 ID。 */
+        public int tryParseSummonId() {
+            if (paramsNode == null || paramsNode.isNull()) {
+                return 0;
+            }
+            return tryParseInt(paramsNode, "summonId", "summon_id", "summon", "id");
+        }
+
+        /** 解析韧性削减量；无配置时返回 0。 */
+        public int tryParseToughnessDelta() {
+            if (paramsNode == null || paramsNode.isNull()) {
+                return 0;
+            }
+            return tryParseInt(paramsNode, "toughness", "toughness_change", "break", "breakDamage");
         }
 
         /**
@@ -349,6 +542,23 @@ public class BattleContext {
         return playerId;
     }
 
+    /** 是否为共战参与者（含发起者）。 */
+    public boolean isParticipant(int pid) {
+        return participantPlayerIds.contains(pid);
+    }
+
+    /** 加入共战参与者；已存在则忽略。 */
+    public void addParticipant(int pid) {
+        if (pid > 0) {
+            participantPlayerIds.add(pid);
+        }
+    }
+
+    /** 不可变参战玩家列表快照。 */
+    public List<Integer> getParticipantPlayerIds() {
+        return List.copyOf(participantPlayerIds);
+    }
+
     /** 返回本场战斗使用的阵容 ID。 */
     public int getLineupId() {
         return lineupId;
@@ -357,5 +567,258 @@ public class BattleContext {
     /** 返回这场战斗中保存的所有波次运行时数据。 */
     public List<WaveRuntime> getWaves() {
         return waves;
+    }
+
+    public int getSceneEntityUid() {
+        return sceneEntityUid;
+    }
+
+    public int getSceneMonsterId() {
+        return sceneMonsterId;
+    }
+
+    public long getPlayerUid() {
+        return playerUid;
+    }
+
+    public int getReturnPlaneId() {
+        return returnPlaneId;
+    }
+
+    public int getReturnFloorId() {
+        return returnFloorId;
+    }
+
+    public int getReturnEntryId() {
+        return returnEntryId;
+    }
+
+    public float getReturnPosX() {
+        return returnPosX;
+    }
+
+    public float getReturnPosY() {
+        return returnPosY;
+    }
+
+    public float getReturnPosZ() {
+        return returnPosZ;
+    }
+
+    /**
+     * 当前波次仍存活的怪物实体 ID 列表（按配置怪物 ID）。
+     */
+    public boolean isAutoBattle() {
+        return autoBattle;
+    }
+
+    public void setAutoBattle(boolean autoBattle, String reason) {
+        this.autoBattle = autoBattle;
+        this.autoReason = reason == null ? "" : reason;
+        if (autoBattle && nextActionAtMs <= 0L) {
+            nextActionAtMs = System.currentTimeMillis();
+        }
+    }
+
+    public String getAutoReason() {
+        return autoReason == null ? "" : autoReason;
+    }
+
+    public int getAutoStrategy() {
+        return autoStrategy;
+    }
+
+    public int getTargetFocus() {
+        return targetFocus;
+    }
+
+    /** 0默认 / 1集火精英 / 2优先破盾 */
+    public boolean setTargetFocus(int focus) {
+        if (focus < 0 || focus > 2) {
+            return false;
+        }
+        this.targetFocus = focus;
+        return true;
+    }
+
+    /** 合法策略 1/2/3；0 视为默认优先战技。 */
+    public boolean setAutoStrategy(int strategy) {
+        if (strategy == 0) {
+            this.autoStrategy = 1;
+            return true;
+        }
+        if (strategy != 1 && strategy != 2 && strategy != 3) {
+            return false;
+        }
+        this.autoStrategy = strategy;
+        return true;
+    }
+
+    /**
+     * 抢占式大招槽：写入待执行大招并立即打断当前 Auto 倒计时（nextActionAtMs=now）。
+     */
+    public void queueManualUlt(int skillId, int casterId, java.util.List<Integer> targetIds) {
+        this.pendingManualSkillId = skillId <= 0 ? 3 : skillId;
+        this.pendingManualCasterId = casterId;
+        this.pendingManualTargets.clear();
+        if (targetIds != null) {
+            this.pendingManualTargets.addAll(targetIds);
+        }
+        // 抢占：暂停 1500ms 倒计时，立刻响应
+        this.nextActionAtMs = System.currentTimeMillis();
+    }
+
+    /**
+     * AI 微观干预：锁定下一动技能，可选执行后自动恢复 Auto 策略。
+     */
+    public void queueMicroIntervention(int skillId, int casterId, java.util.List<Integer> targetIds,
+                                       boolean revertAfter) {
+        if (revertAfter) {
+            this.savedAutoStrategy = autoStrategy;
+            this.savedTargetFocus = targetFocus;
+            this.revertAutoAfterMicro = true;
+        }
+        queueManualUlt(skillId, casterId, targetIds);
+    }
+
+    public boolean consumeRevertAutoAfterMicro() {
+        boolean r = revertAutoAfterMicro;
+        revertAutoAfterMicro = false;
+        return r;
+    }
+
+    public int getSavedAutoStrategy() {
+        return savedAutoStrategy;
+    }
+
+    public int getSavedTargetFocus() {
+        return savedTargetFocus;
+    }
+
+    public int getTeamSkillPoints() {
+        return teamSkillPoints;
+    }
+
+    public void setTeamSkillPoints(int points) {
+        this.teamSkillPoints = Math.max(0, Math.min(5, points));
+    }
+
+    public void adjustTeamSkillPoints(int delta) {
+        setTeamSkillPoints(teamSkillPoints + delta);
+    }
+
+    public int getUltEnergyPercent() {
+        return ultEnergyPercent;
+    }
+
+    public void setUltEnergyPercent(int percent) {
+        this.ultEnergyPercent = Math.max(0, Math.min(100, percent));
+    }
+
+    public boolean hasPendingManualUlt() {
+        return pendingManualSkillId > 0;
+    }
+
+    public int consumePendingManualSkillId() {
+        int id = pendingManualSkillId;
+        pendingManualSkillId = 0;
+        return id;
+    }
+
+    public int getPendingManualCasterId() {
+        return pendingManualCasterId;
+    }
+
+    public java.util.List<Integer> snapshotPendingManualTargets() {
+        return java.util.List.copyOf(pendingManualTargets);
+    }
+
+    public int getSpeedMultiplier() {
+        return speedMultiplier;
+    }
+
+    /** 设置倍速；非法值返回 false 且不改写。 */
+    public boolean setSpeedMultiplier(int multiplier) {
+        if (multiplier != 1 && multiplier != 2 && multiplier != 3) {
+            return false;
+        }
+        this.speedMultiplier = multiplier;
+        return true;
+    }
+
+    public long getNextActionAtMs() {
+        return nextActionAtMs;
+    }
+
+    public void setNextActionAtMs(long nextActionAtMs) {
+        this.nextActionAtMs = nextActionAtMs;
+    }
+
+    public long getExpectedHitStopEndMs() {
+        return expectedHitStopEndMs;
+    }
+
+    public void setExpectedHitStopEndMs(long expectedHitStopEndMs) {
+        this.expectedHitStopEndMs = expectedHitStopEndMs;
+    }
+
+    /**
+     * 按倍速压缩等待：客户端加速播放，服务端决策间隔同步缩短。
+     */
+    public long compressedWaitMs(long baseMs) {
+        int mul = speedMultiplier <= 0 ? 1 : speedMultiplier;
+        return Math.max(50L, baseMs / mul);
+    }
+
+    /** 调度下一拍自动行动。 */
+    public void scheduleNextAutoAction(long baseWaitMs) {
+        this.nextActionAtMs = System.currentTimeMillis() + compressedWaitMs(baseWaitMs);
+    }
+
+    public List<Integer> listAliveMonsterIdsInCurrentWave() {
+        WaveRuntime wave = getWaveByWaveIndex(currentWave);
+        if (wave == null) {
+            return List.of();
+        }
+        List<Integer> ids = new ArrayList<>();
+        for (MonsterRuntime monster : wave.getMonsters()) {
+            EntityState entity = entities.get(monster.getRuntimeEntityId());
+            if (entity != null && !entity.isDead()) {
+                ids.add(entity.getId());
+            }
+        }
+        return ids;
+    }
+
+    /**
+     * 按 targetFocus 重排目标：1=优先高血量精英，2=优先未破盾。
+     */
+    public List<Integer> listAliveMonsterIdsByFocus(int focus) {
+        List<Integer> ids = listAliveMonsterIdsInCurrentWave();
+        if (ids.isEmpty() || focus == 0) {
+            return ids;
+        }
+        List<Integer> ranked = new ArrayList<>(ids);
+        if (focus == 1) {
+            ranked.sort((a, b) -> {
+                EntityState ea = entities.get(a);
+                EntityState eb = entities.get(b);
+                int ha = ea == null ? 0 : ea.getHp();
+                int hb = eb == null ? 0 : eb.getHp();
+                return Integer.compare(hb, ha);
+            });
+        } else if (focus == 2) {
+            ranked.sort((a, b) -> {
+                EntityState ea = entities.get(a);
+                EntityState eb = entities.get(b);
+                boolean ba = ea != null && !ea.isBroken() && ea.getMaxToughness() > 0;
+                boolean bb = eb != null && !eb.isBroken() && eb.getMaxToughness() > 0;
+                if (ba == bb) {
+                    return 0;
+                }
+                return ba ? -1 : 1;
+            });
+        }
+        return ranked;
     }
 }

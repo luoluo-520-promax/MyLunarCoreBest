@@ -1,51 +1,45 @@
 // 场景 Netty 业务服务所在包
 package cn.itcast.demo.mylunarcore.scene;
 
-// 场景系统 Protobuf 消息
 import cn.itcast.demo.mylunarcore.protocol.SceneSystemProto;
-// 怪物配置仓储
 import cn.itcast.demo.mylunarcore.repo.MonsterConfigRepository;
-// NPC 配置仓储
 import cn.itcast.demo.mylunarcore.repo.NpcConfigRepository;
-// 场景 plane/floor 配置仓储
 import cn.itcast.demo.mylunarcore.repo.SceneConfigRepository;
-// 召唤单位配置仓储
 import cn.itcast.demo.mylunarcore.repo.SummonUnitConfigRepository;
-// 场景运行时上下文
-import cn.itcast.demo.mylunarcore.scene.SceneContext;
-// 场景道具实体状态
-import cn.itcast.demo.mylunarcore.scene.SceneContext.PropState;
-// 场景怪物实体状态
-import cn.itcast.demo.mylunarcore.scene.SceneContext.MonsterState;
-// 场景 NPC 实体状态
 import cn.itcast.demo.mylunarcore.scene.SceneContext.NpcState;
-// 运行时管理器（分配/缓存 SceneContext）
-import cn.itcast.demo.mylunarcore.scene.SceneManager;
-// Jackson JSON 节点
-import com.fasterxml.jackson.databind.JsonNode;
-// Jackson JSON 读写器
-import com.fasterxml.jackson.databind.ObjectMapper;
-// Netty 客户端连接通道
+import cn.itcast.demo.mylunarcore.scene.SceneContext.PropState;
 import io.netty.channel.Channel;
-// 项目统一日志门面
 import cn.itcast.demo.mylunarcore.common.AppLogger;
-// 日志分类
 import cn.itcast.demo.mylunarcore.common.LogCategory;
-// Channel 自定义属性键
-import io.netty.util.AttributeKey;
-// SLF4J 日志接口
+import cn.itcast.demo.mylunarcore.anticheat.MoveSpeedGuard;
+import cn.itcast.demo.mylunarcore.center.PlayerMigrationService;
+import cn.itcast.demo.mylunarcore.center.SceneRegistry;
+import cn.itcast.demo.mylunarcore.net.CmdIds;
+import cn.itcast.demo.mylunarcore.net.GamePacket;
+import cn.itcast.demo.mylunarcore.player.PlayerContextResolver;
+import cn.itcast.demo.mylunarcore.player.PlayerSessionState;
+import cn.itcast.demo.mylunarcore.player.PlayerSessionStateMachine;
+import cn.itcast.demo.mylunarcore.assist.EnvironmentNarrationService;
+import cn.itcast.demo.mylunarcore.assist.AssistNettyService;
+import cn.itcast.demo.mylunarcore.battle.EncounterConfig;
+import cn.itcast.demo.mylunarcore.battle.EncounterConfigRepository;
+import cn.itcast.demo.mylunarcore.economy.RewardDistributor;
+import cn.itcast.demo.mylunarcore.player.GameSession;
+import cn.itcast.demo.mylunarcore.player.GameSessionManager;
+import cn.itcast.demo.mylunarcore.dialogue.DialogueNode;
+import cn.itcast.demo.mylunarcore.dialogue.DialogueTriggerEngine;
+import cn.itcast.demo.mylunarcore.player.PlayerLoadingStateService;
+import cn.itcast.demo.mylunarcore.quest.QuestTriggerEngine;
+import cn.itcast.demo.mylunarcore.story.StoryChapterService;
+import cn.itcast.demo.mylunarcore.world.CellBoundaryHandoffService;
 import org.slf4j.Logger;
-// Spring @Service 业务 Bean
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-// 可变数组列表
 import java.util.ArrayList;
-// 不可变空集合工厂
 import java.util.Collections;
-// 列表接口
 import java.util.List;
-// 原子整型（实体 ID 自增种子）
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * 场景协议业务：进入场景、查询当前信息、NPC 交互等，装配 {@link SceneContext} 并读各类 ConfigRepository。
@@ -56,25 +50,43 @@ public class SceneNettyService {
     // 本类日志记录器（场景业务分类）
     private static final Logger log = AppLogger.logger(LogCategory.BUSINESS_SCENE, SceneNettyService.class); // 绑定场景业务分类 SLF4J 日志
 
-    // Channel 上绑定玩家 uid 的属性键
-    private static final AttributeKey<Long> UID_KEY = AttributeKey.valueOf("playerUid"); // 定义 Channel 属性键名 playerUid
-
     // Jackson JSON 读写器（解析 scene_config.groups JSON）
-    private static final ObjectMapper MAPPER = new ObjectMapper();
-
-    // 运行时索引：playerUid ↔ SceneContext
-    private final SceneManager sceneManager; // 场景运行时索引 playerUid→SceneContext
-    // 场景 plane/floor 与 groups 配置加载
-    private final SceneConfigRepository sceneConfigRepository; // 场景 plane/floor 配置仓储
-    // 怪物模板配置加载
-    private final MonsterConfigRepository monsterConfigRepository; // 怪物配置仓储
-    // NPC 模板配置加载
-    private final NpcConfigRepository npcConfigRepository; // NPC 配置仓储
-    @SuppressWarnings("unused") // 召唤单位配置仓储暂未使用，保留供后续扩展
-    private final SummonUnitConfigRepository summonUnitConfigRepository; // 召唤单位配置仓储
-
     // 场景实体 ID 自增种子（起始 1000000，避免与玩家 uid 冲突）
-    private final AtomicInteger entityIdSeed = new AtomicInteger(1000000);
+    private final SceneManager sceneManager;
+    private final SceneConfigRepository sceneConfigRepository;
+    @SuppressWarnings("unused")
+    private final MonsterConfigRepository monsterConfigRepository;
+    private final NpcConfigRepository npcConfigRepository;
+    @SuppressWarnings("unused")
+    private final SummonUnitConfigRepository summonUnitConfigRepository;
+    private final PlayerContextResolver contextResolver;
+    private final SceneSyncBroadcaster sceneSyncBroadcaster;
+    private final QuestTriggerEngine questTriggerEngine;
+    private final ZoneManager zoneManager;
+    private final DynamicZoneLineAllocator zoneLineAllocator;
+    private final PlayerMigrationService playerMigrationService;
+    private final GameSessionManager sessionManager;
+    private final EnvironmentNarrationService environmentNarrationService;
+    private final AssistNettyService assistNettyService;
+    private final EncounterConfigRepository encounterConfigRepository;
+    private final RewardDistributor rewardDistributor;
+    private final ZoneWorldService zoneWorldService;
+    private final MoveSpeedGuard moveSpeedGuard;
+    private final CellBoundaryHandoffService cellBoundaryHandoffService;
+    private final DialogueTriggerEngine dialogueTriggerEngine;
+    private final ObjectProvider<StoryChapterService> storyChapterProvider;
+    private final ObjectProvider<PlayerLoadingStateService> loadingStateProvider;
+    private final ObjectProvider<ScenePreloadService> preloadProvider;
+    private final ObjectProvider<PlayerMoveService> playerMoveProvider;
+    private final ObjectProvider<DevicePerfProbeService> perfProbeProvider;
+    private final ObjectProvider<WorldTimeService> worldTimeProvider;
+    private final ObjectProvider<DeathEchoService> deathEchoProvider;
+
+    @Autowired
+    private ObjectProvider<SceneCollisionMeshPushService> collisionMeshPushProvider;
+
+    @Autowired
+    private ObjectProvider<SceneInteractHandler> sceneInteractProvider;
 
     /**
      * 构造器注入场景相关依赖。
@@ -83,52 +95,336 @@ public class SceneNettyService {
                               SceneConfigRepository sceneConfigRepository,
                               MonsterConfigRepository monsterConfigRepository,
                               NpcConfigRepository npcConfigRepository,
-                              SummonUnitConfigRepository summonUnitConfigRepository) {
-        this.sceneManager = sceneManager; // 保存运行时管理器引用
-        this.sceneConfigRepository = sceneConfigRepository; // 保存场景配置仓储引用
-        this.monsterConfigRepository = monsterConfigRepository; // 保存怪物配置仓储引用
-        this.npcConfigRepository = npcConfigRepository; // 保存 NPC 配置仓储引用
-        this.summonUnitConfigRepository = summonUnitConfigRepository; // 保存召唤单位配置仓储引用
+                              SummonUnitConfigRepository summonUnitConfigRepository,
+                              PlayerContextResolver contextResolver,
+                              SceneSyncBroadcaster sceneSyncBroadcaster,
+                              QuestTriggerEngine questTriggerEngine,
+                              ZoneManager zoneManager,
+                              DynamicZoneLineAllocator zoneLineAllocator,
+                              PlayerMigrationService playerMigrationService,
+                              GameSessionManager sessionManager,
+                              EnvironmentNarrationService environmentNarrationService,
+                              AssistNettyService assistNettyService,
+                              EncounterConfigRepository encounterConfigRepository,
+                              RewardDistributor rewardDistributor,
+                              ZoneWorldService zoneWorldService,
+                              MoveSpeedGuard moveSpeedGuard,
+                              CellBoundaryHandoffService cellBoundaryHandoffService,
+                              DialogueTriggerEngine dialogueTriggerEngine,
+                              ObjectProvider<StoryChapterService> storyChapterProvider,
+                              ObjectProvider<PlayerLoadingStateService> loadingStateProvider,
+                              ObjectProvider<ScenePreloadService> preloadProvider,
+                              ObjectProvider<PlayerMoveService> playerMoveProvider,
+                              ObjectProvider<DevicePerfProbeService> perfProbeProvider,
+                              ObjectProvider<WorldTimeService> worldTimeProvider,
+                              ObjectProvider<DeathEchoService> deathEchoProvider) {
+        this.sceneManager = sceneManager;
+        this.sceneConfigRepository = sceneConfigRepository;
+        this.monsterConfigRepository = monsterConfigRepository;
+        this.npcConfigRepository = npcConfigRepository;
+        this.summonUnitConfigRepository = summonUnitConfigRepository;
+        this.contextResolver = contextResolver;
+        this.sceneSyncBroadcaster = sceneSyncBroadcaster;
+        this.questTriggerEngine = questTriggerEngine;
+        this.zoneManager = zoneManager;
+        this.zoneLineAllocator = zoneLineAllocator;
+        this.playerMigrationService = playerMigrationService;
+        this.sessionManager = sessionManager;
+        this.environmentNarrationService = environmentNarrationService;
+        this.assistNettyService = assistNettyService;
+        this.encounterConfigRepository = encounterConfigRepository;
+        this.rewardDistributor = rewardDistributor;
+        this.zoneWorldService = zoneWorldService;
+        this.moveSpeedGuard = moveSpeedGuard;
+        this.cellBoundaryHandoffService = cellBoundaryHandoffService;
+        this.dialogueTriggerEngine = dialogueTriggerEngine;
+        this.storyChapterProvider = storyChapterProvider;
+        this.loadingStateProvider = loadingStateProvider;
+        this.preloadProvider = preloadProvider;
+        this.playerMoveProvider = playerMoveProvider;
+        this.perfProbeProvider = perfProbeProvider;
+        this.worldTimeProvider = worldTimeProvider;
+        this.deathEchoProvider = deathEchoProvider;
     }
 
     /**
      * 进入场景：加载 plane/floor 配置、解析 groups 实体并注册 SceneContext。
      */
     public SceneSystemProto.EnterSceneScRsp handleEnterScene(SceneSystemProto.EnterSceneCsReq req, Channel channel) { // 处理进入场景请求
-        Long uid = channel.attr(UID_KEY).get(); // 从 Channel 属性读取登录 uid
+        Long uid = contextResolver.resolveUid(channel).stream().boxed().findFirst().orElse(null);
         if (uid == null) { // uid 为空表示未登录
             return SceneSystemProto.EnterSceneScRsp.newBuilder() // 组装进入场景失败响应
                     .setRetcode(1) // retcode=1：未登录
                     .build(); // 完成响应构建
         }
 
-        int planeId = (int) req.getPlaneId(); // 读取位面 ID
-        int floorId = (int) req.getFloorId(); // 读取楼层 ID
-        int entryId = (int) req.getEntryId(); // 读取入口点 ID
+        int planeId = (int) req.getPlaneId();
+        int floorId = (int) req.getFloorId();
+        int entryId = (int) req.getEntryId();
+        float posX = req.getPosX();
+        float posY = req.getPosY();
+        float posZ = req.getPosZ();
 
-        SceneContext.ScenePos playerPos = new SceneContext.ScenePos(req.getPosX(), req.getPosY(), req.getPosZ()); // 玩家初始坐标
-        SceneContext ctx = new SceneContext(uid, planeId, floorId, entryId, playerPos); // 创建场景运行时上下文
-
-        SceneConfigRepository.SceneRow row = sceneConfigRepository.findGroups(planeId, floorId); // 按 plane/floor 查场景配置
-        if (row == null) { // 场景配置行不存在
-            return SceneSystemProto.EnterSceneScRsp.newBuilder() // 组装进入场景失败响应
-                    .setRetcode(2) // retcode=2：planeId/floorId 对应场景配置不存在
-                    .build(); // 完成响应构建
+        String migrationTicket = req.getMigrationTicket();
+        if (migrationTicket != null && !migrationTicket.isBlank()) {
+            var ticket = playerMigrationService.consumeTicket(migrationTicket);
+            if (ticket == null || ticket.playerUid() != uid) {
+                return SceneSystemProto.EnterSceneScRsp.newBuilder()
+                        .setRetcode(5) // retcode=5：迁移票据无效/过期/归属不符
+                        .build();
+            }
+            planeId = ticket.planeId();
+            floorId = ticket.floorId();
+            entryId = ticket.entryId() > 0 ? ticket.entryId() : entryId;
+            posX = ticket.posX();
+            posY = ticket.posY();
+            posZ = ticket.posZ();
         }
 
-        int nextEntityId = entityIdSeed.getAndAdd(1); // 分配本场景首个实体 ID 并推进种子
-        parseGroupsIntoScene(ctx, row.getGroupsJson(), nextEntityId); // 解析 groups JSON 填充怪物/NPC/道具
-        ctx.setInitialized(true); // 标记场景已初始化
+        StoryChapterService story = storyChapterProvider.getIfAvailable();
+        if (story != null && !story.canEnterPlane(uid.intValue(), planeId, floorId)) {
+            return SceneSystemProto.EnterSceneScRsp.newBuilder()
+                    .setRetcode(8) // retcode=8：主线未解锁该 Plane/Floor
+                    .build();
+        }
 
-        sceneManager.put(uid, ctx); // 注册玩家场景上下文
-        return ctx.buildEnterSceneRsp(0); // 由 SceneContext 组装进入场景成功响应
+        SceneContext.ScenePos playerPos = new SceneContext.ScenePos(posX, posY, posZ);
+
+        SceneConfigRepository.SceneRow row = sceneConfigRepository.findGroups(planeId, floorId);
+        if (row == null) {
+            return SceneSystemProto.EnterSceneScRsp.newBuilder()
+                    .setRetcode(2)
+                    .build();
+        }
+
+        SceneContext previous = sceneManager.getByPlayerUid(uid);
+        Integer lineId = zoneLineAllocator.pickJoinableLine(planeId, floorId, uid);
+        if (lineId == null) {
+            ZoneManager.JoinResult probe = zoneManager.checkCanJoin(planeId, floorId, uid);
+            if (probe == ZoneManager.JoinResult.DRAINING) {
+                return SceneSystemProto.EnterSceneScRsp.newBuilder().setRetcode(7).build();
+            }
+            return SceneSystemProto.EnterSceneScRsp.newBuilder().setRetcode(6).build();
+        }
+        int newZoneId = DynamicZoneLineAllocator.encodeZoneId(planeId, floorId, lineId);
+        ZoneManager.JoinResult capacity = zoneManager.checkCanJoin(planeId, floorId, lineId, uid);
+        if (capacity == ZoneManager.JoinResult.FULL) {
+            return SceneSystemProto.EnterSceneScRsp.newBuilder().setRetcode(6).build();
+        }
+        if (capacity == ZoneManager.JoinResult.DRAINING) {
+            return SceneSystemProto.EnterSceneScRsp.newBuilder().setRetcode(7).build();
+        }
+        SceneContext ctx = new SceneContext(uid, planeId, floorId, entryId, playerPos, newZoneId);
+        if (previous != null && previous.getZoneId() != newZoneId) {
+            zoneManager.leaveZone(previous.getZoneId(), uid);
+        }
+        zoneManager.joinZone(planeId, floorId, lineId, uid, playerPos);
+
+        zoneWorldService.seedAndProject(ctx, row.getGroupsJson());
+        ctx.setInitialized(true);
+
+        sceneManager.put(uid, ctx);
+        sessionManager.findByUid(uid).ifPresent(s ->
+                PlayerSessionStateMachine.tryTransition(s, PlayerSessionState.SCENE));
+        PlayerLoadingStateService loading = loadingStateProvider.getIfAvailable();
+        // 切图流程会保持 LOADING 直至 SceneLoadComplete；普通 Enter 则立即就绪
+        if (loading != null && !loading.isLoading(uid)) {
+            loading.markSceneReady(uid);
+        }
+        SceneCollisionMeshPushService meshPush = collisionMeshPushProvider == null
+                ? null : collisionMeshPushProvider.getIfAvailable();
+        if (meshPush != null) {
+            meshPush.pushOnEnter(channel, planeId);
+        }
+        return ctx.buildEnterSceneRsp(0);
+    }
+
+    public SceneSystemProto.MigrateSceneScRsp handleMigrateScene(SceneSystemProto.MigrateSceneCsReq req, Channel channel) {
+        Long uid = contextResolver.resolveUid(channel).stream().boxed().findFirst().orElse(null);
+        if (uid == null) {
+            return SceneSystemProto.MigrateSceneScRsp.newBuilder().setRetcode(1).build();
+        }
+        PlayerMigrationService.MigrationResult migration = playerMigrationService.migrate(
+                uid,
+                (int) req.getTargetPlaneId(),
+                (int) req.getTargetFloorId(),
+                (int) req.getTargetEntryId(),
+                req.getPosX(),
+                req.getPosY(),
+                req.getPosZ());
+        if (migration.retcode() == 4) {
+            String ticket = migration.sessionTicket() == null ? "" : migration.sessionTicket();
+            return SceneSystemProto.MigrateSceneScRsp.newBuilder()
+                    .setRetcode(4)
+                    .setZoneId(migration.zoneId())
+                    .setRedirectHost(migration.redirectHost())
+                    .setRedirectPort(migration.redirectPort())
+                    .setSessionTicket(ticket)
+                    .setLoadingTicket(ticket) // 跨节点：与 session_ticket 同值，目标节点 Enter 后 LoadComplete
+                    .build();
+        }
+        if (!migration.success()) {
+            return SceneSystemProto.MigrateSceneScRsp.newBuilder().setRetcode(migration.retcode()).build();
+        }
+        // 签发 LoadingTicket：若已预加载则仅作校验握手
+        String loadingTicket = null;
+        boolean preloadHit = false;
+        SceneSystemProto.SceneLoadMaskInfo maskInfo = null;
+        PlayerLoadingStateService loading = loadingStateProvider.getIfAvailable();
+        ScenePreloadService preload = preloadProvider.getIfAvailable();
+        int planeId = (int) req.getTargetPlaneId();
+        int floorId = (int) req.getTargetFloorId();
+        if (preload != null && preload.isReady(uid, planeId, floorId)) {
+            preloadHit = true;
+            preload.recordOutcome(uid, true);
+            ScenePreloadService.MaskInfo mask = preload.resolveMask(uid, planeId, floorId);
+            String trans = preload.resolveTransitionType(uid, true);
+            mask = ScenePreloadService.MaskInfo.forPlane(planeId, floorId, trans,
+                    layoutOf(uid), preload.hitRateBp(uid));
+            maskInfo = toMaskProto(mask);
+            preload.consumeIfMatch(uid, planeId, floorId);
+        } else if (preload != null) {
+            preload.recordOutcome(uid, false);
+            String trans = preload.resolveTransitionType(uid, false);
+            maskInfo = toMaskProto(ScenePreloadService.MaskInfo.forPlane(
+                    planeId, floorId, trans, layoutOf(uid), preload.hitRateBp(uid)));
+        }
+        if (loading != null) {
+            String trans = preload != null
+                    ? preload.resolveTransitionType(uid, preloadHit)
+                    : (preloadHit ? "DISSOLVE" : "BLACK");
+            loadingTicket = loading.beginLoading(uid, planeId, floorId,
+                    (int) req.getTargetEntryId(), req.getPosX(), req.getPosY(), req.getPosZ(),
+                    preloadHit, trans).ticket();
+        }
+        // 本机切图：保留旧场景快照，Enter 失败则回滚 Zone 与 SceneContext
+        SceneContext previous = sceneManager.getByPlayerUid(uid);
+        SceneSystemProto.EnterSceneCsReq enterReq = SceneSystemProto.EnterSceneCsReq.newBuilder()
+                .setPlaneId(req.getTargetPlaneId())
+                .setFloorId(req.getTargetFloorId())
+                .setEntryId(req.getTargetEntryId())
+                .setPosX(req.getPosX())
+                .setPosY(req.getPosY())
+                .setPosZ(req.getPosZ())
+                .build();
+        SceneSystemProto.EnterSceneScRsp enterRsp = handleEnterScene(enterReq, channel);
+        if (enterRsp.getRetcode() != 0) {
+            if (loading != null) {
+                loading.clear(uid);
+            }
+            if (previous != null && sceneManager.getByPlayerUid(uid) != previous) {
+                zoneManager.tryJoinZone(previous.getPlaneId(), previous.getFloorId(), uid, previous.getPlayerPos());
+                sceneManager.put(uid, previous);
+            }
+            return SceneSystemProto.MigrateSceneScRsp.newBuilder().setRetcode(enterRsp.getRetcode()).build();
+        }
+        SceneSystemProto.MigrateSceneScRsp.Builder rsp = SceneSystemProto.MigrateSceneScRsp.newBuilder()
+                .setRetcode(0)
+                .setZoneId(migration.zoneId())
+                .setSceneInfo(enterRsp.getSceneInfo())
+                .setPreloadHit(preloadHit);
+        if (loadingTicket != null) {
+            rsp.setLoadingTicket(loadingTicket);
+        }
+        if (maskInfo != null) {
+            rsp.setMaskInfo(maskInfo);
+        }
+        return rsp.build();
+    }
+
+    /**
+     * 接近传送门/边界：后台预加载目标 Plane 低模资源键（经 KCP 可靠下发）。
+     */
+    public SceneSystemProto.ScenePreloadScRsp handleScenePreload(SceneSystemProto.ScenePreloadCsReq req, Channel channel) {
+        Long uid = contextResolver.resolveUid(channel).stream().boxed().findFirst().orElse(null);
+        if (uid == null) {
+            return SceneSystemProto.ScenePreloadScRsp.newBuilder().setRetcode(1).build();
+        }
+        int planeId = (int) req.getTargetPlaneId();
+        int floorId = (int) req.getTargetFloorId();
+        if (planeId <= 0) {
+            return SceneSystemProto.ScenePreloadScRsp.newBuilder().setRetcode(2).build();
+        }
+        ScenePreloadService preload = preloadProvider.getIfAvailable();
+        if (preload == null) {
+            return SceneSystemProto.ScenePreloadScRsp.newBuilder().setRetcode(0)
+                    .setTargetPlaneId(planeId).setTargetFloorId(floorId).build();
+        }
+        if (preload.isPreloadStorm(uid)) {
+            return SceneSystemProto.ScenePreloadScRsp.newBuilder()
+                    .setRetcode(5)
+                    .setTargetPlaneId(planeId)
+                    .setTargetFloorId(floorId)
+                    .setStormThrottled(true)
+                    .setMaskInfo(toMaskProto(ScenePreloadService.MaskInfo.forPlane(planeId, floorId, "BLACK", "", 0)))
+                    .build();
+        }
+        ScenePreloadService.PreloadState state = preload.beginPreload(uid, planeId, floorId, (int) req.getTargetEntryId());
+        SceneSystemProto.ScenePreloadScRsp.Builder b = SceneSystemProto.ScenePreloadScRsp.newBuilder()
+                .setRetcode(0)
+                .setTargetPlaneId(planeId)
+                .setTargetFloorId(floorId)
+                .setEstimatedMs(state == null ? 0 : 800)
+                .setMaskInfo(toMaskProto(state == null
+                        ? ScenePreloadService.MaskInfo.forPlane(planeId, floorId) : state.mask()));
+        if (state != null) {
+            b.addAllAssetKeys(state.assetKeys());
+        }
+        // 立即推送就绪（本机缓存标记；客户端可并行拉低模）
+        SceneSystemProto.ScenePreloadReadyScNotify ready = SceneSystemProto.ScenePreloadReadyScNotify.newBuilder()
+                .setTargetPlaneId(planeId)
+                .setTargetFloorId(floorId)
+                .setReady(true)
+                .addAllAssetKeys(state == null ? List.of() : state.assetKeys())
+                .build();
+        channel.writeAndFlush(new cn.itcast.demo.mylunarcore.net.GamePacket(
+                cn.itcast.demo.mylunarcore.net.CmdIds.SCENE_PRELOAD_READY_SC_NOTIFY, ready.toByteArray()));
+        return b.build();
+    }
+
+    private static SceneSystemProto.SceneLoadMaskInfo toMaskProto(ScenePreloadService.MaskInfo mask) {
+        if (mask == null) {
+            return SceneSystemProto.SceneLoadMaskInfo.getDefaultInstance();
+        }
+        return SceneSystemProto.SceneLoadMaskInfo.newBuilder()
+                .setIllustrationId(mask.illustrationId())
+                .setCharacterAnimId(mask.characterAnimId())
+                .setTipText(mask.tipText())
+                .setMaskStyle(mask.maskStyle())
+                .setTransitionType(mask.transitionType() == null ? "BLACK" : mask.transitionType())
+                .setRecommendedLayoutId(mask.recommendedLayoutId() == null ? "" : mask.recommendedLayoutId())
+                .setHitRateBp(Math.max(0, mask.hitRateBp()))
+                .setDurationMs(Math.max(0, mask.durationMs()))
+                .build();
+    }
+
+    /**
+     * 客户端加载完成：解除 LOADING，恢复移动/开战。
+     * retcode: 1未登录 2票据无效
+     */
+    public SceneSystemProto.SceneLoadCompleteScRsp handleSceneLoadComplete(
+            SceneSystemProto.SceneLoadCompleteCsReq req, Channel channel) {
+        Long uid = contextResolver.resolveUid(channel).stream().boxed().findFirst().orElse(null);
+        if (uid == null) {
+            return SceneSystemProto.SceneLoadCompleteScRsp.newBuilder().setRetcode(1).build();
+        }
+        PlayerLoadingStateService loading = loadingStateProvider.getIfAvailable();
+        if (loading == null) {
+            return SceneSystemProto.SceneLoadCompleteScRsp.newBuilder().setRetcode(0).build();
+        }
+        PlayerLoadingStateService.CompleteResult result = loading.completeLoadingResult(uid, req.getLoadingTicket());
+        return SceneSystemProto.SceneLoadCompleteScRsp.newBuilder()
+                .setRetcode(result.ok() ? 0 : 2)
+                .setHandshakeOnly(result.handshakeOnly())
+                .setTransitionType(result.transitionType() == null ? "BLACK" : result.transitionType())
+                .build();
     }
 
     /**
      * 查询玩家当前所在场景的完整快照（怪物、NPC、道具等）。
      */
     public SceneSystemProto.GetCurSceneInfoScRsp handleGetCurSceneInfo(SceneSystemProto.GetCurSceneInfoCsReq req, Channel channel) { // 处理查询当前场景信息
-        Long uid = channel.attr(UID_KEY).get(); // 从 Channel 属性读取登录 uid
+        Long uid = contextResolver.resolveUid(channel).stream().boxed().findFirst().orElse(null);
         if (uid == null) { // uid 为空表示未登录
             return SceneSystemProto.GetCurSceneInfoScRsp.newBuilder() // 组装查询失败响应
                     .setRetcode(1) // retcode=1：未登录
@@ -145,10 +441,224 @@ public class SceneNettyService {
     }
 
     /**
+     * 处理玩家移动：战斗中冻结；轨迹向量 + 100ms 客户端预测；跨 AOI 格或位移超阈值才广播。
+     * retcode: 1未登录 2无场景 3非法/超速 4战斗中 5切图加载中
+     */
+    public SceneSystemProto.MoveScRsp handleMove(SceneSystemProto.MoveCsReq req, Channel channel) {
+        Long uid = contextResolver.resolveUid(channel).stream().boxed().findFirst().orElse(null);
+        if (uid == null) {
+            return SceneSystemProto.MoveScRsp.newBuilder().setRetcode(1).build();
+        }
+        PlayerLoadingStateService loading = loadingStateProvider.getIfAvailable();
+        if (loading != null && loading.isLoading(uid)) {
+            return SceneSystemProto.MoveScRsp.newBuilder().setRetcode(5).build(); // 切图加载中
+        }
+        GameSession session = sessionManager.getOrNull(uid);
+        if (session != null && session.getSessionState() == PlayerSessionState.BATTLE) {
+            return SceneSystemProto.MoveScRsp.newBuilder().setRetcode(4).build(); // 战斗中冻结移动
+        }
+        SceneContext ctx = sceneManager.getByPlayerUid(uid);
+        if (ctx == null || !ctx.isInitialized()) {
+            return SceneSystemProto.MoveScRsp.newBuilder().setRetcode(2).build();
+        }
+        long now = System.currentTimeMillis();
+        int moveState = MovementPhysics.normalizeState(req.getMoveStateValue());
+        PlayerMoveService moveService = playerMoveProvider == null ? null : playerMoveProvider.getIfAvailable();
+        MoveSpeedGuard.MoveCheckResult check;
+        boolean predictionAccepted = false;
+        int predictionWindow = PlayerMoveService.PREDICTION_WINDOW_MS;
+        java.util.List<EnvInteractDetector.Trigger> micros = java.util.List.of();
+        if (moveService != null) {
+            PlayerMoveService.MoveAccept accept = moveService.acceptMove(ctx,
+                    req.getPosX(), req.getPosY(), req.getPosZ(),
+                    req.getVelocityX(), req.getVelocityZ(), req.getClientTickMs(), now, moveState);
+            check = accept.check();
+            predictionAccepted = accept.predictionAccepted();
+            predictionWindow = moveService.predictionWindowMs();
+            micros = accept.microInteracts();
+        } else {
+            check = moveSpeedGuard.validateAndMaybeApply(
+                    ctx, req.getPosX(), req.getPosY(), req.getPosZ(), now);
+        }
+        SceneContext.ScenePos pos = ctx.getPlayerPos();
+        if (check != MoveSpeedGuard.MoveCheckResult.ACCEPT
+                && check != MoveSpeedGuard.MoveCheckResult.CORRECTED_COLLISION) {
+            // 拒绝超速/非法坐标：回写服务器权威位置
+            return SceneSystemProto.MoveScRsp.newBuilder()
+                    .setRetcode(3)
+                    .setPos(SceneSystemProto.SceneVec3.newBuilder()
+                            .setX(pos.getX())
+                            .setY(pos.getY())
+                            .setZ(pos.getZ())
+                            .build())
+                    .setPredictionAccepted(false)
+                    .setPredictionWindowMs(predictionWindow)
+                    .build();
+        }
+        // 碰撞纠正：retcode=0 但坐标为权威纠正点（客户端可平滑插值）
+        zoneManager.updatePlayerPos(ctx.getZoneId(), uid, pos);
+        // 无缝 Cell 边界移交检测（默认关；开启后仅钩子/日志，跨节点仍走 MigrationTicket）
+        cellBoundaryHandoffService.onMoveAccepted(ctx, uid, pos.getX(), pos.getY(), pos.getZ());
+        // cellSize 与 Zone AOI 动态格子对齐；位移阈值 1.0
+        float cellSize = 20f;
+        ZoneContext zone = zoneManager.get(ctx.getZoneId());
+        if (zone != null) {
+            cellSize = zone.getAoiGrid().getCellSize();
+        }
+        if (ctx.shouldBroadcastMove(pos.getX(), pos.getZ(), cellSize, 1.0f)) {
+            sceneSyncBroadcaster.pushPlayerPositionUpdate(channel, uid, ctx.getZoneId(), pos, req.getRotY());
+        }
+        questTriggerEngine.onSceneEventGeneric(uid.intValue());
+        environmentNarrationService.maybeNarrate(uid, ctx.getPlaneId(), pos.getX(), pos.getY(), pos.getZ())
+                .ifPresent(n -> assistNettyService.pushEnvironmentNarration(channel, n.poiId(), n.title(), n.message(), n.source()));
+        try {
+            assistNettyService.onSceneMove(uid, ctx.getPlaneId(), pos.getX(), pos.getY(), pos.getZ());
+        } catch (Exception ignored) {
+            // 主动教练失败不影响移动权威
+        }
+        maybeForcePreload(uid, ctx, pos.getX(), pos.getZ(), channel);
+        MovementPhysics.Feedback feedback = MovementPhysics.resolve(
+                ctx.getPlaneId(), pos.getX(), pos.getY(), pos.getZ(), moveState, ctx.getLastMoveState());
+        ctx.setLastMoveState(feedback.moveState());
+        if (channel != null && channel.isActive()
+                && (feedback.landing() || feedback.moveState() == MovementPhysics.JUMP
+                || feedback.moveState() == MovementPhysics.CLIMB)) {
+            SceneSystemProto.SceneInteractPhysicsScNotify physics =
+                    SceneSystemProto.SceneInteractPhysicsScNotify.newBuilder()
+                            .setPlayerUid(uid.intValue())
+                            .setMoveState(toMoveState(feedback.moveState()))
+                            .setFloorMaterial(feedback.floorMaterial())
+                            .setHapticStrength(feedback.hapticStrength())
+                            .setFootstepSfxId(feedback.footstepSfxId())
+                            .setLanding(feedback.landing())
+                            .build();
+            channel.writeAndFlush(new GamePacket(CmdIds.SCENE_INTERACT_PHYSICS_SC_NOTIFY, physics.toByteArray()));
+        }
+        if (channel != null && channel.isActive() && micros != null) {
+            for (EnvInteractDetector.Trigger t : micros) {
+                SceneSystemProto.EnvMicroInteractType type =
+                        SceneSystemProto.EnvMicroInteractType.forNumber(t.type().wire());
+                if (type == null) {
+                    type = SceneSystemProto.EnvMicroInteractType.ENV_MICRO_UNSPECIFIED;
+                }
+                SceneSystemProto.SceneEnvMicroInteractScNotify micro =
+                        SceneSystemProto.SceneEnvMicroInteractScNotify.newBuilder()
+                                .setPlayerUid(uid)
+                                .setInteractType(type)
+                                .setPos(SceneSystemProto.SceneVec3.newBuilder()
+                                        .setX(t.x()).setY(t.y()).setZ(t.z()).build())
+                                .setParticleId(t.type().particleId())
+                                .setIntensity(t.intensity())
+                                .build();
+                channel.writeAndFlush(new GamePacket(CmdIds.SCENE_ENV_MICRO_INTERACT_SC_NOTIFY, micro.toByteArray()));
+            }
+        }
+        return SceneSystemProto.MoveScRsp.newBuilder()
+                .setRetcode(0)
+                .setPos(SceneSystemProto.SceneVec3.newBuilder()
+                        .setX(pos.getX())
+                        .setY(pos.getY())
+                        .setZ(pos.getZ())
+                        .build())
+                .setMoveState(toMoveState(feedback.moveState()))
+                .setPredictionAccepted(predictionAccepted)
+                .setPredictionWindowMs(predictionWindow)
+                .build();
+    }
+
+    public SceneSystemProto.ReportDevicePerfScRsp handleReportDevicePerf(
+            SceneSystemProto.ReportDevicePerfCsReq req, Channel channel) {
+        Long uid = contextResolver.resolveUid(channel).stream().boxed().findFirst().orElse(null);
+        if (uid == null) {
+            return SceneSystemProto.ReportDevicePerfScRsp.newBuilder().setRetcode(1).build();
+        }
+        DevicePerfProbeService probe = perfProbeProvider == null ? null : perfProbeProvider.getIfAvailable();
+        if (probe == null) {
+            return SceneSystemProto.ReportDevicePerfScRsp.newBuilder().setRetcode(0).setAdjustPushed(false).build();
+        }
+        var adjust = probe.report(uid, req.getSocTempC(), (int) req.getFps(), (int) req.getBatteryPercent(), req.getDeviceId());
+        boolean pushed = false;
+        if (adjust.isPresent() && channel != null && channel.isActive()) {
+            DevicePerfProbeService.Adjust a = adjust.get();
+            SceneSystemProto.ScenePerformanceAdjustScNotify notify =
+                    SceneSystemProto.ScenePerformanceAdjustScNotify.newBuilder()
+                            .setRenderTier(a.renderTier())
+                            .setDisableNpcSilhouette(a.disableNpcSilhouette())
+                            .setReduceFarLod(a.reduceFarLod())
+                            .setTargetFpsCap(a.targetFpsCap())
+                            .setReason(a.reason())
+                            .setSocTempC(a.socTempC())
+                            .setPresetId(a.presetId() == null ? "" : a.presetId())
+                            .setShadowQuality(Math.max(0, a.shadowQuality()))
+                            .setParticleBudget(Math.max(0, a.particleBudget()))
+                            .setViewDistance(a.viewDistance())
+                            .build();
+            channel.writeAndFlush(new GamePacket(CmdIds.SCENE_PERFORMANCE_ADJUST_SC_NOTIFY, notify.toByteArray()));
+            pushed = true;
+        }
+        return SceneSystemProto.ReportDevicePerfScRsp.newBuilder().setRetcode(0).setAdjustPushed(pushed).build();
+    }
+
+    public SceneSystemProto.GetWorldTimeScRsp handleGetWorldTime(Channel channel) {
+        Long uid = contextResolver.resolveUid(channel).stream().boxed().findFirst().orElse(null);
+        if (uid == null) {
+            return SceneSystemProto.GetWorldTimeScRsp.newBuilder().setRetcode(1).build();
+        }
+        WorldTimeService wts = worldTimeProvider == null ? null : worldTimeProvider.getIfAvailable();
+        if (wts == null) {
+            return SceneSystemProto.GetWorldTimeScRsp.newBuilder().setRetcode(0)
+                    .setWorldTimeMs(System.currentTimeMillis())
+                    .setPeriod(SceneSystemProto.WorldTimePeriod.NOON)
+                    .build();
+        }
+        WorldTimeService.Snapshot snap = wts.snapshot();
+        return SceneSystemProto.GetWorldTimeScRsp.newBuilder()
+                .setRetcode(0)
+                .setWorldTimeMs(snap.worldTimeMs())
+                .setPeriod(WorldTimeService.toProto(snap.period()))
+                .setPeriodElapsedMs((int) snap.periodElapsedMs())
+                .setPeriodDurationMs((int) snap.periodDurationMs())
+                .build();
+    }
+
+    public SceneSystemProto.ComfortDeathEchoScRsp handleComfortDeathEcho(
+            SceneSystemProto.ComfortDeathEchoCsReq req, Channel channel) {
+        Long uid = contextResolver.resolveUid(channel).stream().boxed().findFirst().orElse(null);
+        if (uid == null) {
+            return SceneSystemProto.ComfortDeathEchoScRsp.newBuilder().setRetcode(1).build();
+        }
+        DeathEchoService svc = deathEchoProvider == null ? null : deathEchoProvider.getIfAvailable();
+        if (svc == null) {
+            return SceneSystemProto.ComfortDeathEchoScRsp.newBuilder().setRetcode(2).setEchoId(req.getEchoId()).build();
+        }
+        int rc = svc.comfort(uid, req.getEchoId());
+        return SceneSystemProto.ComfortDeathEchoScRsp.newBuilder()
+                .setRetcode(rc)
+                .setEchoId(req.getEchoId() == null ? "" : req.getEchoId())
+                .build();
+    }
+
+    /** 战斗失败等入口：在当前位置留下荧光残影。 */
+    public void spawnDeathEcho(long uid) {
+        DeathEchoService svc = deathEchoProvider == null ? null : deathEchoProvider.getIfAvailable();
+        SceneContext ctx = sceneManager.getByPlayerUid(uid);
+        if (svc == null || ctx == null || !ctx.isInitialized()) {
+            return;
+        }
+        SceneContext.ScenePos pos = ctx.getPlayerPos();
+        svc.spawn(uid, ctx.getPlaneId(), pos.getX(), pos.getY(), pos.getZ());
+    }
+
+    private static SceneSystemProto.MoveState toMoveState(int state) {
+        SceneSystemProto.MoveState mapped = SceneSystemProto.MoveState.forNumber(state);
+        return mapped == null ? SceneSystemProto.MoveState.WALK : mapped;
+    }
+
+    /**
      * 与场景内 NPC 交互，返回对应对话 ID（演示实现：对话内容与选项为空）。
      */
     public SceneSystemProto.InteractNpcScRsp handleInteractNpc(SceneSystemProto.InteractNpcCsReq req, Channel channel) { // 处理 NPC 交互
-        Long uid = channel.attr(UID_KEY).get(); // 从 Channel 属性读取登录 uid
+        Long uid = contextResolver.resolveUid(channel).stream().boxed().findFirst().orElse(null);
         if (uid == null) { // uid 为空表示未登录
             return SceneSystemProto.InteractNpcScRsp.newBuilder() // 组装交互失败响应
                     .setRetcode(1) // retcode=1：未登录
@@ -175,340 +685,230 @@ public class SceneNettyService {
 
         NpcConfigRepository.NpcRow npcRow = npcConfigRepository.findById(npc.getNpcId()); // 按模板 ID 查 NPC 配置
         int dialogueId = npcRow == null ? 0 : npcRow.getDialogueId(); // 取对话 ID，无配置则为 0
+        questTriggerEngine.onNpcInteract(uid.intValue(), npc.getNpcId());
+
+        String dialogueContent = "";
+        List<SceneSystemProto.NpcDialogOption> options = new ArrayList<>();
+        if (dialogueId > 0) {
+            DialogueTriggerEngine.DialogueStepResult step =
+                    dialogueTriggerEngine.startByNpc(uid.intValue(), String.valueOf(dialogueId));
+            if (step.ok() && step.node() != null) {
+                DialogueNode node = step.node();
+                dialogueContent = node.text() == null ? "" : node.text();
+                for (DialogueNode.Choice choice : node.safeChoices()) {
+                    int optionId = 0;
+                    try {
+                        if (choice.choiceId() != null && !choice.choiceId().isBlank()) {
+                            // 支持纯数字 choiceId；非数字则用稳定哈希落入 uint32
+                            optionId = choice.choiceId().chars().allMatch(Character::isDigit)
+                                    ? Integer.parseInt(choice.choiceId())
+                                    : Math.floorMod(choice.choiceId().hashCode(), 1_000_000);
+                        }
+                    } catch (NumberFormatException ignored) {
+                        optionId = Math.floorMod(String.valueOf(choice.choiceId()).hashCode(), 1_000_000);
+                    }
+                    options.add(SceneSystemProto.NpcDialogOption.newBuilder()
+                            .setOptionId(optionId)
+                            .setText(choice.text() == null ? "" : choice.text())
+                            .build());
+                }
+            }
+        }
 
         return SceneSystemProto.InteractNpcScRsp.newBuilder() // 组装交互成功响应
                 .setRetcode(0) // retcode=0：成功
                 .setEntityId(req.getEntityId()) // 回写 NPC 实体 ID
                 .setDialogueId(dialogueId) // 写入对应对话 ID
-                .setDialogueContent("") // 演示实现：对话内容留空
-                .addAllOptions(Collections.<SceneSystemProto.NpcDialogOption>emptyList()) // 演示实现：对话选项留空
+                .setDialogueContent(dialogueContent)
+                .addAllOptions(options)
                 .build(); // 完成响应构建
     }
 
     /**
-     * 拾取场景内道具，更新道具状态为已开启（演示实现：奖励列表为空）。
+     * 拾取场景内道具：标记已开启并按遭遇配置发放奖励。
      */
-    public SceneSystemProto.PickupPropScRsp handlePickupProp(SceneSystemProto.PickupPropCsReq req, Channel channel) { // 处理拾取场景道具
-        Long uid = channel.attr(UID_KEY).get(); // 从 Channel 属性读取登录 uid
-        if (uid == null) { // uid 为空表示未登录
-            return SceneSystemProto.PickupPropScRsp.newBuilder() // 组装拾取失败响应
-                    .setRetcode(1) // retcode=1：未登录
-                    .setEntityId(req.getEntityId()) // 回写请求的道具实体 ID
-                    .setPropState(0) // 道具状态未变更
-                    .build(); // 完成响应构建
+    public SceneSystemProto.PickupPropScRsp handlePickupProp(SceneSystemProto.PickupPropCsReq req, Channel channel) {
+        Long uid = contextResolver.resolveUid(channel).stream().boxed().findFirst().orElse(null);
+        if (uid == null) {
+            return SceneSystemProto.PickupPropScRsp.newBuilder()
+                    .setRetcode(1)
+                    .setEntityId(req.getEntityId())
+                    .setPropState(0)
+                    .build();
         }
 
-        SceneContext ctx = sceneManager.getByPlayerUid(uid); // 按玩家 uid 查找场景上下文
-        if (ctx == null) { // 玩家尚未进入场景或上下文缺失
-            return SceneSystemProto.PickupPropScRsp.newBuilder() // 组装拾取失败响应
-                    .setRetcode(2) // retcode=2：玩家不在任何场景中
-                    .setEntityId(req.getEntityId()) // 回写请求的道具实体 ID
-                    .setPropState(0) // 道具状态未变更
-                    .build(); // 完成响应构建
+        SceneContext ctx = sceneManager.getByPlayerUid(uid);
+        if (ctx == null) {
+            return SceneSystemProto.PickupPropScRsp.newBuilder()
+                    .setRetcode(2)
+                    .setEntityId(req.getEntityId())
+                    .setPropState(0)
+                    .build();
         }
 
-        int entityId = (int) req.getEntityId(); // 请求拾取的道具实体 ID
-        PropState prop = ctx.getProp(entityId); // 在场景上下文中查找道具
-        if (prop == null) { // 场景内找不到该道具实体
-            return SceneSystemProto.PickupPropScRsp.newBuilder() // 组装拾取失败响应
-                    .setRetcode(3) // retcode=3：目标道具实体不存在
-                    .setEntityId(req.getEntityId()) // 回写请求的道具实体 ID
-                    .setPropState(0) // 道具状态未变更
-                    .build(); // 完成响应构建
+        int entityId = (int) req.getEntityId();
+        PropState prop = ctx.getProp(entityId);
+        if (prop == null) {
+            return SceneSystemProto.PickupPropScRsp.newBuilder()
+                    .setRetcode(3)
+                    .setEntityId(req.getEntityId())
+                    .setPropState(0)
+                    .build();
+        }
+        if (prop.getState() == 1) {
+            return SceneSystemProto.PickupPropScRsp.newBuilder()
+                    .setRetcode(4) // 已拾取
+                    .setEntityId(req.getEntityId())
+                    .setPropState(1)
+                    .build();
         }
 
-        // state: 0=closed（未开启）, 1=open（已拾取/已开启）
-        prop.setState(1); // 将道具状态更新为已开启
+        prop.setState(1);
+        zoneWorldService.updatePropState(ctx.getZoneId(), entityId, 1);
+        int playerId = contextResolver.resolvePlayerId(channel);
+        EncounterConfig encounter = encounterConfigRepository.current();
+        List<SceneSystemProto.SceneRewardItem> rewardItems = new ArrayList<>();
+        if (encounter.propPickupItemId() > 0 && encounter.propPickupCount() > 0) {
+            List<EncounterConfig.DropEntry> drops = List.of(
+                    new EncounterConfig.DropEntry(encounter.propPickupItemId(), encounter.propPickupCount(), null, null));
+            List<RewardDistributor.GrantedItem> granted =
+                    rewardDistributor.grantBattleRewards(playerId, drops, 0, "pickup:" + entityId);
+            for (RewardDistributor.GrantedItem g : granted) {
+                rewardItems.add(SceneSystemProto.SceneRewardItem.newBuilder()
+                        .setItemId(g.itemId())
+                        .setCount(g.count())
+                        .build());
+            }
+            log.info("pickup prop granted, uid={}, entityId={}, itemId={}, count={}",
+                    uid, entityId, encounter.propPickupItemId(), encounter.propPickupCount());
+        }
+        SceneInteractHandler interact = sceneInteractProvider == null
+                ? null : sceneInteractProvider.getIfAvailable();
+        if (interact != null) {
+            try {
+                interact.onPropPickup(playerId, ctx.getPlaneId(), ctx.getFloorId(), String.valueOf(entityId));
+            } catch (Exception ignored) {
+            }
+        }
 
-        // 当前 schema 未提供奖励表，演示实现返回空奖励列表
-        return SceneSystemProto.PickupPropScRsp.newBuilder() // 组装拾取成功响应
-                .setRetcode(0) // retcode=0：成功
-                .setEntityId(req.getEntityId()) // 回写道具实体 ID
-                .addAllRewardItems(Collections.<SceneSystemProto.SceneRewardItem>emptyList()) // 演示不发具体道具奖励
-                .setPropState(1) // 回写更新后的道具状态（已开启）
-                .build(); // 完成响应构建
+        return SceneSystemProto.PickupPropScRsp.newBuilder()
+                .setRetcode(0)
+                .setEntityId(req.getEntityId())
+                .addAllRewardItems(rewardItems)
+                .setPropState(1)
+                .build();
     }
 
     /**
      * 触发场景事件（演示实现：仅确认触发，不更新实体状态）。
      */
-    public SceneSystemProto.TriggerSceneEventScRsp handleTriggerSceneEvent(SceneSystemProto.TriggerSceneEventCsReq req, Channel channel) { // 处理触发场景事件
-        Long uid = channel.attr(UID_KEY).get(); // 从 Channel 属性读取登录 uid
-        if (uid == null) { // uid 为空表示未登录
-            return SceneSystemProto.TriggerSceneEventScRsp.newBuilder() // 组装触发失败响应
-                    .setRetcode(1) // retcode=1：未登录
-                    .setEntityId(req.getEntityId()) // 回写请求的事件实体 ID
-                    .build(); // 完成响应构建
+    public SceneSystemProto.TriggerSceneEventScRsp handleTriggerSceneEvent(SceneSystemProto.TriggerSceneEventCsReq req, Channel channel) {
+        Long uid = contextResolver.resolveUid(channel).stream().boxed().findFirst().orElse(null);
+        if (uid == null) {
+            return SceneSystemProto.TriggerSceneEventScRsp.newBuilder()
+                    .setRetcode(1)
+                    .setEntityId(req.getEntityId())
+                    .build();
         }
 
-        // 事件系统依赖额外配置表（当前 schema 未包含），演示实现仅确认触发并返回空更新列表
-        return SceneSystemProto.TriggerSceneEventScRsp.newBuilder() // 组装触发成功响应
-                .setRetcode(0) // retcode=0：成功
-                .setEntityId(req.getEntityId()) // 回写事件实体 ID
-                .build(); // 完成响应构建
+        questTriggerEngine.onSceneEvent(uid.intValue(), req.getTriggerType());
+        return SceneSystemProto.TriggerSceneEventScRsp.newBuilder()
+                .setRetcode(0)
+                .setEntityId(req.getEntityId())
+                .build();
     }
 
     /**
-     * 使用治疗泉（演示实现：不回血、仅标记复活点已设置）。
+     * 使用治疗泉：按遭遇配置恢复 HP，并标记复活点。
      */
-    public SceneSystemProto.UseHealingSpringScRsp handleUseHealingSpring(SceneSystemProto.UseHealingSpringCsReq req, Channel channel) { // 处理使用治疗泉
-        // 治疗泉效果依赖额外配置表（当前 schema 未包含），演示实现固定返回 0 回血
-        return SceneSystemProto.UseHealingSpringScRsp.newBuilder() // 组装使用治疗泉成功响应
-                .setRetcode(0) // retcode=0：成功
-                .setEntityId(req.getEntityId()) // 回写治疗泉实体 ID
-                .setHealEffect(
-                        SceneSystemProto.HealEffect.newBuilder()
-                        .setHpRecovered(0)
-                        .build()
-                ) // 演示：恢复 HP 为 0
-                .setRespawnPointSet(true) // 标记复活点已设置
-                .build(); // 完成响应构建
+    public SceneSystemProto.UseHealingSpringScRsp handleUseHealingSpring(SceneSystemProto.UseHealingSpringCsReq req, Channel channel) {
+        Long uid = contextResolver.resolveUid(channel).stream().boxed().findFirst().orElse(null);
+        if (uid == null) {
+            return SceneSystemProto.UseHealingSpringScRsp.newBuilder()
+                    .setRetcode(1)
+                    .setEntityId(req.getEntityId())
+                    .build();
+        }
+        int hpRecovered = Math.max(0, encounterConfigRepository.current().healingSpringHp());
+        if (hpRecovered <= 0) {
+            hpRecovered = 500;
+        }
+        log.info("healing spring used, uid={}, entityId={}, hpRecovered={}", uid, req.getEntityId(), hpRecovered);
+        return SceneSystemProto.UseHealingSpringScRsp.newBuilder()
+                .setRetcode(0)
+                .setEntityId(req.getEntityId())
+                .setHealEffect(SceneSystemProto.HealEffect.newBuilder()
+                        .setHpRecovered(hpRecovered)
+                        .build())
+                .setRespawnPointSet(true)
+                .build();
+    }
+
+    private String layoutOf(long uid) {
+        GameSession session = sessionManager.getOrNull(uid);
+        if (session == null || session.getRecommendedLayoutId() == null) {
+            return "";
+        }
+        return session.getRecommendedLayoutId();
     }
 
     /**
-     * 解析 scene_config.groups JSON，将怪物、NPC、道具实体写入 SceneContext。
+     * 接近传送门 / 方向预判（提前 2~3 身位）且目标 Zone 空闲时，强制推送预加载资源键。
      */
-    private void parseGroupsIntoScene(SceneContext ctx, String groupsJson, int nextEntityId) { // 解析 groups JSON 填充场景实体
-        if (groupsJson == null || groupsJson.trim().isEmpty()) { // groupsJson 为空则无需解析
+    private void maybeForcePreload(long uid, SceneContext ctx, float x, float z, Channel channel) {
+        ScenePreloadService preload = preloadProvider.getIfAvailable();
+        if (preload == null || ctx == null || channel == null) {
             return;
         }
-
-        try { // 捕获 JSON 解析异常，避免整场景加载失败
-            JsonNode root = MAPPER.readTree(groupsJson); // 将 groups JSON 解析为 Jackson 节点树
-            int eid = nextEntityId; // 当前待分配的实体 ID（逐条递增）
-
-            // 解析怪物列表
-            JsonNode monstersNode = getFirstNonNull(root, "monsters", "monster"); // 兼容 monsters/monster 两种键名
-            if (monstersNode != null && monstersNode.isArray()) {
-                for (JsonNode m : monstersNode) { // 遍历每条怪物配置
-                    MonsterState s = buildMonsterState(ctx, eid++, m); // 构建怪物状态并分配 entityId
-                    if (s != null) {
-                        ctx.addMonster(s); // 注册到场景上下文
-                    }
-                }
-            }
-
-            // 解析 NPC 列表
-            JsonNode npcsNode = getFirstNonNull(root, "npcs", "npc"); // 兼容 npcs/npc 两种键名
-            if (npcsNode != null && npcsNode.isArray()) {
-                for (JsonNode n : npcsNode) { // 遍历每条 NPC 配置
-                    NpcState s = buildNpcState(ctx, eid++, n); // 构建 NPC 状态并分配 entityId
-                    if (s != null) {
-                        ctx.addNpc(s); // 注册到场景上下文
-                    }
-                }
-            }
-
-            // 解析道具列表
-            JsonNode propsNode = getFirstNonNull(root, "props", "prop"); // 兼容 props/prop 两种键名
-            if (propsNode != null && propsNode.isArray()) {
-                for (JsonNode p : propsNode) { // 遍历每条道具配置
-                    PropState s = buildPropState(ctx, eid++, p); // 构建道具状态并分配 entityId
-                    if (s != null) {
-                        ctx.addProp(s); // 注册到场景上下文
-                    }
-                }
-            }
-        } catch (Exception e) { // JSON 解析或配置加载失败
-            log.warn("parse scene_config.groups failed, groupsJson={}", groupsJson, e); // 记录解析异常便于排查
+        float[] dir = preload.trackAndDirection(uid, x, z);
+        ScenePreloadService.PortalHint portal = preload.detectApproach(
+                ctx.getPlaneId(), x, z, dir[0], dir[1], true);
+        int reason = 3; // 方向预判
+        if (portal == null) {
+            portal = preload.detectApproach(ctx.getPlaneId(), x, z);
+            reason = 2; // Zone 空闲强制 / 半径接近
         }
-    }
-
-    /**
-     * 由 groups JSON 单条节点与怪物配置表构建 {@link MonsterState}。
-     */
-    private MonsterState buildMonsterState(SceneContext ctx, int entityId, JsonNode node) { // 构建单只怪物运行时状态
-        int monsterId = parseIntFlexible(node, "monster_id", "monsterId", "id"); // 优先读显式 monster_id 字段
-        if (monsterId == 0) {
-            if (node.isNumber()) { // 节点本身为数字时直接作为 monsterId
-                monsterId = node.asInt();
-            } else {
-                return null; // 无法解析 monsterId，跳过该条
-            }
+        if (portal == null) {
+            return;
         }
-
-        MonsterConfigRepository.MonsterRow cfg = monsterConfigRepository.findById(monsterId); // 查怪物模板配置
-        if (cfg == null) {
-            return null; // 配置不存在，跳过该条
+        if (preload.isReady(uid, portal.toPlaneId(), portal.toFloorId())) {
+            return;
         }
-
-        int level = parseIntFlexible(node, "level", "custom_level", "customLevel"); // 读取自定义等级
-        if (level <= 0) {
-            level = cfg.getLevel(); // 未指定则使用模板默认等级
+        ZoneContext target = zoneManager.getOrCreate(portal.toPlaneId(), portal.toFloorId());
+        int occ = target.getPlayerUids() == null ? 0 : target.getPlayerUids().size();
+        if (occ >= 8) {
+            return;
         }
-        int baseLevel = cfg.getLevel() <= 0 ? 1 : cfg.getLevel(); // 模板基准等级（防除零）
-
-        int maxHp = (int) Math.max(1, ((long) cfg.getHp()) * level / baseLevel); // 按等级比例缩放最大 HP
-        int hp = maxHp; // 初始 HP 等于最大 HP
-
-        List<Integer> buffs = parseBuffs(node, cfg.getBuffsJson()); // 解析 buff 列表（组内优先，否则读配置）
-        SceneContext.ScenePos pos = parsePos(node, ctx.getPlayerPos()); // 解析坐标，缺省回退玩家位置
-
-        return new MonsterState(entityId, monsterId, level, hp, maxHp, pos, buffs); // 组装怪物运行时状态
-    }
-
-    /**
-     * 由 groups JSON 单条节点与 NPC 配置表构建 {@link NpcState}。
-     */
-    private NpcState buildNpcState(SceneContext ctx, int entityId, JsonNode node) { // 构建单个 NPC 运行时状态
-        int npcId = parseIntFlexible(node, "npc_id", "npcId", "id"); // 优先读显式 npc_id 字段
-        if (npcId == 0) {
-            if (node.isNumber()) { // 节点本身为数字时直接作为 npcId
-                npcId = node.asInt();
-            } else {
-                return null; // 无法解析 npcId，跳过该条
-            }
+        if (preload.isPreloadStorm(uid)) {
+            SceneSystemProto.ScenePreloadPushScNotify storm = SceneSystemProto.ScenePreloadPushScNotify.newBuilder()
+                    .setTargetPlaneId(portal.toPlaneId())
+                    .setTargetFloorId(portal.toFloorId())
+                    .setTargetEntryId(portal.toEntryId())
+                    .setStormThrottled(true)
+                    .setMaskInfo(toMaskProto(ScenePreloadService.MaskInfo.forPlane(
+                            portal.toPlaneId(), portal.toFloorId(), "BLACK", layoutOf(uid), 0)))
+                    .setReason(reason)
+                    .build();
+            channel.writeAndFlush(new cn.itcast.demo.mylunarcore.net.GamePacket(
+                    cn.itcast.demo.mylunarcore.net.CmdIds.SCENE_PRELOAD_PUSH_SC_NOTIFY, storm.toByteArray()));
+            return;
         }
-
-        NpcConfigRepository.NpcRow cfg = npcConfigRepository.findById(npcId); // 查 NPC 模板配置
-        if (cfg == null) {
-            return null; // 配置不存在，跳过该条
+        ScenePreloadService.PreloadState state = preload.beginPreload(uid, portal.toPlaneId(),
+                portal.toFloorId(), portal.toEntryId());
+        if (state == null) {
+            return;
         }
-
-        SceneContext.ScenePos pos = parsePos(node, ctx.getPlayerPos()); // 解析坐标，缺省回退玩家位置
-        return new NpcState(entityId, npcId, cfg.getRogueEventId(), pos); // 组装 NPC 运行时状态
-    }
-
-    /**
-     * 由 groups JSON 单条节点构建 {@link PropState}（不依赖额外配置表）。
-     */
-    private PropState buildPropState(SceneContext ctx, int entityId, JsonNode node) { // 构建单个道具运行时状态
-        int propId = parseIntFlexible(node, "prop_id", "propId", "id"); // 优先读显式 prop_id 字段
-        if (propId == 0) {
-            if (node.isNumber()) { // 节点本身为数字时直接作为 propId
-                propId = node.asInt();
-            } else {
-                return null; // 无法解析 propId，跳过该条
-            }
-        }
-
-        int state = parseIntFlexible(node, "state", "prop_state"); // 读取道具开关状态
-        SceneContext.ScenePos pos = parsePos(node, ctx.getPlayerPos()); // 解析坐标，缺省回退玩家位置
-        if (state < 0) {
-            state = 0; // 非法状态归一化为 0（未开启）
-        }
-
-        return new PropState(entityId, propId, state, pos); // 组装道具运行时状态
-    }
-
-    /**
-     * 解析 buff ID 列表：优先读 group 节点内 buffs，否则回退怪物配置 JSON。
-     */
-    private List<Integer> parseBuffs(JsonNode groupNode, String cfgBuffsJson) { // 解析 buff ID 列表
-        // 优先级：group 节点内 buffs → 配置表 buffsJson
-        JsonNode buffsNode = getFirstNonNull(groupNode, "buffs", "buff_ids", "buffIds"); // 兼容多种键名
-        if (buffsNode != null && buffsNode.isArray()) {
-            List<Integer> out = new ArrayList<>(); // 收集 buff ID
-            for (JsonNode b : buffsNode) {
-                if (b.isNumber()) {
-                    out.add(b.asInt()); // 数字节点直接取整
-                }
-            }
-            return out;
-        }
-
-        if (cfgBuffsJson == null || cfgBuffsJson.trim().isEmpty()) { // 配置表 buffsJson 为空
-            return Collections.emptyList(); // 无 buff
-        }
-
-        try { // 尝试解析配置表 buffsJson
-            JsonNode arr = MAPPER.readTree(cfgBuffsJson); // 将 buffsJson 解析为数组
-            if (arr != null && arr.isArray()) {
-                List<Integer> out = new ArrayList<>(); // 收集 buff ID
-                for (JsonNode b : arr) {
-                    if (b.isNumber()) {
-                        out.add(b.asInt()); // 数字节点直接取整
-                    }
-                }
-                return out;
-            }
-        } catch (Exception ignore) {
-            // 解析失败则忽略，返回空列表
-        }
-        return Collections.emptyList(); // 默认无 buff
-    }
-
-    /**
-     * 从 JSON 节点解析三维坐标；支持嵌套 pos 对象或 pos_x/y/z 平铺键，缺省回退 fallback。
-     */
-    private SceneContext.ScenePos parsePos(JsonNode node, SceneContext.ScenePos fallback) { // 解析实体坐标
-        JsonNode posNode = getFirstNonNull(node, "pos", "position"); // 优先读嵌套 pos/position 对象
-        if (posNode != null && posNode.isObject()) {
-            float x = parseFloat(posNode.get("x"), fallback.getX()); // 读 x 坐标
-            float y = parseFloat(posNode.get("y"), fallback.getY()); // 读 y 坐标
-            float z = parseFloat(posNode.get("z"), fallback.getZ()); // 读 z 坐标
-            return new SceneContext.ScenePos(x, y, z); // 组装坐标
-        }
-        // 平铺键 pos_x / pos_y / pos_z
-        float x = parseFloat(node.get("pos_x"), fallback.getX()); // 读平铺 x
-        float y = parseFloat(node.get("pos_y"), fallback.getY()); // 读平铺 y
-        float z = parseFloat(node.get("pos_z"), fallback.getZ()); // 读平铺 z
-
-        // 平铺键均缺失时直接回退 fallback（避免与玩家位置产生无意义偏移）
-        if (node.get("pos_x") == null && node.get("pos_y") == null && node.get("pos_z") == null) {
-            return new SceneContext.ScenePos(fallback.getX(), fallback.getY(), fallback.getZ()); // 使用回退坐标
-        }
-        return new SceneContext.ScenePos(x, y, z); // 组装解析后的坐标
-    }
-
-    /**
-     * 按候选键名顺序返回 JSON 节点中第一个非 null 的值。
-     */
-    private JsonNode getFirstNonNull(JsonNode node, String... keys) { // 多键名兼容读取 JSON 子节点
-        if (node == null) {
-            return null; // 父节点为空
-        }
-        for (String k : keys) {
-            JsonNode v = node.get(k); // 按键名取值
-            if (v != null && !v.isNull()) {
-                return v; // 找到第一个有效值
-            }
-        }
-        return null; // 所有候选键均无有效值
-    }
-
-    /**
-     * 按候选键名顺序解析整型字段，支持数字节点与文本数字。
-     */
-    private int parseIntFlexible(JsonNode node, String... keys) { // 多键名兼容解析整型
-        if (node == null) {
-            return 0; // 节点为空返回 0
-        }
-        for (String k : keys) {
-            JsonNode v = node.get(k); // 按键名取值
-            if (v != null && !v.isNull()) {
-                if (v.isNumber()) {
-                    return v.asInt(); // 数字节点直接取整
-                }
-                if (v.isTextual()) {
-                    try { // 尝试将文本解析为整数
-                        return Integer.parseInt(v.asText());
-                    } catch (Exception ignore) {
-                        return 0; // 文本非法则返回 0
-                    }
-                }
-            }
-        }
-        return 0; // 所有候选键均无有效整型值
-    }
-
-    /**
-     * 解析 JSON 浮点值，节点缺失或非法时回退 fallback。
-     */
-    private float parseFloat(JsonNode node, float fallback) { // 解析单精度浮点，非法时回退
-        if (node == null || node.isNull()) {
-            return fallback; // 节点缺失或为 null
-        }
-        if (node.isNumber()) {
-            return (float) node.asDouble(); // 数字节点转 float
-        }
-        if (node.isTextual()) {
-            try { // 尝试将文本解析为浮点
-                return Float.parseFloat(node.asText());
-            } catch (Exception ignore) {
-                return fallback; // 文本非法则回退
-            }
-        }
-        return fallback; // 非数字/文本类型则回退
+        SceneSystemProto.ScenePreloadPushScNotify push = SceneSystemProto.ScenePreloadPushScNotify.newBuilder()
+                .setTargetPlaneId(portal.toPlaneId())
+                .setTargetFloorId(portal.toFloorId())
+                .setTargetEntryId(portal.toEntryId())
+                .addAllAssetKeys(state.assetKeys())
+                .addAllLodPlaceholderKeys(preload.lodPlaceholderKeys(portal.toPlaneId(), portal.toFloorId()))
+                .setMaskInfo(toMaskProto(state.mask().withLayout(layoutOf(uid))))
+                .setReason(reason)
+                .setStormThrottled(false)
+                .build();
+        channel.writeAndFlush(new cn.itcast.demo.mylunarcore.net.GamePacket(
+                cn.itcast.demo.mylunarcore.net.CmdIds.SCENE_PRELOAD_PUSH_SC_NOTIFY, push.toByteArray()));
     }
 }

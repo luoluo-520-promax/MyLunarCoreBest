@@ -1,0 +1,9 @@
+{
+  "levels": [
+    {"guildLevel": 1, "atkBonusPct": 0.0, "defBonusPct": 0.0, "hpBonusPct": 0.0, "staminaRegenBonusPct": 0.0},
+    {"guildLevel": 2, "atkBonusPct": 0.01, "defBonusPct": 0.0, "hpBonusPct": 0.01, "staminaRegenBonusPct": 0.0},
+    {"guildLevel": 3, "atkBonusPct": 0.02, "defBonusPct": 0.01, "hpBonusPct": 0.02, "staminaRegenBonusPct": 0.05},
+    {"guildLevel": 5, "atkBonusPct": 0.03, "defBonusPct": 0.02, "hpBonusPct": 0.03, "staminaRegenBonusPct": 0.10},
+    {"guildLevel": 10, "atkBonusPct": 0.05, "defBonusPct": 0.03, "hpBonusPct": 0.05, "staminaRegenBonusPct": 0.15}
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "seasonId": 1,
+  "seasonKey": "1.0",
+  "maxLevel": 50,
+  "xpPerLevel": 1000,
+  "freeRewards": [
+    {"level": 1, "currencyId": 1, "amount": 100},
+    {"level": 5, "itemId": 101, "count": 2},
+    {"level": 10, "currencyId": 1, "amount": 500}
+  ],
+  "premiumRewards": [
+    {"level": 1, "currencyId": 101, "amount": 10},
+    {"level": 5, "itemId": 201, "count": 1},
+    {"level": 10, "currencyId": 101, "amount": 50}
+  ]
+}

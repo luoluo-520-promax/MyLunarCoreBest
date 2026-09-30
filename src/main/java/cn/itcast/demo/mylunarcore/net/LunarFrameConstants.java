@@ -6,6 +6,8 @@ package cn.itcast.demo.mylunarcore.net;
  * <pre>
  * 帧结构（小端序）：magic(4) | opcode u16 | headerLen u16 | dataLen i32 | 可选扩展头 | payload | magic(4)
  * </pre>
+ * 帧头魔数明文仅用于定界；完整性请叠加 {@link ProtocolHmacSigner}（命令号动态盐 HMAC）
+ * 与/或 {@link KcpSessionCryptoCodec}（会话 AES-GCM）。
  */
 public final class LunarFrameConstants {
 

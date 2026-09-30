@@ -1,0 +1,29 @@
+[
+  {
+    "setId": 501,
+    "name": "野穗伴行的快枪手",
+    "pieces": 4,
+    "bonuses": [
+      {"need": 2, "stat": "ATK_PCT", "value": 12.0},
+      {"need": 4, "stat": "SPD", "value": 6.0}
+    ]
+  },
+  {
+    "setId": 502,
+    "name": "密林卧雪的猎人",
+    "pieces": 4,
+    "bonuses": [
+      {"need": 2, "stat": "CRIT_DMG", "value": 16.0},
+      {"need": 4, "stat": "ATK_PCT", "value": 8.0}
+    ]
+  },
+  {
+    "setId": 601,
+    "name": "繁星璀璨的天才",
+    "pieces": 4,
+    "bonuses": [
+      {"need": 2, "stat": "ATK_PCT", "value": 12.0},
+      {"need": 4, "stat": "CRIT_RATE", "value": 8.0}
+    ]
+  }
+]

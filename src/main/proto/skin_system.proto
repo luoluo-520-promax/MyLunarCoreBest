@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package cn.itcast.demo.mylunarcore.proto;
+
+option java_package = "cn.itcast.demo.mylunarcore.protocol";
+option java_outer_classname = "SkinSystemProto";
+
+message SkinWardrobeEntry {
+  uint32 skin_id = 1;
+  bool owned = 2;
+  bool equipped = 3;
+  string name = 4;
+  uint32 rarity = 5;
+  string resource_key = 6;
+  string preview_icon = 7;
+  string obtain_tips = 8;
+  bool is_default = 9;
+}
+
+message GetSkinWardrobeCsReq {
+  uint32 avatar_id = 1;
+}
+
+message GetSkinWardrobeScRsp {
+  int32 retcode = 1;
+  uint32 avatar_id = 2;
+  uint32 equipped_skin_id = 3;
+  repeated SkinWardrobeEntry skins = 4;
+}
+
+message EquipSkinCsReq {
+  uint32 avatar_id = 1;
+  uint32 skin_id = 2; // 0 = 还原默认皮肤
+}
+
+message EquipSkinScRsp {
+  int32 retcode = 1;
+  uint32 avatar_id = 2;
+  uint32 equipped_skin_id = 3;
+}

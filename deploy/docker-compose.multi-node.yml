@@ -1,0 +1,53 @@
+# 多节点切服模拟（实验）：1×Center 路由 + 2×游戏节点共享 Redis
+# 说明：游戏进程仍用主机上的 Spring Boot；本文件只拉起共享中间件与可选 Center HTTP 桩。
+# 完整双节点需在两台主机（或两个 JVM）分别启动主工程，并设置：
+#   lunarcore.center.mode=remote
+#   lunarcore.center.remote-base-url=http://localhost:8080
+#   lunarcore.redis.enabled=true
+#   lunarcore.redis.host=127.0.0.1
+#   lunarcore.center.advertise-host=<本机IP>
+#   lunarcore.center.advertise-port=9000|9001
+#
+# 用法:
+#   docker compose -f deploy/docker-compose.multi-node.yml up -d
+# 验证清单见 docs/multi-node-failover.md
+
+services:
+  mysql:
+    image: mysql:8.0.39
+    container_name: mylunarcore-mn-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: "123456"
+      MYSQL_DATABASE: lunarcore
+    ports:
+      - "3306:3306"
+    command: ["mysqld", "--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    volumes:
+      - mn_mysql_data:/var/lib/mysql
+      - ../src/main/resources/db:/docker-entrypoint-initdb.d:ro
+
+  redis:
+    image: redis:7.4.1
+    container_name: mylunarcore-mn-redis
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - mn_redis_data:/data
+
+  # Redis Sentinel 示例（可选，profile=ha）；应用侧仍需自行配置哨兵地址
+  redis-sentinel:
+    image: redis:7.4.1
+    container_name: mylunarcore-mn-sentinel
+    profiles: ["ha"]
+    depends_on:
+      - redis
+    command: >
+      sh -c "printf 'port 26379\nsentinel monitor mymaster redis 6379 1\nsentinel down-after-milliseconds mymaster 5000\nsentinel failover-timeout mymaster 10000\nsentinel parallel-syncs mymaster 1\n' > /tmp/sentinel.conf
+      && redis-sentinel /tmp/sentinel.conf"
+    ports:
+      - "26379:26379"
+
+volumes:
+  mn_mysql_data:
+  mn_redis_data:

@@ -1,0 +1,187 @@
+syntax = "proto3";
+
+option java_package = "cn.itcast.demo.mylunarcore.protocol";
+option java_outer_classname = "DailyLoopSystemProto";
+
+// 日常循环协议：体力(996–1000)、每日任务(1001–1005)、章节(1006–1008)
+
+// ---------- 体力 ----------
+message GetStaminaCsReq {}
+
+message GetStaminaScRsp {
+  int32 retcode = 1;
+  int32 current = 2;
+  int32 max = 3;
+  int32 daily_buy_count = 4;
+  int32 daily_buy_limit = 5;
+  int64 next_regen_at_ms = 6;
+  int32 reserve = 7;
+  int32 reserve_cap = 8;
+}
+
+message BuyStaminaCsReq {}
+
+message BuyStaminaScRsp {
+  int32 retcode = 1;
+  int32 current = 2;
+  int32 daily_buy_count = 3;
+}
+
+message StaminaUpdateScNotify {
+  int32 current = 1;
+  int32 max = 2;
+  int32 daily_buy_count = 3;
+  int32 daily_buy_limit = 4;
+  int64 next_regen_at_ms = 5;
+  string reason = 6; // regen | buy | consume | overflow | reserve_claim
+  int32 reserve = 7;
+  int32 reserve_cap = 8;
+}
+
+/** 从后备体力池提取到当前体力 */
+message ClaimReserveStaminaCsReq {
+  int32 amount = 1; // 0=尽量抽满当前上限
+}
+
+message ClaimReserveStaminaScRsp {
+  int32 retcode = 1; // 0成功 1未登录 2储备不足 3当前已满
+  int32 current = 2;
+  int32 reserve = 3;
+}
+
+// ---------- 每日任务 ----------
+message DailyMissionEntry {
+  uint32 mission_id = 1;
+  string title = 2;
+  string description = 3;
+  int32 progress = 4;
+  int32 required = 5;
+  bool completed = 6;
+  bool claimed = 7;
+}
+
+message GetDailyMissionCsReq {}
+
+message GetDailyMissionScRsp {
+  int32 retcode = 1;
+  string mission_day = 2;
+  repeated DailyMissionEntry missions = 3;
+}
+
+message ClaimDailyMissionCsReq {
+  uint32 mission_id = 1;
+}
+
+message ClaimDailyMissionScRsp {
+  int32 retcode = 1;
+  uint32 mission_id = 2;
+}
+
+message DailyMissionUpdateScNotify {
+  string mission_day = 1;
+  DailyMissionEntry mission = 2;
+}
+
+// ---------- 主线章节 ----------
+message StoryChapterEntry {
+  uint32 chapter_id = 1;
+  string title = 2;
+  uint32 current_chapter_id = 3;
+  bool unlocked = 4;
+  int32 unlock_plane_id = 5;
+  int32 unlock_floor_id = 6;
+}
+
+message GetStoryChapterCsReq {}
+
+message GetStoryChapterScRsp {
+  int32 retcode = 1;
+  uint32 current_chapter_id = 2;
+  repeated StoryChapterEntry chapters = 3;
+}
+
+message StoryChapterUpdateScNotify {
+  uint32 current_chapter_id = 1;
+  uint32 advanced_from = 2;
+  StoryChapterEntry chapter = 3;
+}
+
+// ---------- 扫荡 / 多倍消耗（1010–1013） ----------
+message SweepStageCsReq {
+  uint32 battle_stage_id = 1;
+  /** 体力倍率：1/2/3，对应奖励倍率（受掉落上限约束） */
+  uint32 multiplier = 2;
+}
+
+message SweepRewardItem {
+  uint32 item_id = 1;
+  uint32 count = 2;
+}
+
+message SweepStageScRsp {
+  int32 retcode = 1;
+  // 0成功 1未登录 2体力不足 3未通关不可扫荡 4倍率非法 5掉落上限 6内部错误
+  uint32 battle_stage_id = 2;
+  uint32 multiplier = 3;
+  int32 stamina_cost = 4;
+  int32 stamina_remaining = 5;
+  uint32 best_turn_count = 6;
+  repeated SweepRewardItem rewards = 7;
+  uint32 player_exp = 8;
+}
+
+message GetSweepInfoCsReq {
+  uint32 battle_stage_id = 1;
+}
+
+message GetSweepInfoScRsp {
+  int32 retcode = 1;
+  uint32 battle_stage_id = 2;
+  bool unlocked = 3;
+  uint32 best_turn_count = 4;
+  uint32 max_multiplier = 5;
+  int32 unit_stamina_cost = 6;
+}
+
+/** 一键连续扫荡：按关卡顺序后台多次执行，统一结算 */
+message BatchSweepStep {
+  uint32 battle_stage_id = 1;
+  uint32 times = 2; // 连续次数，每次按 1 倍体力
+}
+
+message BatchSweepCsReq {
+  repeated BatchSweepStep steps = 1;
+  int32 confirmed_stamina_cost = 2;
+}
+
+message BatchSweepScRsp {
+  int32 retcode = 1;
+  // 0成功 1未登录 2体力不足/确认不一致 3含未解锁关卡 4步骤为空 5中途中止
+  int32 stamina_cost = 2;
+  int32 stamina_remaining = 3;
+  uint32 completed_times = 4;
+  repeated SweepRewardItem rewards = 5;
+  uint32 player_exp = 6;
+}
+
+message BatchSweepProgressNotify {
+  uint32 battle_stage_id = 1;
+  uint32 completed_times = 2;
+  uint32 total_times = 3;
+  bool finished = 4;
+}
+
+/** 连战结算 UI 加速：仅展示增量变化，免去反复 3D 抽奖盒动画 */
+message BatchSweepRewardSummary {
+  repeated SweepRewardItem delta_rewards = 1;
+  uint32 delta_player_exp = 2;
+  int32 delta_stamina = 3;
+  string summary_text = 4; // 如「经验书 +5，信用点 +9999」
+  bool skip_loot_box_anim = 5;
+}
+
+message BatchSweepRewardSummaryScNotify {
+  BatchSweepRewardSummary summary = 1;
+  uint32 completed_times = 2;
+}
+

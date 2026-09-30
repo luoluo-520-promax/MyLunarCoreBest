@@ -7,11 +7,15 @@ import org.slf4j.LoggerFactory;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+/**
+ * {@link MonsterRuntime}：构造时当前 HP=maxHp；setHp 只改当前血不改上限。
+ */
 @DisplayName("MonsterRuntime 怪物运行时测试")
 class MonsterRuntimeTest {
 
     private static final Logger log = LoggerFactory.getLogger(MonsterRuntimeTest.class);
 
+    /** new MonsterRuntime(101,3,300) → config/level/maxHp/hp 均为给定满血值。 */
     @Test
     @DisplayName("创建时应满血且属性与构造参数一致")
     void shouldInitializeWithFullHp() {
@@ -25,6 +29,7 @@ class MonsterRuntimeTest {
         assertEquals(300, monster.getHp());
     }
 
+    /** setHp(45) 后 getHp()=45，maxHp 仍为 100。 */
     @Test
     @DisplayName("setHp 应更新当前血量")
     void setHpShouldUpdateCurrentHp() {

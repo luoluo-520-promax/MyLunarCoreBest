@@ -1,0 +1,190 @@
+syntax = "proto3";
+
+
+
+package cn.itcast.demo.mylunarcore.proto;
+
+
+
+option java_package = "cn.itcast.demo.mylunarcore.protocol";
+
+option java_outer_classname = "EconomySystemProto";
+
+
+
+message CurrencyEntry {
+
+  uint32 currency_id = 1;
+
+  uint32 amount = 2;
+
+}
+
+
+
+message ShopItem {
+
+  uint32 shop_item_id = 1;
+
+  uint32 item_id = 2;           // 兼容旧字段；IAP 礼包可忽略
+
+  uint32 item_count = 3;
+
+  uint32 currency_id = 4;       // 0 = 真钱
+
+  uint32 price = 5;             // 游戏币价或展示用
+
+  uint32 daily_limit = 6;
+
+  string product_category = 7;  // DIRECT_TOPUP/DISCOUNT_PACK/PAID_PACK
+
+  string pay_type = 8;          // CURRENCY/IAP
+
+  string sku_id = 9;
+
+  uint32 price_cents = 10;
+
+  uint32 original_price_cents = 11;
+
+  uint32 discount_rate = 12;
+
+  int64 sale_end_at_ms = 13;
+
+  uint32 remain_limit = 14;     // 服务端算好剩余可购次数；无限制时为 uint32 max
+
+  string display_name = 15;
+
+  uint32 skin_id = 16;          // SKIN* 品类：皮肤配置 id
+
+  uint32 avatar_id = 17;        // SKIN* 品类：绑定角色模板 id
+
+  bool owned = 18;              // SKIN* 品类：当前玩家是否已拥有
+
+}
+
+
+
+message GetShopListCsReq {
+
+  uint32 shop_id = 1;
+
+}
+
+
+
+message GetShopListScRsp {
+
+  int32 retcode = 1;
+
+  uint32 shop_id = 2;
+
+  repeated ShopItem items = 3;
+
+}
+
+
+
+message BuyShopItemCsReq {
+
+  uint32 shop_id = 1;
+
+  uint32 shop_item_id = 2;
+
+  uint32 count = 3;
+
+}
+
+
+
+message BuyShopItemScRsp {
+
+  int32 retcode = 1;
+
+  uint32 shop_item_id = 2;
+
+  uint32 bought_count = 3;
+
+  repeated CurrencyEntry remaining_currency = 4;
+
+}
+
+
+
+message CreateIapOrderCsReq {
+
+  uint32 shop_id = 1;
+
+  uint32 shop_item_id = 2;
+
+}
+
+
+
+message CreateIapOrderScRsp {
+
+  int32 retcode = 1;
+
+  string order_id = 2;
+
+  string sku_id = 3;
+
+  uint32 price_cents = 4;
+
+}
+
+
+
+message ConfirmIapOrderCsReq {
+
+  string order_id = 1;
+
+  string channel = 2;
+
+  string channel_receipt = 3;   // 渠道票据/交易号
+
+}
+
+
+
+message ConfirmIapOrderScRsp {
+
+  int32 retcode = 1;
+
+  string order_id = 2;
+
+  repeated CurrencyEntry remaining_currency = 3;
+
+}
+
+
+
+message ClaimIapDailyCsReq {
+
+}
+
+
+
+message ClaimIapDailyScRsp {
+
+  int32 retcode = 1;
+
+  uint32 currency_id = 2;
+
+  uint32 amount = 3;
+
+  uint32 remaining_days = 4;
+
+  repeated CurrencyEntry remaining_currency = 5;
+
+}
+
+
+
+message CurrencyChangeScNotify {
+
+  repeated CurrencyEntry currency = 1;
+
+  string reason = 2;
+
+}
+

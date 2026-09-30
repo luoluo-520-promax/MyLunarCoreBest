@@ -36,4 +36,9 @@ public class PlayerEntity {
 
     private Timestamp lastLogin;  // 上次登录时间
     private Timestamp lastLogout; // 上次登出时间
+
+    /**
+     * 乐观锁版本（对应 player.data_version），落盘时 WHERE data_version=? 条件更新。
+     */
+    private long dataVersion;
 }

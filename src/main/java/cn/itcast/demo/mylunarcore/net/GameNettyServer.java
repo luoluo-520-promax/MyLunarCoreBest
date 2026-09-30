@@ -3,14 +3,8 @@ package cn.itcast.demo.mylunarcore.net;
 
 // 全局配置（端口、TLS、线程相关）
 import cn.itcast.demo.mylunarcore.config.LunarCoreProperties;
-// 入站字节流解码为 GamePacket
-import cn.itcast.demo.mylunarcore.net.LunarFrameDecoder;
-// 出站 GamePacket 编码为二进制帧
-import cn.itcast.demo.mylunarcore.net.LunarFrameEncoder;
 // TCP 管线末端：把包交给分发器
 import cn.itcast.demo.mylunarcore.net.GameServerChannelHandler;
-// 短窗口幂等：去重并回放首个响应
-import cn.itcast.demo.mylunarcore.net.PacketIdempotencyHandler;
 // 根据 keystore 构建 Netty TLS 上下文
 import cn.itcast.demo.mylunarcore.net.GameNettyTlsSupport;
 // Netty 服务端启动引导
@@ -35,8 +29,6 @@ import io.netty.handler.ssl.SslContext;
 import io.netty.util.concurrent.DefaultEventExecutorGroup;
 // Bean 初始化完成回调
 import jakarta.annotation.PostConstruct;
-// Bean 销毁前回调
-import jakarta.annotation.PreDestroy;
 // Spring BeanFactory 作用域常量
 import org.springframework.beans.factory.config.ConfigurableBeanFactory;
 // 声明 Bean 作用域
@@ -53,7 +45,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 // Duration：用于幂等缓存 TTL
-import java.time.Duration;
 
 /**
  * TCP 游戏服 Netty 引导：绑定端口、装配帧编解码与 {@link cn.itcast.demo.mylunarcore.net.GameServerChannelHandler}，可选 TLS。
@@ -68,6 +59,9 @@ public class GameNettyServer {
     private final LunarCoreProperties properties; // 注入：端口、TLS 开关等
     private final GameServerChannelHandler gameServerChannelHandler; // 注入：业务处理链尾节点
     private final DefaultEventExecutorGroup gameBusinessExecutorGroup; // 注入：业务线程池
+    private final ConnectionPacketRateLimiterHandler packetRateLimiterHandler;
+    private final NettyBackpressureHandler backpressureHandler;
+    private final NetTraceContextHandler traceContextHandler;
 
     private EventLoopGroup bossGroup; // 接受新连接的线程组
     private EventLoopGroup workerGroup; // 处理已连接 Channel I/O 的线程组
@@ -80,10 +74,16 @@ public class GameNettyServer {
      */
     public GameNettyServer(LunarCoreProperties properties,
                            GameServerChannelHandler gameServerChannelHandler,
-                           DefaultEventExecutorGroup gameBusinessExecutorGroup) {
-        this.properties = properties; // 保存配置引用
-        this.gameServerChannelHandler = gameServerChannelHandler; // 保存 Handler 引用
-        this.gameBusinessExecutorGroup = gameBusinessExecutorGroup; // 保存线程池引用
+                           DefaultEventExecutorGroup gameBusinessExecutorGroup,
+                           ConnectionPacketRateLimiterHandler packetRateLimiterHandler,
+                           NettyBackpressureHandler backpressureHandler,
+                           NetTraceContextHandler traceContextHandler) {
+        this.properties = properties;
+        this.gameServerChannelHandler = gameServerChannelHandler;
+        this.gameBusinessExecutorGroup = gameBusinessExecutorGroup;
+        this.packetRateLimiterHandler = packetRateLimiterHandler;
+        this.backpressureHandler = backpressureHandler;
+        this.traceContextHandler = traceContextHandler;
     }
 
     /**
@@ -104,18 +104,21 @@ public class GameNettyServer {
         ServerBootstrap bootstrap = new ServerBootstrap(); // TCP 服务端装配器
         bootstrap.group(bossGroup, workerGroup) // boss accept + worker I/O
                 .channel(NioServerSocketChannel.class) // 经典 Java NIO 服务端
-                .childOption(ChannelOption.TCP_NODELAY, true) // 禁用 Nagle，降低小包延迟
-                .childHandler(new ChannelInitializer<SocketChannel>() {
+                .childOption(ChannelOption.TCP_NODELAY, true); // 禁用 Nagle，降低小包延迟
+        NettyChannelOptions.applyChildOptions(bootstrap);
+        bootstrap.childHandler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     protected void initChannel(SocketChannel ch) { // 每条新连接初始化 pipeline
-                        if (sslContext != null) { // 需要 TLS 时最先加入 ssl handler
-                            ch.pipeline().addFirst("ssl", sslContext.newHandler(ch.alloc())); // TLS 解密在帧解码之前
+                        if (sslContext != null) {
+                            ch.pipeline().addFirst("ssl", sslContext.newHandler(ch.alloc()));
                         }
-                        ch.pipeline()
-                                .addLast(new LunarFrameDecoder()) // 字节流 → GamePacket
-                                .addLast(new LunarFrameEncoder()) // GamePacket → 字节流
-                                .addLast("idempotency", new PacketIdempotencyHandler(Duration.ofSeconds(10), 2048)) // 10s 窗口、最多 2048 条缓存
-                                .addLast(gameBusinessExecutorGroup, "business", gameServerChannelHandler); // 业务在独立线程池
+                        GamePipelineConfigurer.configureCommonHandlers(
+                                ch.pipeline(), backpressureHandler, packetRateLimiterHandler, traceContextHandler);
+                        if (properties.getProtocolHmac().isEnabled()) {
+                            ch.pipeline().addFirst("protocol-hmac", new ProtocolHmacCodec(properties));
+                        }
+                        GamePipelineConfigurer.addBusinessHandler(
+                                ch.pipeline(), gameBusinessExecutorGroup, gameServerChannelHandler);
                     }
                 });
 
@@ -126,7 +129,6 @@ public class GameNettyServer {
     /**
      * 停止服务：关闭监听 Channel 并优雅退出事件线程组。
      */
-    @PreDestroy // 应用关闭时释放端口与线程
     public void stop() {
         try {
             if (bindFuture != null) { // 已 bind 才需要关闭

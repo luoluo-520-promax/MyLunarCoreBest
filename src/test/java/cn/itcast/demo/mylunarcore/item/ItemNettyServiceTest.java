@@ -4,7 +4,10 @@ import cn.itcast.demo.mylunarcore.model.GameItemEntity;
 import cn.itcast.demo.mylunarcore.net.CmdIds;
 import cn.itcast.demo.mylunarcore.net.GamePacket;
 import cn.itcast.demo.mylunarcore.protocol.ItemSystemProto;
-import cn.itcast.demo.mylunarcore.repo.ItemRepository;
+import cn.itcast.demo.mylunarcore.net.mapper.ItemProtoMapper;
+import cn.itcast.demo.mylunarcore.player.PlayerContextResolver;
+import cn.itcast.demo.mylunarcore.player.PlayerDataSyncService;
+import cn.itcast.demo.mylunarcore.player.DataChangeScope;
 import io.netty.channel.Channel;
 import io.netty.util.Attribute;
 import io.netty.util.AttributeKey;
@@ -16,6 +19,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
+import java.util.OptionalLong;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -23,12 +27,19 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * ItemNettyService 道具协议服务测试。
+ * <p>
+ * 针对相关生产代码的单元/切片测试类 {@code ItemNettyServiceTest}：
+ * 通过 fixture、mock 与断言覆盖关键成功路径、失败码与状态边界。
+ */
 @DisplayName("ItemNettyService 道具协议服务测试")
 class ItemNettyServiceTest {
 
@@ -38,21 +49,44 @@ class ItemNettyServiceTest {
     private static final long PLAYER_UID = 77L;
     private static final int PLAYER_ID = 77;
 
-    private ItemRepository itemRepository;
+    private ItemApplicationService itemApplicationService;
+    private ItemProtoMapper itemProtoMapper;
+    private PlayerContextResolver contextResolver;
+    private PlayerDataSyncService playerDataSyncService;
     private ItemNettyService service;
 
     @BeforeEach
     void setUp() {
-        itemRepository = mock(ItemRepository.class);
-        service = new ItemNettyService(itemRepository);
-        log.info("道具协议服务初始化: playerId={}, uidKey={}", PLAYER_ID, UID_KEY.name());
+        itemApplicationService = mock(ItemApplicationService.class);
+        itemProtoMapper = mock(ItemProtoMapper.class);
+        contextResolver = mock(PlayerContextResolver.class);
+        playerDataSyncService = mock(PlayerDataSyncService.class);
+        service = new ItemNettyService(itemApplicationService, itemProtoMapper, contextResolver, playerDataSyncService);
+        log.info("道具协议服务初始化: playerId={}", PLAYER_ID);
     }
 
+    /**
+     * 验证点：GetBag 成功应返回分页背包列表。
+     * <p>测试方法 {@code getBagSuccessShouldReturnPagedItems}：
+     * <ul>
+     *   <li>{@code when(itemApplicationService.countBagItems(PLAYER_ID, 1)).thenReturn(2L);}</li>
+     *   <li>{@code when(itemApplicationService.listBagItems(PLAYER_ID, 1, 1, 50)).thenReturn(entities);}</li>
+     *   <li>{@code when(itemProtoMapper.toBagItems(entities)).thenReturn(List.of(}</li>
+     *   <li>{@code assertEquals(0, rsp.getRetcode());}</li>
+     *   <li>{@code assertEquals(2, rsp.getTotalCount());}</li>
+     *   <li>{@code assertEquals(2, rsp.getItemsCount());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("GetBag 成功应返回分页背包列表")
     void getBagSuccessShouldReturnPagedItems() {
-        when(itemRepository.countBagItems(PLAYER_ID, 1)).thenReturn(2L);
-        when(itemRepository.listBagItems(PLAYER_ID, 1, 1, 50)).thenReturn(List.of(
+        when(itemApplicationService.countBagItems(PLAYER_ID, 1)).thenReturn(2L);
+        List<GameItemEntity> entities = List.of(
+                ItemTestFixtures.item(1001L, 23001, 1),
+                ItemTestFixtures.item(1002L, 21001, 2)
+        );
+        when(itemApplicationService.listBagItems(PLAYER_ID, 1, 1, 50)).thenReturn(entities);
+        when(itemProtoMapper.toBagItems(entities)).thenReturn(List.of(
                 ItemTestFixtures.bagItem(1001L, 23001, 1, 1),
                 ItemTestFixtures.bagItem(1002L, 21001, 2, 1)
         ));
@@ -73,6 +107,15 @@ class ItemNettyServiceTest {
         assertEquals(1001L, rsp.getItems(0).getUid());
     }
 
+    /**
+     * 验证点：未登录查询背包应返回 retcode=1。
+     * <p>测试方法 {@code getBagWithoutLoginShouldFail}：
+     * <ul>
+     *   <li>{@code assertEquals(1, rsp.getRetcode());}</li>
+     *   <li>{@code assertEquals(0, rsp.getTotalCount());}</li>
+     *   <li>{@code verify(itemApplicationService, never()).countBagItems(anyInt(), anyInt());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("未登录查询背包应返回 retcode=1")
     void getBagWithoutLoginShouldFail() {
@@ -84,14 +127,26 @@ class ItemNettyServiceTest {
                 rsp.getRetcode(), rsp.getTotalCount(), rsp.getItemsCount());
         assertEquals(1, rsp.getRetcode());
         assertEquals(0, rsp.getTotalCount());
-        verify(itemRepository, never()).countBagItems(anyInt(), anyInt());
+        verify(itemApplicationService, never()).countBagItems(anyInt(), anyInt());
     }
 
+    /**
+     * 验证点：非法 typeFilter 应降级为 0 并查询全部。
+     * <p>测试方法 {@code getBagInvalidTypeFilterShouldFallbackToAll}：
+     * <ul>
+     *   <li>{@code when(itemApplicationService.countBagItems(PLAYER_ID, 0)).thenReturn(5L);}</li>
+     *   <li>{@code when(itemApplicationService.listBagItems(PLAYER_ID, 0, 1, 50)).thenReturn(List.of());}</li>
+     *   <li>{@code assertEquals(0, rsp.getRetcode());}</li>
+     *   <li>{@code assertEquals(5, rsp.getTotalCount());}</li>
+     *   <li>{@code verify(itemApplicationService).countBagItems(PLAYER_ID, 0);}</li>
+     *   <li>{@code verify(itemApplicationService).listBagItems(PLAYER_ID, 0, 1, 50);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("非法 typeFilter 应降级为 0 并查询全部")
     void getBagInvalidTypeFilterShouldFallbackToAll() {
-        when(itemRepository.countBagItems(PLAYER_ID, 0)).thenReturn(5L);
-        when(itemRepository.listBagItems(PLAYER_ID, 0, 1, 50)).thenReturn(List.of());
+        when(itemApplicationService.countBagItems(PLAYER_ID, 0)).thenReturn(5L);
+        when(itemApplicationService.listBagItems(PLAYER_ID, 0, 1, 50)).thenReturn(List.of());
 
         ItemSystemProto.GetBagScRsp rsp = service.handleGetBag(
                 ItemSystemProto.GetBagCsReq.newBuilder()
@@ -105,16 +160,30 @@ class ItemNettyServiceTest {
                 rsp.getRetcode(), rsp.getTotalCount());
         assertEquals(0, rsp.getRetcode());
         assertEquals(5, rsp.getTotalCount());
-        verify(itemRepository).countBagItems(PLAYER_ID, 0);
-        verify(itemRepository).listBagItems(PLAYER_ID, 0, 1, 50);
+        verify(itemApplicationService).countBagItems(PLAYER_ID, 0);
+        verify(itemApplicationService).listBagItems(PLAYER_ID, 0, 1, 50);
     }
 
+    /**
+     * 验证点：UseItem 材料类应批量扣减并推送变更通知。
+     * <p>测试方法 {@code useMaterialItemShouldConsumeAndNotify}：
+     * <ul>
+     *   <li>{@code when(itemApplicationService.findItem(PLAYER_ID, 2001L)).thenReturn(material);}</li>
+     *   <li>{@code when(itemProtoMapper.toBagItem(material)).thenReturn(ItemTestFixtures.bagItem(2001L, 30001, 3, 10));}</li>
+     *   <li>{@code when(itemApplicationService.useItem(PLAYER_ID, 2001L, 3, 1101))}</li>
+     *   <li>{@code assertEquals(0, rsp.getRetcode());}</li>
+     *   <li>{@code assertEquals(3, rsp.getUsedCount());}</li>
+     *   <li>{@code assertEquals(150, rsp.getEffects().getPlayerExp());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("UseItem 材料类应批量扣减并推送变更通知")
     void useMaterialItemShouldConsumeAndNotify() {
         GameItemEntity material = ItemTestFixtures.item(2001L, 30001, 3, 10, 50, false, false);
-        when(itemRepository.findItemByUid(PLAYER_ID, 2001L)).thenReturn(material);
-        when(itemRepository.toBagItem(material)).thenReturn(ItemTestFixtures.bagItem(2001L, 30001, 3, 10));
+        when(itemApplicationService.findItem(PLAYER_ID, 2001L)).thenReturn(material);
+        when(itemProtoMapper.toBagItem(material)).thenReturn(ItemTestFixtures.bagItem(2001L, 30001, 3, 10));
+        when(itemApplicationService.useItem(PLAYER_ID, 2001L, 3, 1101))
+                .thenReturn(new ItemApplicationService.UseItemResult(3, 7, false, 150, 150));
 
         Channel channel = loggedInActiveChannel(PLAYER_UID);
         ItemSystemProto.UseItemScRsp rsp = service.handleUseItem(
@@ -132,7 +201,7 @@ class ItemNettyServiceTest {
         assertEquals(3, rsp.getUsedCount());
         assertEquals(150, rsp.getEffects().getPlayerExp());
         assertEquals(150, rsp.getEffects().getAvatarExp());
-        verify(itemRepository).updateItemCountAndDiscard(PLAYER_ID, 2001L, 7, false);
+        verify(itemApplicationService).useItem(PLAYER_ID, 2001L, 3, 1101);
 
         ArgumentCaptor<GamePacket> packetCaptor = ArgumentCaptor.forClass(GamePacket.class);
         verify(channel).writeAndFlush(packetCaptor.capture());
@@ -142,13 +211,26 @@ class ItemNettyServiceTest {
         assertEquals(CmdIds.ITEM_CHANGE_SC_NOTIFY, packet.getCmdId());
     }
 
+    /**
+     * 验证点：UseItem 非材料类应单次消耗并标记丢弃。
+     * <p>测试方法 {@code useNonMaterialItemShouldDiscardAfterUse}：
+     * <ul>
+     *   <li>{@code when(itemApplicationService.findItem(PLAYER_ID, 3001L)).thenReturn(lightCone);}</li>
+     *   <li>{@code when(itemProtoMapper.toBagItem(lightCone)).thenReturn(ItemTestFixtures.bagItem(3001L, 23001, 1, 1));}</li>
+     *   <li>{@code when(itemApplicationService.useItem(PLAYER_ID, 3001L, 5, 0))}</li>
+     *   <li>{@code assertEquals(0, rsp.getRetcode());}</li>
+     *   <li>{@code assertEquals(1, rsp.getUsedCount());}</li>
+     *   <li>{@code assertEquals(100, rsp.getEffects().getPlayerExp());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("UseItem 非材料类应单次消耗并标记丢弃")
     void useNonMaterialItemShouldDiscardAfterUse() {
         GameItemEntity lightCone = ItemTestFixtures.item(3001L, 23001, 1, 1, 100, false, false);
-        when(itemRepository.findItemByUid(PLAYER_ID, 3001L)).thenReturn(lightCone);
-        when(itemRepository.toBagItem(lightCone)).thenReturn(ItemTestFixtures.bagItem(3001L, 23001, 1, 1));
-        when(itemRepository.findItemByUid(PLAYER_ID, 3001L)).thenReturn(lightCone).thenReturn(null);
+        when(itemApplicationService.findItem(PLAYER_ID, 3001L)).thenReturn(lightCone);
+        when(itemProtoMapper.toBagItem(lightCone)).thenReturn(ItemTestFixtures.bagItem(3001L, 23001, 1, 1));
+        when(itemApplicationService.useItem(PLAYER_ID, 3001L, 5, 0))
+                .thenReturn(new ItemApplicationService.UseItemResult(1, 0, true, 100, 0));
 
         ItemSystemProto.UseItemScRsp rsp = service.handleUseItem(
                 ItemSystemProto.UseItemCsReq.newBuilder()
@@ -162,14 +244,24 @@ class ItemNettyServiceTest {
         assertEquals(0, rsp.getRetcode());
         assertEquals(1, rsp.getUsedCount());
         assertEquals(100, rsp.getEffects().getPlayerExp());
-        verify(itemRepository).updateItemCountAndDiscard(PLAYER_ID, 3001L, 0, true);
+        verify(itemApplicationService).useItem(PLAYER_ID, 3001L, 5, 0);
     }
 
+    /**
+     * 验证点：UseItem 锁定道具应返回 retcode=3。
+     * <p>测试方法 {@code useLockedItemShouldFail}：
+     * <ul>
+     *   <li>{@code when(itemApplicationService.findItem(PLAYER_ID, 4001L)).thenReturn(locked);}</li>
+     *   <li>{@code assertEquals(3, rsp.getRetcode());}</li>
+     *   <li>{@code assertEquals(0, rsp.getUsedCount());}</li>
+     *   <li>{@code verify(itemApplicationService, never()).useItem(anyInt(), anyLong(), anyLong(), anyInt());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("UseItem 锁定道具应返回 retcode=3")
     void useLockedItemShouldFail() {
         GameItemEntity locked = ItemTestFixtures.item(4001L, 30001, 3, 5, 10, true, false);
-        when(itemRepository.findItemByUid(PLAYER_ID, 4001L)).thenReturn(locked);
+        when(itemApplicationService.findItem(PLAYER_ID, 4001L)).thenReturn(locked);
 
         ItemSystemProto.UseItemScRsp rsp = service.handleUseItem(
                 ItemSystemProto.UseItemCsReq.newBuilder().setUid(4001L).setCount(1).build(),
@@ -179,14 +271,26 @@ class ItemNettyServiceTest {
                 rsp.getRetcode(), rsp.getUsedCount());
         assertEquals(3, rsp.getRetcode());
         assertEquals(0, rsp.getUsedCount());
-        verify(itemRepository, never()).updateItemCountAndDiscard(anyInt(), anyLong(), anyLong(), eq(true));
+        verify(itemApplicationService, never()).useItem(anyInt(), anyLong(), anyLong(), anyInt());
     }
 
+    /**
+     * 验证点：EquipItem 光锥应装备到指定角色。
+     * <p>测试方法 {@code equipLightConeShouldBindAvatar}：
+     * <ul>
+     *   <li>{@code when(itemApplicationService.findItem(PLAYER_ID, 5001L)).thenReturn(lightCone);}</li>
+     *   <li>{@code when(itemApplicationService.equipItem(PLAYER_ID, 5001L, 1102)).thenReturn(true);}</li>
+     *   <li>{@code assertEquals(0, rsp.getRetcode());}</li>
+     *   <li>{@code assertEquals(1102, rsp.getAvatarId());}</li>
+     *   <li>{@code verify(itemApplicationService).equipItem(PLAYER_ID, 5001L, 1102);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("EquipItem 光锥应装备到指定角色")
     void equipLightConeShouldBindAvatar() {
         GameItemEntity lightCone = ItemTestFixtures.item(5001L, 23001, 1, 1, 0, false, false);
-        when(itemRepository.findItemByUid(PLAYER_ID, 5001L)).thenReturn(lightCone);
+        when(itemApplicationService.findItem(PLAYER_ID, 5001L)).thenReturn(lightCone);
+        when(itemApplicationService.equipItem(PLAYER_ID, 5001L, 1102)).thenReturn(true);
 
         ItemSystemProto.EquipItemScRsp rsp = service.handleEquipItem(
                 ItemSystemProto.EquipItemCsReq.newBuilder()
@@ -199,14 +303,23 @@ class ItemNettyServiceTest {
                 rsp.getRetcode(), rsp.getAvatarId());
         assertEquals(0, rsp.getRetcode());
         assertEquals(1102, rsp.getAvatarId());
-        verify(itemRepository).setEquipAvatarId(PLAYER_ID, 5001L, 1102);
+        verify(itemApplicationService).equipItem(PLAYER_ID, 5001L, 1102);
     }
 
+    /**
+     * 验证点：EquipItem 材料类不可装备应返回 retcode=5。
+     * <p>测试方法 {@code equipMaterialShouldFail}：
+     * <ul>
+     *   <li>{@code when(itemApplicationService.findItem(PLAYER_ID, 5002L)).thenReturn(material);}</li>
+     *   <li>{@code assertEquals(5, rsp.getRetcode());}</li>
+     *   <li>{@code verify(itemApplicationService, never()).equipItem(anyInt(), anyLong(), anyInt());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("EquipItem 材料类不可装备应返回 retcode=5")
     void equipMaterialShouldFail() {
         GameItemEntity material = ItemTestFixtures.item(5002L, 30001, 3, 10, 0, false, false);
-        when(itemRepository.findItemByUid(PLAYER_ID, 5002L)).thenReturn(material);
+        when(itemApplicationService.findItem(PLAYER_ID, 5002L)).thenReturn(material);
 
         ItemSystemProto.EquipItemScRsp rsp = service.handleEquipItem(
                 ItemSystemProto.EquipItemCsReq.newBuilder()
@@ -217,15 +330,28 @@ class ItemNettyServiceTest {
 
         log.info("不可装备类型校验: uid=5002, type=3, avatarId=1102, retcode={}", rsp.getRetcode());
         assertEquals(5, rsp.getRetcode());
-        verify(itemRepository, never()).setEquipAvatarId(anyInt(), anyLong(), anyInt());
+        verify(itemApplicationService, never()).equipItem(anyInt(), anyLong(), anyInt());
     }
 
+    /**
+     * 验证点：UnequipItem 成功应清空 equipAvatarId。
+     * <p>测试方法 {@code unequipItemShouldClearAvatarBinding}：
+     * <ul>
+     *   <li>{@code when(itemApplicationService.findItem(PLAYER_ID, 6001L)).thenReturn(relic);}</li>
+     *   <li>{@code when(itemApplicationService.unequipItem(PLAYER_ID, 6001L)).thenReturn(1103);}</li>
+     *   <li>{@code assertEquals(0, rsp.getRetcode());}</li>
+     *   <li>{@code assertEquals(1103, rsp.getAvatarId());}</li>
+     *   <li>{@code verify(itemApplicationService).unequipItem(PLAYER_ID, 6001L);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("UnequipItem 成功应清空 equipAvatarId")
     void unequipItemShouldClearAvatarBinding() {
         GameItemEntity relic = ItemTestFixtures.item(6001L, 21001, 2, 1, 0, false, false);
         relic.setEquipAvatarId(1103);
-        when(itemRepository.findItemByUid(PLAYER_ID, 6001L)).thenReturn(relic);
+        when(itemApplicationService.findItem(PLAYER_ID, 6001L)).thenReturn(relic);
+
+        when(itemApplicationService.unequipItem(PLAYER_ID, 6001L)).thenReturn(1103);
 
         ItemSystemProto.UnequipItemScRsp rsp = service.handleUnequipItem(
                 ItemSystemProto.UnequipItemCsReq.newBuilder().setUid(6001L).build(),
@@ -235,9 +361,21 @@ class ItemNettyServiceTest {
                 rsp.getRetcode(), rsp.getAvatarId());
         assertEquals(0, rsp.getRetcode());
         assertEquals(1103, rsp.getAvatarId());
-        verify(itemRepository).setEquipAvatarId(PLAYER_ID, 6001L, null);
+        verify(itemApplicationService).unequipItem(PLAYER_ID, 6001L);
     }
 
+    /**
+     * 验证点：EnhanceItem 应消耗材料并提升等级经验。
+     * <p>测试方法 {@code enhanceItemShouldConsumeMaterialsAndUpgrade}：
+     * <ul>
+     *   <li>{@code when(itemApplicationService.findItem(PLAYER_ID, 7001L)).thenReturn(target);}</li>
+     *   <li>{@code when(itemApplicationService.findItem(PLAYER_ID, 7002L)).thenReturn(mat1);}</li>
+     *   <li>{@code when(itemApplicationService.findItem(PLAYER_ID, 7003L)).thenReturn(mat2);}</li>
+     *   <li>{@code when(itemApplicationService.enhanceItem(eq(PLAYER_ID), eq(7001L), anyList()))}</li>
+     *   <li>{@code assertEquals(0, rsp.getRetcode());}</li>
+     *   <li>{@code assertEquals(6, rsp.getNewLevel());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("EnhanceItem 应消耗材料并提升等级经验")
     void enhanceItemShouldConsumeMaterialsAndUpgrade() {
@@ -245,9 +383,12 @@ class ItemNettyServiceTest {
         target.setLevel(5);
         GameItemEntity mat1 = ItemTestFixtures.item(7002L, 30002, 3, 2, 500, false, false);
         GameItemEntity mat2 = ItemTestFixtures.item(7003L, 30003, 3, 1, 800, false, false);
-        when(itemRepository.findItemByUid(PLAYER_ID, 7001L)).thenReturn(target);
-        when(itemRepository.findItemByUid(PLAYER_ID, 7002L)).thenReturn(mat1);
-        when(itemRepository.findItemByUid(PLAYER_ID, 7003L)).thenReturn(mat2);
+        when(itemApplicationService.findItem(PLAYER_ID, 7001L)).thenReturn(target);
+        when(itemApplicationService.findItem(PLAYER_ID, 7002L)).thenReturn(mat1);
+        when(itemApplicationService.findItem(PLAYER_ID, 7003L)).thenReturn(mat2);
+
+        when(itemApplicationService.enhanceItem(eq(PLAYER_ID), eq(7001L), anyList()))
+                .thenReturn(new ItemApplicationService.EnhanceItemResult(6, 2000L, List.of(7002L, 7003L)));
 
         ItemSystemProto.EnhanceItemScRsp rsp = service.handleEnhanceItem(
                 ItemSystemProto.EnhanceItemCsReq.newBuilder()
@@ -263,11 +404,17 @@ class ItemNettyServiceTest {
         assertEquals(6, rsp.getNewLevel());
         assertEquals(2000, rsp.getNewExp());
         assertEquals(2, rsp.getConsumedUidsCount());
-        verify(itemRepository).applyEnhance(PLAYER_ID, 7001L, 6, 2000L);
-        verify(itemRepository).markDiscarded(PLAYER_ID, 7002L);
-        verify(itemRepository).markDiscarded(PLAYER_ID, 7003L);
+        verify(itemApplicationService).enhanceItem(eq(PLAYER_ID), eq(7001L), anyList());
     }
 
+    /**
+     * 验证点：EnhanceItem 缺少材料参数应返回 retcode=5。
+     * <p>测试方法 {@code enhanceItemMissingMaterialsShouldFail}：
+     * <ul>
+     *   <li>{@code assertEquals(5, rsp.getRetcode());}</li>
+     *   <li>{@code verify(itemApplicationService, never()).enhanceItem(anyInt(), anyLong(), anyList());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("EnhanceItem 缺少材料参数应返回 retcode=5")
     void enhanceItemMissingMaterialsShouldFail() {
@@ -280,15 +427,28 @@ class ItemNettyServiceTest {
         log.info("强化参数非法校验: targetUid=7001, materialCount=0, retcode={}, newLevel={}",
                 rsp.getRetcode(), rsp.getNewLevel());
         assertEquals(5, rsp.getRetcode());
-        verify(itemRepository, never()).applyEnhance(anyInt(), anyLong(), anyInt(), anyLong());
+        verify(itemApplicationService, never()).enhanceItem(anyInt(), anyLong(), anyList());
     }
 
+    /**
+     * 验证点：PromoteItem 成功应 promotion +1。
+     * <p>测试方法 {@code promoteItemShouldIncrementPromotion}：
+     * <ul>
+     *   <li>{@code when(itemApplicationService.findItem(PLAYER_ID, 8001L)).thenReturn(item);}</li>
+     *   <li>{@code when(itemApplicationService.promoteItem(PLAYER_ID, 8001L)).thenReturn(3);}</li>
+     *   <li>{@code assertEquals(0, rsp.getRetcode());}</li>
+     *   <li>{@code assertEquals(3, rsp.getNewPromotion());}</li>
+     *   <li>{@code verify(itemApplicationService).promoteItem(PLAYER_ID, 8001L);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("PromoteItem 成功应 promotion +1")
     void promoteItemShouldIncrementPromotion() {
         GameItemEntity item = ItemTestFixtures.item(8001L, 23001, 1, 1, 0, false, false);
         item.setPromotion(2);
-        when(itemRepository.findItemByUid(PLAYER_ID, 8001L)).thenReturn(item);
+        when(itemApplicationService.findItem(PLAYER_ID, 8001L)).thenReturn(item);
+
+        when(itemApplicationService.promoteItem(PLAYER_ID, 8001L)).thenReturn(3);
 
         ItemSystemProto.PromoteItemScRsp rsp = service.handlePromoteItem(
                 ItemSystemProto.PromoteItemCsReq.newBuilder().setUid(8001L).build(),
@@ -298,17 +458,32 @@ class ItemNettyServiceTest {
                 rsp.getRetcode(), rsp.getNewPromotion());
         assertEquals(0, rsp.getRetcode());
         assertEquals(3, rsp.getNewPromotion());
-        verify(itemRepository).updatePromotion(PLAYER_ID, 8001L, 3);
+        verify(itemApplicationService).promoteItem(PLAYER_ID, 8001L);
     }
 
+    /**
+     * 验证点：RankUpItem 成功应提升 rank 并消耗材料。
+     * <p>测试方法 {@code rankUpItemShouldUpgradeBaseAndDiscardMaterial}：
+     * <ul>
+     *   <li>{@code when(itemApplicationService.findItem(PLAYER_ID, 9001L)).thenReturn(base);}</li>
+     *   <li>{@code when(itemApplicationService.findItem(PLAYER_ID, 9002L)).thenReturn(material);}</li>
+     *   <li>{@code when(itemApplicationService.rankUpItem(PLAYER_ID, 9001L, 9002L))}</li>
+     *   <li>{@code assertEquals(0, rsp.getRetcode());}</li>
+     *   <li>{@code assertEquals(2, rsp.getNewRank());}</li>
+     *   <li>{@code assertEquals(9002L, rsp.getConsumedUid());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("RankUpItem 成功应提升 rank 并消耗材料")
     void rankUpItemShouldUpgradeBaseAndDiscardMaterial() {
         GameItemEntity base = ItemTestFixtures.item(9001L, 23001, 1, 1, 0, false, false);
         base.setRank(1);
         GameItemEntity material = ItemTestFixtures.item(9002L, 23001, 1, 1, 0, false, false);
-        when(itemRepository.findItemByUid(PLAYER_ID, 9001L)).thenReturn(base);
-        when(itemRepository.findItemByUid(PLAYER_ID, 9002L)).thenReturn(material);
+        when(itemApplicationService.findItem(PLAYER_ID, 9001L)).thenReturn(base);
+        when(itemApplicationService.findItem(PLAYER_ID, 9002L)).thenReturn(material);
+
+        when(itemApplicationService.rankUpItem(PLAYER_ID, 9001L, 9002L))
+                .thenReturn(new ItemApplicationService.RankUpItemResult(2, 9002L));
 
         ItemSystemProto.RankUpItemScRsp rsp = service.handleRankUpItem(
                 ItemSystemProto.RankUpItemCsReq.newBuilder()
@@ -322,14 +497,23 @@ class ItemNettyServiceTest {
         assertEquals(0, rsp.getRetcode());
         assertEquals(2, rsp.getNewRank());
         assertEquals(9002L, rsp.getConsumedUid());
-        verify(itemRepository).updateRank(PLAYER_ID, 9001L, 2);
-        verify(itemRepository).markDiscarded(PLAYER_ID, 9002L);
+        verify(itemApplicationService).rankUpItem(PLAYER_ID, 9001L, 9002L);
     }
 
+    /**
+     * 验证点：LockItem 成功应更新锁定状态。
+     * <p>测试方法 {@code lockItemShouldUpdateLockedFlag}：
+     * <ul>
+     *   <li>{@code when(itemApplicationService.setLocked(PLAYER_ID, 10001L, true)).thenReturn(true);}</li>
+     *   <li>{@code assertEquals(0, rsp.getRetcode());}</li>
+     *   <li>{@code assertTrue(rsp.getLocked());}</li>
+     *   <li>{@code verify(itemApplicationService).setLocked(PLAYER_ID, 10001L, true);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("LockItem 成功应更新锁定状态")
     void lockItemShouldUpdateLockedFlag() {
-        when(itemRepository.setLocked(PLAYER_ID, 10001L, true)).thenReturn(1);
+        when(itemApplicationService.setLocked(PLAYER_ID, 10001L, true)).thenReturn(true);
 
         ItemSystemProto.LockItemScRsp rsp = service.handleLockItem(
                 ItemSystemProto.LockItemCsReq.newBuilder()
@@ -342,13 +526,22 @@ class ItemNettyServiceTest {
                 rsp.getRetcode(), rsp.getLocked());
         assertEquals(0, rsp.getRetcode());
         assertTrue(rsp.getLocked());
-        verify(itemRepository).setLocked(PLAYER_ID, 10001L, true);
+        verify(itemApplicationService).setLocked(PLAYER_ID, 10001L, true);
     }
 
+    /**
+     * 验证点：LockItem 道具不存在应返回 retcode=2。
+     * <p>测试方法 {@code lockMissingItemShouldFail}：
+     * <ul>
+     *   <li>{@code when(itemApplicationService.setLocked(PLAYER_ID, 10002L, false)).thenReturn(false);}</li>
+     *   <li>{@code assertEquals(2, rsp.getRetcode());}</li>
+     *   <li>{@code assertFalse(rsp.getLocked());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("LockItem 道具不存在应返回 retcode=2")
     void lockMissingItemShouldFail() {
-        when(itemRepository.setLocked(PLAYER_ID, 10002L, false)).thenReturn(0);
+        when(itemApplicationService.setLocked(PLAYER_ID, 10002L, false)).thenReturn(false);
 
         ItemSystemProto.LockItemScRsp rsp = service.handleLockItem(
                 ItemSystemProto.LockItemCsReq.newBuilder()
@@ -363,11 +556,23 @@ class ItemNettyServiceTest {
         assertFalse(rsp.getLocked());
     }
 
+    /**
+     * 验证点：DiscardItem 成功应扣减数量。
+     * <p>测试方法 {@code discardItemShouldReduceCount}：
+     * <ul>
+     *   <li>{@code when(itemApplicationService.findItem(PLAYER_ID, 11001L)).thenReturn(item);}</li>
+     *   <li>{@code when(itemApplicationService.discardItem(PLAYER_ID, 11001L, 3)).thenReturn(5L);}</li>
+     *   <li>{@code assertEquals(0, rsp.getRetcode());}</li>
+     *   <li>{@code assertEquals(5, rsp.getRemainingCount());}</li>
+     *   <li>{@code verify(itemApplicationService).discardItem(PLAYER_ID, 11001L, 3);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("DiscardItem 成功应扣减数量")
     void discardItemShouldReduceCount() {
         GameItemEntity item = ItemTestFixtures.item(11001L, 30001, 3, 8, 0, false, false);
-        when(itemRepository.findItemByUid(PLAYER_ID, 11001L)).thenReturn(item);
+        when(itemApplicationService.findItem(PLAYER_ID, 11001L)).thenReturn(item);
+        when(itemApplicationService.discardItem(PLAYER_ID, 11001L, 3)).thenReturn(5L);
 
         ItemSystemProto.DiscardItemScRsp rsp = service.handleDiscardItem(
                 ItemSystemProto.DiscardItemCsReq.newBuilder()
@@ -380,14 +585,24 @@ class ItemNettyServiceTest {
                 rsp.getRetcode(), rsp.getRemainingCount());
         assertEquals(0, rsp.getRetcode());
         assertEquals(5, rsp.getRemainingCount());
-        verify(itemRepository).updateItemCountAndDiscard(PLAYER_ID, 11001L, 5, false);
+        verify(itemApplicationService).discardItem(PLAYER_ID, 11001L, 3);
     }
 
+    /**
+     * 验证点：DiscardItem 锁定道具应返回 retcode=3。
+     * <p>测试方法 {@code discardLockedItemShouldFail}：
+     * <ul>
+     *   <li>{@code when(itemApplicationService.findItem(PLAYER_ID, 11002L)).thenReturn(locked);}</li>
+     *   <li>{@code assertEquals(3, rsp.getRetcode());}</li>
+     *   <li>{@code assertEquals(4, rsp.getRemainingCount());}</li>
+     *   <li>{@code verify(itemApplicationService, never()).discardItem(anyInt(), anyLong(), anyLong());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("DiscardItem 锁定道具应返回 retcode=3")
     void discardLockedItemShouldFail() {
         GameItemEntity locked = ItemTestFixtures.item(11002L, 30001, 3, 4, 0, true, false);
-        when(itemRepository.findItemByUid(PLAYER_ID, 11002L)).thenReturn(locked);
+        when(itemApplicationService.findItem(PLAYER_ID, 11002L)).thenReturn(locked);
 
         ItemSystemProto.DiscardItemScRsp rsp = service.handleDiscardItem(
                 ItemSystemProto.DiscardItemCsReq.newBuilder()
@@ -400,14 +615,13 @@ class ItemNettyServiceTest {
                 rsp.getRetcode(), rsp.getRemainingCount());
         assertEquals(3, rsp.getRetcode());
         assertEquals(4, rsp.getRemainingCount());
-        verify(itemRepository, never()).updateItemCountAndDiscard(anyInt(), anyLong(), anyLong(), eq(true));
+        verify(itemApplicationService, never()).discardItem(anyInt(), anyLong(), anyLong());
     }
 
     private Channel loggedInChannel(long uid) {
         Channel channel = mock(Channel.class);
-        Attribute<Long> uidAttr = mock(Attribute.class);
-        when(channel.attr(UID_KEY)).thenReturn(uidAttr);
-        when(uidAttr.get()).thenReturn(uid);
+        when(contextResolver.resolvePlayerId(channel)).thenReturn((int) (uid & 0xffffffffL));
+        when(contextResolver.resolveUid(channel)).thenReturn(OptionalLong.of(uid));
         log.info("模拟登录 Channel: uid={}, playerId={}", uid, (int) (uid & 0xffffffffL));
         return channel;
     }
@@ -420,9 +634,8 @@ class ItemNettyServiceTest {
 
     private Channel loggedOutChannel() {
         Channel channel = mock(Channel.class);
-        Attribute<Long> uidAttr = mock(Attribute.class);
-        when(channel.attr(UID_KEY)).thenReturn(uidAttr);
-        when(uidAttr.get()).thenReturn(null);
+        when(contextResolver.resolvePlayerId(channel)).thenReturn(0);
+        when(contextResolver.resolveUid(channel)).thenReturn(OptionalLong.empty());
         log.info("模拟未登录 Channel: uid=null");
         return channel;
     }

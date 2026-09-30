@@ -1,0 +1,48 @@
+{
+  "missions": [
+    {
+      "missionId": 1,
+      "title": "每日清剿",
+      "description": "完成 1 场战斗",
+      "triggerType": 1,
+      "targetId": 0,
+      "required": 1,
+      "rewards": [{"currencyId": 1, "amount": 100}],
+      "battlePassXp": 200,
+      "timePeriod": "any"
+    },
+    {
+      "missionId": 2,
+      "title": "每日对话",
+      "description": "与任意 NPC 交互 1 次",
+      "triggerType": 2,
+      "targetId": 0,
+      "required": 1,
+      "rewards": [{"currencyId": 1, "amount": 50}],
+      "battlePassXp": 100,
+      "timePeriod": "any"
+    },
+    {
+      "missionId": 3,
+      "title": "每日探索",
+      "description": "触发 1 次场景事件",
+      "triggerType": 3,
+      "targetId": 0,
+      "required": 1,
+      "rewards": [{"itemId": 101, "count": 1}],
+      "battlePassXp": 100,
+      "timePeriod": "any"
+    },
+    {
+      "missionId": 4,
+      "title": "夜巡奇遇",
+      "description": "仅在夜间出现：与夜巡 NPC 交互或击败夜行怪物",
+      "triggerType": 2,
+      "targetId": 0,
+      "required": 1,
+      "rewards": [{"currencyId": 1, "amount": 80}],
+      "battlePassXp": 150,
+      "timePeriod": "night"
+    }
+  ]
+}

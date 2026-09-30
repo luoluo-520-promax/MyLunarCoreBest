@@ -12,6 +12,19 @@ message PlayerLoginCsReq {
   string device_info = 4;
   /** 非空时优先按令牌登录（免密），用于断线重连或携带令牌进入其它子服务；与 username/password 二选一 */
   string session_token = 5;
+  /** 客户端声明的线协议主版本；须 >= 2（角色号段）；v3 起含 input_methods / 推荐布局 */
+  uint32 wire_version = 6;
+  /** 客户端 SupportedFeatures 位掩码（见 ClientFeatureFlags）；0=旧客户端默认能力集 */
+  uint64 supported_features = 7;
+  /** 客户端资源包（AssetBundle）版本号，须 >= data/ClientRequiredVersions.json 阈值 */
+  string client_res_version = 8;
+  /**
+   * 设备输入能力掩码（wire v3）：bit0=键鼠 bit1=触屏 bit2=手柄。
+   * 同时应在 supported_features 中声明对应 INPUT_* 位。
+   */
+  uint32 input_methods = 9;
+  /** 设备标识（用于推荐 UI 布局，如 android / ios / windows / xbox） */
+  string device_id = 10;
 }
 
 message PlayerLoginScRsp {
@@ -21,6 +34,25 @@ message PlayerLoginScRsp {
   SceneInfo scene_info = 4;
   /** 登录成功后下发的会话令牌，后续请求可携带此字段识别身份 */
   string session_token = 5;
+  /** 服务端线协议主版本，供客户端校验 */
+  uint32 wire_version = 6;
+  /**
+   * Base64 会话密钥（AES-GCM / Protocol HMAC 共用）。
+   * 仅经已鉴权的 TCP/TLS 通道下发；客户端写入 KCP 侧会话 Attribute 后启用加密帧。
+   */
+  string session_crypto_key = 7;
+  /** 服务端认可的能力交集（client ∩ server），客户端据此隐藏入口 */
+  uint64 enabled_features = 8;
+  /** 服务端要求的最低资源包版本（拦截时一并下发） */
+  string required_client_res_version = 9;
+  /** 客户端过旧时的更新下载 URL */
+  string client_update_url = 10;
+  /** 服务端识别的输入能力掩码（与 enabled_features 中 INPUT_* 对齐） */
+  uint32 input_methods = 11;
+  /** 推荐 UI 皮肤：pc_km / mobile_touch / console_gamepad */
+  string recommended_layout_id = 12;
+  /** 强制升级截止时间戳（毫秒）；>0 且已过期则阻断登录并跳转商店 */
+  uint64 force_upgrade_deadline = 13;
 }
 
 message PlayerInfo {
@@ -50,6 +82,10 @@ message PlayerHeartBeatScRsp {
 }
 
 message PlayerLogoutCsReq {
+  /**
+   * 退出原因：0=未知，1=退出到标题/主界面（客户端关连接后展示主界面），
+   * 2=切换账号，3=被踢下线。服务端目前统一做会话清理；客户端可按 reason 决定 UI。
+   */
   uint32 reason = 1;
 }
 
@@ -89,6 +125,7 @@ message AvatarSyncEntry {
   uint32 promotion = 5;
   uint32 rank = 6;
   bool locked = 7;
+  uint32 equipped_skin_id = 8; // 0 = 默认皮肤
 }
 
 message LineupSyncEntry {
@@ -111,5 +148,50 @@ message GetSessionInfoScRsp {
   uint32 uid = 2;
   string nickname = 3;
   uint32 level = 4;
+  /**
+   * 当前玩法状态：0=HALL 主界面，1=SCENE，2=BATTLE，3=CHALLENGE，4=ROGUE，5=MATCHING
+   * 客户端据此判断是否在主界面，以及「开始游戏 / 返回主界面」是否可用。
+   */
+  uint32 session_state = 5;
+}
+
+/**
+ * 主界面点击「开始游戏」：从 HALL 进入玩法（加载上次场景或请求指定场景）。
+ * plane_id=0 时使用玩家存档中的 scene_id / 坐标。
+ */
+message StartGameCsReq {
+  uint32 plane_id = 1;
+  uint32 floor_id = 2;
+  uint32 entry_id = 3;
+  float pos_x = 4;
+  float pos_y = 5;
+  float pos_z = 6;
+}
+
+message StartGameScRsp {
+  int32 retcode = 1;
+  /** 进入后的玩法状态，成功时应为 SCENE(1) */
+  uint32 session_state = 2;
+  uint32 plane_id = 3;
+  uint32 floor_id = 4;
+  uint32 entry_id = 5;
+  float pos_x = 6;
+  float pos_y = 7;
+  float pos_z = 8;
+}
+
+/**
+ * 退出当前玩法并返回游戏主界面（HALL），不断开连接。
+ * 与 PLAYER_LOGOUT（彻底退出到登录/标题）区分：本协议保持登录态。
+ */
+message ReturnMainMenuCsReq {
+  /** 0=玩家主动返回主界面，1=战斗/场景异常回退 */
+  uint32 reason = 1;
+}
+
+message ReturnMainMenuScRsp {
+  int32 retcode = 1;
+  /** 成功后应为 HALL(0) */
+  uint32 session_state = 2;
 }
 

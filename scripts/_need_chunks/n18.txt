@@ -1,0 +1,15 @@
+c:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\economy\iap\IapOrderServiceTest.java
+c:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\config\NettyGameBusinessConfigurationTest.java
+c:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\assist\AiAssistApplicationServiceTest.java
+c:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\common\ActivityImportServiceTest.java
+c:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\battle\MultiBattleParticipantTest.java
+c:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\main\java\cn\itcast\demo\mylunarcore\dialogue\DialogueConditionEvaluator.java
+c:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\main\java\cn\itcast\demo\mylunarcore\quest\QuestTriggerEngine.java
+c:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\anticheat\PacketIntegrityGuardTest.java
+c:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\scene\SceneNettyServiceTest.java
+c:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\main\java\cn\itcast\demo\mylunarcore\character\AttributeCalculator.java
+c:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\battle\BattleNettyServiceTest.java
+c:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\common\GameServerTest.java
+c:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\main\java\cn\itcast\demo\mylunarcore\admin\AdminOpenApiConfig.java
+c:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\activity\ActivityTypeCatalogTest.java
+c:\Users\ASUS\IdeaProjects\test\MyLunarCore\src\test\java\cn\itcast\demo\mylunarcore\assist\AssistFeatureCoverageTest.java

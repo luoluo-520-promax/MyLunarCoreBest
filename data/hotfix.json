@@ -1,0 +1,74 @@
+{
+  "clientResourceBaseUrl": "https://cdn.example.com/lunar/static/",
+  "hotfixVersion": "1.1.0",
+  "patchVersion": 2,
+  "gameResourcePack": {
+    "version": "1.1.0",
+    "url": "https://cdn.example.com/lunar/packs/game_1.1.0.zip",
+    "hash": "a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456",
+    "size": 524288000
+  },
+  "audioLanguagePacks": [
+    {
+      "locale": "zh-CN",
+      "version": "1.1.0",
+      "url": "https://cdn.example.com/lunar/packs/audio_zh-CN_1.1.0.zip",
+      "hash": "b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef1234567890",
+      "size": 104857600
+    },
+    {
+      "locale": "en-US",
+      "version": "1.1.0",
+      "url": "https://cdn.example.com/lunar/packs/audio_en-US_1.1.0.zip",
+      "hash": "c3d4e5f6789012345678901234567890abcdef1234567890abcdef1234567890ab",
+      "size": 104857600
+    }
+  ],
+  "versionInfo": {
+    "version": "1.1.0",
+    "manifestUrl": "https://cdn.example.com/lunar/manifest/manifest_1.1.0.json",
+    "manifestHash": "d4e5f6789012345678901234567890abcdef1234567890abcdef1234567890abcd",
+    "files": [
+      {
+        "path": "ui/activity/summer_banner.png",
+        "hash": "e5f6789012345678901234567890abcdef1234567890abcdef1234567890abcdef",
+        "size": 204800
+      },
+      {
+        "path": "config/ActivityConfigs.json",
+        "hash": "f6789012345678901234567890abcdef1234567890abcdef1234567890abcdef12",
+        "size": 4096
+      }
+    ]
+  },
+  "deletedFiles": [
+    "ui/legacy/old_banner.png",
+    "config/deprecated_events.json"
+  ],
+  "configFiles": [
+    {
+      "name": "ActivityConfigs.json",
+      "url": "https://cdn.example.com/lunar/config/ActivityConfigs.json",
+      "hash": "6789012345678901234567890abcdef1234567890abcdef1234567890abcdef1234",
+      "size": 8192
+    },
+    {
+      "name": "hotfix.json",
+      "url": "https://cdn.example.com/lunar/config/hotfix.json",
+      "hash": "789012345678901234567890abcdef1234567890abcdef1234567890abcdef12345",
+      "size": 2048
+    }
+  ],
+  "patchTool": {
+    "algorithm": "sha256",
+    "patchBaseUrl": "https://cdn.example.com/lunar/patches/",
+    "verifyToolUrl": "https://cdn.example.com/lunar/tools/patch_verify.exe",
+    "manifestHash": "d4e5f6789012345678901234567890abcdef1234567890abcdef1234567890abcd"
+  },
+  "guidePack": {
+    "version": "1.0.0",
+    "url": "https://cdn.example.com/lunar/packs/GuidePack_1.0.0.json",
+    "hash": "local-guide-pack-v1",
+    "size": 2048
+  }
+}

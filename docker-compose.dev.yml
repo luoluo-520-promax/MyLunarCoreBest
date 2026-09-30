@@ -1,0 +1,42 @@
+# 开发一键依赖：MySQL + Redis，初始化主工程 SQL
+# 用法（仓库根目录）:
+#   docker compose -f docker-compose.dev.yml up -d
+#   mvn -DskipTests spring-boot:run
+#
+# 可选：导入策划配置后启动游戏服；Admin 默认 :8080，游戏口 :9000
+
+services:
+  mysql:
+    image: mysql:8.0.39
+    container_name: mylunarcore-dev-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: "123456"
+      MYSQL_DATABASE: lunarcore
+    ports:
+      - "3306:3306"
+    command: ["mysqld", "--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    volumes:
+      - dev_mysql_data:/var/lib/mysql
+      - ./src/main/resources/db:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p123456"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7.4.1
+    container_name: mylunarcore-dev-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - dev_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  dev_mysql_data:
+  dev_redis_data:

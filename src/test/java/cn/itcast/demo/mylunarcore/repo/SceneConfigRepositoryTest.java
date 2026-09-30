@@ -11,6 +11,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.mock;
 
+/**
+ * SceneConfigRepository 场景配置仓储测试。
+ * <p>
+ * 针对相关生产代码的单元/切片测试类 {@code SceneConfigRepositoryTest}：
+ * 通过 fixture、mock 与断言覆盖关键成功路径、失败码与状态边界。
+ */
 @DisplayName("SceneConfigRepository 场景配置仓储测试")
 class SceneConfigRepositoryTest {
 
@@ -26,6 +32,15 @@ class SceneConfigRepositoryTest {
         log.info("仓储初始化: repository={}", repository.getClass().getSimpleName());
     }
 
+    /**
+     * 验证点：findGroups 应返回场景分组 JSON。
+     * <p>测试方法 {@code findGroupsShouldReturnSceneRow}：
+     * <ul>
+     *   <li>{@code assertEquals(1, row.getPlaneId());}</li>
+     *   <li>{@code assertEquals(2, row.getFloorId());}</li>
+     *   <li>{@code assertEquals("[{\"npc\":1001}]", row.getGroupsJson());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("findGroups 应返回场景分组 JSON")
     void findGroupsShouldReturnSceneRow() {
@@ -41,6 +56,13 @@ class SceneConfigRepositoryTest {
         assertEquals("[{\"npc\":1001}]", row.getGroupsJson());
     }
 
+    /**
+     * 验证点：无配置时应返回 null。
+     * <p>测试方法 {@code findGroupsShouldReturnNullWhenMissing}：
+     * <ul>
+     *   <li>{@code assertNull(row);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("无配置时应返回 null")
     void findGroupsShouldReturnNullWhenMissing() {

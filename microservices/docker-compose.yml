@@ -28,6 +28,7 @@ services:
     command: ["mysqld", "--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
     volumes:
       - mysql_data:/var/lib/mysql
+      - ../src/main/resources/db:/docker-entrypoint-initdb.d:ro
 
   redis:
     image: redis:7.4.1
@@ -37,6 +38,48 @@ services:
     volumes:
       - redis_data:/data
 
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: mylunarcore-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ../deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../deploy/prometheus/rules:/etc/prometheus/rules:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-lifecycle
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: mylunarcore-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ../deploy/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../deploy/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8
+    container_name: mylunarcore-clickhouse
+    ports:
+      - "8123:8123"
+      - "9009:9000"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - ../deploy/clickhouse/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    profiles:
+      - analytics
+
 volumes:
   mysql_data:
   redis_data:
+  clickhouse_data:

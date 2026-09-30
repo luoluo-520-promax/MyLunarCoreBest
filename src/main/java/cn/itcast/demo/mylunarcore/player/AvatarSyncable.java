@@ -45,6 +45,7 @@ public class AvatarSyncable implements Syncable {
                     .setPromotion(Math.max(0, a.getPromotion())) // 星魂/突破等级
                     .setRank(Math.max(0, a.getRank())) // 光锥/命座等等阶
                     .setLocked(a.isLocked()) // 是否被锁定（防止误分解等）
+                    .setEquippedSkinId(Math.max(0, a.getEquippedSkinId())) // 0=默认皮肤
                     .build()); // 构建单条 AvatarSyncEntry 并追加
         }
     }

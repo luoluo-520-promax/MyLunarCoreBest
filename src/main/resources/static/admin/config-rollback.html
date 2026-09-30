@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>配置一键回滚 · MyLunarCore</title>
+  <style>
+    :root { --bg:#0f1419; --card:#1a2332; --text:#e7ecf3; --muted:#8b9bb4; --accent:#3d8bfd; --danger:#e35d6a; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: "Segoe UI", "PingFang SC", sans-serif; background:var(--bg); color:var(--text); }
+    main { max-width:720px; margin:48px auto; padding:0 20px; }
+    h1 { font-size:1.4rem; margin:0 0 8px; }
+    p { color:var(--muted); line-height:1.5; }
+    label { display:block; margin:16px 0 6px; font-size:.9rem; color:var(--muted); }
+    textarea, input { width:100%; background:var(--card); border:1px solid #2a3548; color:var(--text); border-radius:8px; padding:10px 12px; font:inherit; }
+    textarea { min-height:120px; resize:vertical; }
+    .row { display:flex; gap:12px; margin-top:20px; flex-wrap:wrap; }
+    button { border:0; border-radius:8px; padding:10px 18px; font:inherit; cursor:pointer; }
+    .primary { background:var(--accent); color:#fff; }
+    .danger { background:var(--danger); color:#fff; }
+    #out { margin-top:20px; white-space:pre-wrap; background:var(--card); padding:14px; border-radius:8px; font-size:.85rem; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>配置版本一键回滚</h1>
+  <p>从 <code>.bak</code> 恢复已导入配置文件，并可选触发热重载。需先登录管理后台获取 Session。</p>
+  <label>文件列表（每行一个，如 Banners.json）</label>
+  <textarea id="files">Banners.json
+ActivityScheduling.json
+hotfix.json</textarea>
+  <label><input type="checkbox" id="reload" checked/> 回滚后执行热重载</label>
+  <div class="row">
+    <button class="primary" id="dry">Dry-run 差异预览</button>
+    <button class="danger" id="go">确认回滚</button>
+  </div>
+  <pre id="out"></pre>
+</main>
+<script>
+async function csrf() {
+  const r = await fetch('/api/admin/csrf', { credentials: 'include' });
+  if (!r.ok) throw new Error('请先登录 /api/admin/login');
+  const j = await r.json();
+  return j.token || j.csrfToken || j._csrf;
+}
+function fileList() {
+  return document.getElementById('files').value.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+}
+document.getElementById('dry').onclick = async () => {
+  const out = document.getElementById('out');
+  try {
+    const token = await csrf();
+    const files = {};
+    for (const f of fileList()) files[f] = '{}';
+    const r = await fetch('/api/admin/ops/import/json-files', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token },
+      body: JSON.stringify({ files, dryRun: true, reload: false })
+    });
+    out.textContent = JSON.stringify(await r.json(), null, 2);
+  } catch (e) { out.textContent = String(e); }
+};
+document.getElementById('go').onclick = async () => {
+  const out = document.getElementById('out');
+  if (!confirm('确认从 .bak 回滚所选文件？')) return;
+  try {
+    const token = await csrf();
+    const r = await fetch('/api/admin/ops/import/rollback', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token },
+      body: JSON.stringify({ files: fileList(), reload: document.getElementById('reload').checked })
+    });
+    out.textContent = JSON.stringify(await r.json(), null, 2);
+  } catch (e) { out.textContent = String(e); }
+};
+</script>
+</body>
+</html>

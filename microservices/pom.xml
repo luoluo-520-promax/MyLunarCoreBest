@@ -13,16 +13,21 @@
 
     <modules>
         <module>common/common-api</module>
+        <module>common/match-api</module>
+        <module>common/chat-api</module>
         <module>services/api-gateway</module>
         <module>services/auth-service</module>
         <module>services/player-service</module>
+        <module>services/ai-assist-service</module>
+        <module>services/match-service</module>
+        <module>services/chat-service</module>
     </modules>
 
     <properties>
         <java.version>17</java.version>
-        <spring-boot.version>3.3.4</spring-boot.version>
-        <spring-cloud.version>2023.0.3</spring-cloud.version>
-        <spring-cloud-alibaba.version>2023.0.1.2</spring-cloud-alibaba.version>
+        <spring-boot.version>4.0.4</spring-boot.version>
+        <spring-cloud.version>2025.1.0</spring-cloud.version>
+        <spring-cloud-alibaba.version>2025.1.0.0</spring-cloud-alibaba.version>
         <maven.compiler.source>${java.version}</maven.compiler.source>
         <maven.compiler.target>${java.version}</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>

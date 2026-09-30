@@ -1,9 +1,10 @@
-// 统一日志分类与门面所在包
+// 统一日志分类枚举：把系统日志与各业务域日志分到不同 logger 命名空间
 package cn.itcast.demo.mylunarcore.common;
 
 /**
  * 日志分类：系统框架与业务域分离，对应 Logback 中不同滚动文件。
- * <p>通过 {@link #loggerName(Class)} 生成与 logback-spring.xml 一致的 logger 名称。</p>
+ * <p>通过 {@link #loggerName(Class)} 生成与 logback-spring.xml 一致的 logger 名称，
+ * 便于在配置中按业务域分别设置输出路径、级别和滚动策略。</p>
  */
 public enum LogCategory {
 
@@ -29,12 +30,17 @@ public enum LogCategory {
     /** 持久化与仓储 */
     BUSINESS_DATA("data"), // 业务子域：data
     /** 同步与货币等辅助 */
-    BUSINESS_SYNC("sync"); // 业务子域：sync
+    BUSINESS_SYNC("sync"), // 业务子域：sync
+    /** AI 辅助 / 规则教练 */
+    BUSINESS_ASSIST("assist"); // 业务子域：assist
 
-    private static final String ROOT_SYS = "cn.itcast.demo.mylunarcore.sys"; // 系统日志 logger 名前缀
-    private static final String ROOT_BIZ = "cn.itcast.demo.mylunarcore.biz"; // 业务日志 logger 名前缀
+    // 系统日志 logger 名前缀：对应 logback 中的 system 文件/控制台规则
+    private static final String ROOT_SYS = "cn.itcast.demo.mylunarcore.sys";
+    // 业务日志 logger 名前缀：再拼接细分子域
+    private static final String ROOT_BIZ = "cn.itcast.demo.mylunarcore.biz";
 
-    private final String segment; // 业务子命名空间片段（SYSTEM 为 null）
+    // 业务子命名空间片段（SYSTEM 为 null）
+    private final String segment;
 
     /** 系统分类构造：不绑定 segment */
     LogCategory() {

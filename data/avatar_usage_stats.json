@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "totalBattles": 1000,
+  "avatars": [
+    { "avatarId": 1001, "pickCount": 420, "winCount": 240 },
+    { "avatarId": 1002, "pickCount": 310, "winCount": 170 },
+    { "avatarId": 1003, "pickCount": 260, "winCount": 130 },
+    { "avatarId": 2001, "pickCount": 180, "winCount": 95 },
+    { "avatarId": 2002, "pickCount": 120, "winCount": 55 }
+  ]
+}

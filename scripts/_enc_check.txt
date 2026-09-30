@@ -1,0 +1,6 @@
+import org.junit.jupiter.api.DisplayName;
+@DisplayName("AccountPasswordService 密码哈希统一测试")
+     * 验证点：应校验 bcrypt 哈希；默认关闭明文兼容。
+    @DisplayName("应校验 bcrypt 哈希；默认关闭明文兼容")
+     * 验证点：开启明文兼容开关后应允许无前缀比对。
+    @DisplayName("开启明文兼容开关后应允许无前缀比对")

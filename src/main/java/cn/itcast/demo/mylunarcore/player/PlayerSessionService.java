@@ -38,7 +38,20 @@ import cn.itcast.demo.mylunarcore.player.PlayerDataPeriodicPersistenceService;
 import cn.itcast.demo.mylunarcore.player.SyncReason;
 
 // 从 Netty Channel 读取绑定的 Ukcp 实例
+import cn.itcast.demo.mylunarcore.net.ClientFeatureFlags;
+import cn.itcast.demo.mylunarcore.net.CmdIds;
+import cn.itcast.demo.mylunarcore.net.GameLoginRateLimiter;
+import cn.itcast.demo.mylunarcore.net.GamePacket;
+import cn.itcast.demo.mylunarcore.net.InputCapability;
+import cn.itcast.demo.mylunarcore.net.ProtocolCompatService;
+import cn.itcast.demo.mylunarcore.net.SessionCryptoBinder;
 import cn.itcast.demo.mylunarcore.net.UkcpChannelAccessor;
+import cn.itcast.demo.mylunarcore.hall.ChatService;
+import cn.itcast.demo.mylunarcore.home.HomeNettyService;
+import cn.itcast.demo.mylunarcore.social.FriendOnlineStatusService;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
 
 // 场景管理器，OnlinePlayer 构造依赖
 import cn.itcast.demo.mylunarcore.scene.SceneManager;
@@ -65,13 +78,16 @@ import cn.itcast.demo.mylunarcore.common.LogCategory;
 import org.slf4j.Logger;
 
 // Spring 服务层组件
-import org.springframework.stereotype.Service;
+import cn.itcast.demo.mylunarcore.common.AccountPasswordService;
+import cn.itcast.demo.mylunarcore.common.BusinessMetrics;
 
 // 高精度小数，读取数据库中的场景坐标
 import java.math.BigDecimal;
 
 // JDBC 时间戳，写入登录/登出审计字段
 import java.sql.Timestamp;
+
+import java.time.Instant;
 
 // 货币 map，填充登录响应 PlayerInfo
 import java.util.Map;
@@ -114,6 +130,19 @@ public class PlayerSessionService {
     /** 会话令牌无效或已过期（顶号、登出后旧 token 失效） */
     public static final int RET_TOKEN_INVALID = 7;
 
+    /** 登录请求被限流 */
+    public static final int RET_RATE_LIMITED = 8;
+
+    /** 客户端线协议版本过旧，需强制升级 */
+    public static final int RET_PROTOCOL_INCOMPATIBLE = 9;
+
+    /** 客户端资源包版本过旧（AssetBundle） */
+    public static final int RET_CLIENT_TOO_OLD = ClientVersionGateService.ERR_CLIENT_TOO_OLD;
+    /** 资源 Manifest 落后（RESOURCE_OUTDATED），强制跳转更新页 */
+    public static final int RET_RESOURCE_OUTDATED = ClientVersionGateService.ERR_RESOURCE_OUTDATED;
+    /** 超过强制升级截止时间仍未升级 */
+    public static final int RET_FORCE_UPGRADE = ClientVersionGateService.ERR_FORCE_UPGRADE;
+
     /** 账号/玩家数据读写仓储 */
     private final PlayerDataRepository repository;
 
@@ -135,6 +164,42 @@ public class PlayerSessionService {
     /** 读取全局开关（如周期持久化间隔） */
     private final LunarCoreProperties lunarCoreProperties;
 
+    /** 登录多步写库事务封装 */
+    private final PlayerLoginApplicationService loginApplicationService;
+
+    /** 断连/登出统一清理 */
+    private final ConnectionLifecycleService connectionLifecycleService;
+
+    /** 登录限流 */
+    private final GameLoginRateLimiter loginRateLimiter;
+
+    /** 游戏账号密码校验（与 Admin 共用哈希策略） */
+    private final AccountPasswordService accountPasswordService;
+
+    private final ChatService chatService;
+
+    private final ProtocolCompatService protocolCompatService;
+
+    private final SessionCryptoBinder sessionCryptoBinder;
+
+    private final ObjectProvider<StaminaService> staminaProvider;
+
+    private final ObjectProvider<BusinessMetrics> businessMetricsProvider;
+
+    private final ObjectProvider<ClientVersionGateService> clientVersionGateProvider;
+
+    private final ObjectProvider<cn.itcast.demo.mylunarcore.ops.MaintenanceModeService> maintenanceModeProvider;
+
+    private final ObjectProvider<cn.itcast.demo.mylunarcore.achievement.OfflineAchievementCompensator> offlineAchievementProvider;
+
+    private final ObjectProvider<FriendOnlineStatusService> friendOnlineStatusProvider;
+
+    private final ObjectProvider<HomeNettyService> homeNettyProvider;
+
+    private final ObjectProvider<cn.itcast.demo.mylunarcore.activity.ActivityVisibilityService> visibilityProvider;
+
+    private final ObjectProvider<cn.itcast.demo.mylunarcore.qol.QolLoginHookService> qolLoginHookProvider;
+
     /**
      * Spring 构造注入全部依赖。
      */
@@ -144,7 +209,109 @@ public class PlayerSessionService {
                                 PlayerTickRegistry playerTickRegistry,
                                 PlayerDataAsyncLoadService playerDataAsyncLoadService,
                                 PlayerDataPeriodicPersistenceService periodicPersistenceService,
-                                LunarCoreProperties lunarCoreProperties) {
+                                LunarCoreProperties lunarCoreProperties,
+                                PlayerLoginApplicationService loginApplicationService,
+                                ConnectionLifecycleService connectionLifecycleService,
+                                GameLoginRateLimiter loginRateLimiter,
+                                AccountPasswordService accountPasswordService,
+                                ObjectProvider<ChatService> chatServiceProvider,
+                                ProtocolCompatService protocolCompatService,
+                                SessionCryptoBinder sessionCryptoBinder,
+                                ObjectProvider<StaminaService> staminaProvider,
+                                ObjectProvider<BusinessMetrics> businessMetricsProvider,
+                                ObjectProvider<ClientVersionGateService> clientVersionGateProvider,
+                                ObjectProvider<cn.itcast.demo.mylunarcore.ops.MaintenanceModeService> maintenanceModeProvider,
+                                ObjectProvider<cn.itcast.demo.mylunarcore.achievement.OfflineAchievementCompensator> offlineAchievementProvider) {
+        this(repository, sessionManager, sceneManager, playerTickRegistry, playerDataAsyncLoadService,
+                periodicPersistenceService, lunarCoreProperties, loginApplicationService, connectionLifecycleService,
+                loginRateLimiter, accountPasswordService, chatServiceProvider, protocolCompatService,
+                sessionCryptoBinder, staminaProvider, businessMetricsProvider, clientVersionGateProvider,
+                maintenanceModeProvider, offlineAchievementProvider, null, null, null);
+    }
+
+    public PlayerSessionService(PlayerDataRepository repository,
+                                GameSessionManager sessionManager,
+                                SceneManager sceneManager,
+                                PlayerTickRegistry playerTickRegistry,
+                                PlayerDataAsyncLoadService playerDataAsyncLoadService,
+                                PlayerDataPeriodicPersistenceService periodicPersistenceService,
+                                LunarCoreProperties lunarCoreProperties,
+                                PlayerLoginApplicationService loginApplicationService,
+                                ConnectionLifecycleService connectionLifecycleService,
+                                GameLoginRateLimiter loginRateLimiter,
+                                AccountPasswordService accountPasswordService,
+                                ObjectProvider<ChatService> chatServiceProvider,
+                                ProtocolCompatService protocolCompatService,
+                                SessionCryptoBinder sessionCryptoBinder,
+                                ObjectProvider<StaminaService> staminaProvider,
+                                ObjectProvider<BusinessMetrics> businessMetricsProvider,
+                                ObjectProvider<ClientVersionGateService> clientVersionGateProvider,
+                                ObjectProvider<cn.itcast.demo.mylunarcore.ops.MaintenanceModeService> maintenanceModeProvider,
+                                ObjectProvider<cn.itcast.demo.mylunarcore.achievement.OfflineAchievementCompensator> offlineAchievementProvider,
+                                ObjectProvider<FriendOnlineStatusService> friendOnlineStatusProvider,
+                                ObjectProvider<HomeNettyService> homeNettyProvider) {
+        this(repository, sessionManager, sceneManager, playerTickRegistry, playerDataAsyncLoadService,
+                periodicPersistenceService, lunarCoreProperties, loginApplicationService, connectionLifecycleService,
+                loginRateLimiter, accountPasswordService, chatServiceProvider, protocolCompatService,
+                sessionCryptoBinder, staminaProvider, businessMetricsProvider, clientVersionGateProvider,
+                maintenanceModeProvider, offlineAchievementProvider, friendOnlineStatusProvider, homeNettyProvider,
+                null);
+    }
+
+    public PlayerSessionService(PlayerDataRepository repository,
+                                GameSessionManager sessionManager,
+                                SceneManager sceneManager,
+                                PlayerTickRegistry playerTickRegistry,
+                                PlayerDataAsyncLoadService playerDataAsyncLoadService,
+                                PlayerDataPeriodicPersistenceService periodicPersistenceService,
+                                LunarCoreProperties lunarCoreProperties,
+                                PlayerLoginApplicationService loginApplicationService,
+                                ConnectionLifecycleService connectionLifecycleService,
+                                GameLoginRateLimiter loginRateLimiter,
+                                AccountPasswordService accountPasswordService,
+                                ObjectProvider<ChatService> chatServiceProvider,
+                                ProtocolCompatService protocolCompatService,
+                                SessionCryptoBinder sessionCryptoBinder,
+                                ObjectProvider<StaminaService> staminaProvider,
+                                ObjectProvider<BusinessMetrics> businessMetricsProvider,
+                                ObjectProvider<ClientVersionGateService> clientVersionGateProvider,
+                                ObjectProvider<cn.itcast.demo.mylunarcore.ops.MaintenanceModeService> maintenanceModeProvider,
+                                ObjectProvider<cn.itcast.demo.mylunarcore.achievement.OfflineAchievementCompensator> offlineAchievementProvider,
+                                ObjectProvider<FriendOnlineStatusService> friendOnlineStatusProvider,
+                                ObjectProvider<HomeNettyService> homeNettyProvider,
+                                ObjectProvider<cn.itcast.demo.mylunarcore.activity.ActivityVisibilityService> visibilityProvider) {
+        this(repository, sessionManager, sceneManager, playerTickRegistry, playerDataAsyncLoadService,
+                periodicPersistenceService, lunarCoreProperties, loginApplicationService, connectionLifecycleService,
+                loginRateLimiter, accountPasswordService, chatServiceProvider, protocolCompatService,
+                sessionCryptoBinder, staminaProvider, businessMetricsProvider, clientVersionGateProvider,
+                maintenanceModeProvider, offlineAchievementProvider, friendOnlineStatusProvider, homeNettyProvider,
+                visibilityProvider, null);
+    }
+
+    @Autowired
+    public PlayerSessionService(PlayerDataRepository repository,
+                                GameSessionManager sessionManager,
+                                SceneManager sceneManager,
+                                PlayerTickRegistry playerTickRegistry,
+                                PlayerDataAsyncLoadService playerDataAsyncLoadService,
+                                PlayerDataPeriodicPersistenceService periodicPersistenceService,
+                                LunarCoreProperties lunarCoreProperties,
+                                PlayerLoginApplicationService loginApplicationService,
+                                ConnectionLifecycleService connectionLifecycleService,
+                                GameLoginRateLimiter loginRateLimiter,
+                                AccountPasswordService accountPasswordService,
+                                ObjectProvider<ChatService> chatServiceProvider,
+                                ProtocolCompatService protocolCompatService,
+                                SessionCryptoBinder sessionCryptoBinder,
+                                ObjectProvider<StaminaService> staminaProvider,
+                                ObjectProvider<BusinessMetrics> businessMetricsProvider,
+                                ObjectProvider<ClientVersionGateService> clientVersionGateProvider,
+                                ObjectProvider<cn.itcast.demo.mylunarcore.ops.MaintenanceModeService> maintenanceModeProvider,
+                                ObjectProvider<cn.itcast.demo.mylunarcore.achievement.OfflineAchievementCompensator> offlineAchievementProvider,
+                                ObjectProvider<FriendOnlineStatusService> friendOnlineStatusProvider,
+                                ObjectProvider<HomeNettyService> homeNettyProvider,
+                                ObjectProvider<cn.itcast.demo.mylunarcore.activity.ActivityVisibilityService> visibilityProvider,
+                                ObjectProvider<cn.itcast.demo.mylunarcore.qol.QolLoginHookService> qolLoginHookProvider) {
         this.repository = repository;
         this.sessionManager = sessionManager;
         this.sceneManager = sceneManager;
@@ -152,6 +319,22 @@ public class PlayerSessionService {
         this.playerDataAsyncLoadService = playerDataAsyncLoadService;
         this.periodicPersistenceService = periodicPersistenceService;
         this.lunarCoreProperties = lunarCoreProperties;
+        this.loginApplicationService = loginApplicationService;
+        this.connectionLifecycleService = connectionLifecycleService;
+        this.loginRateLimiter = loginRateLimiter;
+        this.accountPasswordService = accountPasswordService;
+        this.chatService = chatServiceProvider.getIfAvailable();
+        this.protocolCompatService = protocolCompatService;
+        this.sessionCryptoBinder = sessionCryptoBinder;
+        this.staminaProvider = staminaProvider;
+        this.businessMetricsProvider = businessMetricsProvider;
+        this.clientVersionGateProvider = clientVersionGateProvider;
+        this.maintenanceModeProvider = maintenanceModeProvider;
+        this.offlineAchievementProvider = offlineAchievementProvider;
+        this.friendOnlineStatusProvider = friendOnlineStatusProvider;
+        this.homeNettyProvider = homeNettyProvider;
+        this.visibilityProvider = visibilityProvider;
+        this.qolLoginHookProvider = qolLoginHookProvider;
     }
 
     /**
@@ -166,15 +349,67 @@ public class PlayerSessionService {
                                                            Channel channel,
                                                            String clientIp) {
         try {
+            var maintenance = maintenanceModeProvider.getIfAvailable();
+            if (maintenance != null && maintenance.rejectLogin()) {
+                return PlayerSessionProto.PlayerLoginScRsp.newBuilder()
+                        .setRetcode(RET_RATE_LIMITED)
+                        .setWireVersion(CmdIds.PROTOCOL_WIRE_VERSION)
+                        .build();
+            }
+            int clientWire = req.getWireVersion();
+            // 未声明时按 1 处理，强制升级到 PROTOCOL_WIRE_VERSION
+            if (clientWire == 0) {
+                clientWire = 1;
+            }
+            if (!protocolCompatService.isCompatible(clientWire)) {
+                return PlayerSessionProto.PlayerLoginScRsp.newBuilder()
+                        .setRetcode(RET_PROTOCOL_INCOMPATIBLE)
+                        .setWireVersion(CmdIds.PROTOCOL_WIRE_VERSION)
+                        .build();
+            }
+            ClientVersionGateService gate = clientVersionGateProvider.getIfAvailable();
+            if (gate != null) {
+                ClientVersionGateService.GateResult resGate = gate.check(req.getClientResVersion());
+                if (!resGate.allowed()) {
+                    int code = resGate.retcode() == ClientVersionGateService.ERR_RESOURCE_OUTDATED
+                            ? RET_RESOURCE_OUTDATED
+                            : (resGate.retcode() == ClientVersionGateService.ERR_FORCE_UPGRADE
+                            ? RET_FORCE_UPGRADE : RET_CLIENT_TOO_OLD);
+                    var builder = PlayerSessionProto.PlayerLoginScRsp.newBuilder()
+                            .setRetcode(code)
+                            .setWireVersion(CmdIds.PROTOCOL_WIRE_VERSION)
+                            .setRequiredClientResVersion(resGate.requiredResVersion())
+                            .setClientUpdateUrl(resGate.updateUrl());
+                    if (resGate.forceUpgradeDeadline() > 0) {
+                        builder.setForceUpgradeDeadline(resGate.forceUpgradeDeadline());
+                    }
+                    return builder.build();
+                }
+            }
+            if (!loginRateLimiter.tryAcquire(clientIp, req.getUsername())) {
+                return PlayerSessionProto.PlayerLoginScRsp.newBuilder()
+                        .setRetcode(RET_RATE_LIMITED)
+                        .setWireVersion(CmdIds.PROTOCOL_WIRE_VERSION)
+                        .build();
+            }
+            long clientFeatures = ClientFeatureFlags.normalizeClientMask(req.getSupportedFeatures());
+            int inputMethods = InputCapability.normalize(req.getInputMethods());
+            clientFeatures |= InputCapability.toFeatureBits(inputMethods);
+            if (inputMethods != 0) {
+                clientFeatures |= ClientFeatureFlags.LAYOUT_HINT;
+            }
+            clientFeatures &= ClientFeatureFlags.SERVER_ALL;
+            String deviceId = req.getDeviceId() == null ? "" : req.getDeviceId();
             String tokenReq = req.getSessionToken(); // 客户端上报的会话令牌（可为空串）
             if (tokenReq != null && !tokenReq.isBlank()) { // 有 token 则优先免密登录
-                return handleLoginByToken(tokenReq.trim(), channel, clientIp);
+                return handleLoginByToken(tokenReq.trim(), channel, clientIp, clientFeatures, inputMethods, deviceId);
             }
-            return handleLoginByPassword(req, channel, clientIp); // 无 token 则账号密码登录
+            return handleLoginByPassword(req, channel, clientIp, clientFeatures, inputMethods, deviceId); // 无 token 则账号密码登录
         } catch (Exception e) {
             log.error("handleLogin error, username={}", req.getUsername(), e);
             return PlayerSessionProto.PlayerLoginScRsp.newBuilder()
                     .setRetcode(RET_INTERNAL_ERROR)
+                    .setWireVersion(CmdIds.PROTOCOL_WIRE_VERSION)
                     .build();
         }
     }
@@ -189,7 +424,10 @@ public class PlayerSessionService {
      */
     private PlayerSessionProto.PlayerLoginScRsp handleLoginByToken(String sessionToken,
                                                                    Channel channel,
-                                                                   String clientIp) {
+                                                                   String clientIp,
+                                                                   long clientFeatures,
+                                                                   int inputMethods,
+                                                                   String deviceId) {
         Long uid = sessionManager.resolveToken(sessionToken); // 从 token 表解析 uid
         if (uid == null) { // token 不存在或已失效
             return PlayerSessionProto.PlayerLoginScRsp.newBuilder()
@@ -218,7 +456,7 @@ public class PlayerSessionService {
                     .setRetcode(RET_SERVER_FULL)
                     .build();
         }
-        return completeSuccessfulLogin(account, player, channel, clientIp); // 进入统一成功流程
+        return completeSuccessfulLogin(account, player, channel, clientIp, clientFeatures, inputMethods, deviceId);
     }
 
     /**
@@ -231,7 +469,10 @@ public class PlayerSessionService {
      */
     private PlayerSessionProto.PlayerLoginScRsp handleLoginByPassword(PlayerSessionProto.PlayerLoginCsReq req,
                                                                       Channel channel,
-                                                                      String clientIp) {
+                                                                      String clientIp,
+                                                                      long clientFeatures,
+                                                                      int inputMethods,
+                                                                      String deviceId) {
         AccountEntity account = repository.findAccountByUsername(req.getUsername()); // 用户名唯一索引查询
         if (account == null) {
             return PlayerSessionProto.PlayerLoginScRsp.newBuilder()
@@ -243,10 +484,15 @@ public class PlayerSessionService {
                     .setRetcode(RET_ACCOUNT_BANNED)
                     .build();
         }
-        if (!safeEquals(account.getPassword(), req.getPassword())) { // 明文密码比对（生产环境应使用哈希）
+        if (!accountPasswordService.matches(req.getPassword(), account.getPassword())) {
             return PlayerSessionProto.PlayerLoginScRsp.newBuilder()
                     .setRetcode(RET_PASSWORD_ERROR)
                     .build();
+        }
+        if (accountPasswordService.needsRehash(account.getPassword())) {
+            String encoded = accountPasswordService.encode(req.getPassword());
+            repository.updateAccountPassword(account.getId(), encoded);
+            account.setPassword(encoded);
         }
         PlayerEntity player = repository.loadPlayerByUsername(req.getUsername()); // 读取该账号下玩家角色
         if (player == null) { // 首次登录：自动创建默认角色
@@ -257,7 +503,7 @@ public class PlayerSessionService {
                     .setRetcode(RET_SERVER_FULL)
                     .build();
         }
-        return completeSuccessfulLogin(account, player, channel, clientIp);
+        return completeSuccessfulLogin(account, player, channel, clientIp, clientFeatures, inputMethods, deviceId);
     }
 
     /**
@@ -272,20 +518,97 @@ public class PlayerSessionService {
     private PlayerSessionProto.PlayerLoginScRsp completeSuccessfulLogin(AccountEntity account,
                                                                         PlayerEntity player,
                                                                         Channel channel,
-                                                                        String clientIp) {
+                                                                        String clientIp,
+                                                                        long clientFeatures,
+                                                                        int inputMethods,
+                                                                        String deviceId) {
         Timestamp now = new Timestamp(System.currentTimeMillis()); // 当前时间，写入 DB 审计字段
-        repository.updateAccountLogin(account, player.getUid(), now, clientIp); // 更新最后登录时间、IP、uid
-        repository.loadCoreData(player.getUid()); // 同步加载核心切片，减小首包等待
-       sessionManager.createOrReplace(player.getUid(), channel,
+        loginApplicationService.recordSuccessfulLogin(account, player.getUid(), now, clientIp); // 事务内更新账号+玩家登录时间
+        BusinessMetrics metrics = businessMetricsProvider.getIfAvailable();
+        if (metrics != null) {
+            metrics.recordLoginSuccess();
+            metrics.recordDailyLoginUv(player.getUid());
+        }
+        PlayerData core = repository.loadCoreData(player.getUid()); // 同步加载核心切片并挂载到 Session
+        GameSession session = sessionManager.createOrReplace(player.getUid(), channel,
                 UkcpChannelAccessor.ukcp(channel)); // 创建或顶号替换会话
+        session.setPlayerData(core);
+        long enabledFeatures = clientFeatures & ClientFeatureFlags.SERVER_ALL;
+        session.setEnabledFeatures(enabledFeatures);
+        String layoutId = InputCapability.recommendedLayoutId(inputMethods, deviceId);
+        session.setInputMethods(inputMethods);
+        session.setDeviceId(deviceId == null ? "" : deviceId);
+        session.setRecommendedLayoutId(layoutId);
+        var visibility = visibilityProvider == null ? null : visibilityProvider.getIfAvailable();
+        if (visibility != null) {
+            session.setQaTester(visibility.isQaTester(player.getUid()));
+        }
+        if (core.getPlayer() != null) {
+            session.setNickname(core.getPlayer().getNickname());
+            session.setLevel(core.getPlayer().getLevel());
+            session.bindDataVersion(core.getPlayer().getDataVersion());
+            session.clearDirty();
+        }
         sessionManager.updateActive(player.getUid()); // 初始化最后活跃时间
+        session.setSessionState(PlayerSessionState.HALL); // 登录后落在主界面，需「开始游戏」才进场景
         channel.attr(PlayerChannelAttributes.PLAYER_UID).set(player.getUid()); // Channel 绑定 uid，供后续 Handler 使用
-        // 注册 OnlinePlayer 至 Tick 循环：负责定时同步、周期持久化等
+        // 注册 OnlinePlayer 至 Tick 循环：负责定时同步、周期持久化、体力恢复等
         playerTickRegistry.register(new OnlinePlayer(player.getUid(), sessionManager, sceneManager,
-                playerDataAsyncLoadService, periodicPersistenceService, lunarCoreProperties));
+                playerDataAsyncLoadService, periodicPersistenceService, lunarCoreProperties,
+                staminaProvider.getIfAvailable()));
         // 「先可玩、后补全」：登录响应仅含核心字段；全量数据异步加载完成后以 LOGIN 原因推送
         playerDataAsyncLoadService.reloadFullAsync(player.getUid(), SyncReason.LOGIN);
+        if (chatService != null) {
+            try {
+                chatService.flushOffline((int) player.getUid());
+            } catch (Exception ignored) {
+                // 离线消息推送失败不阻断登录
+            }
+        }
+        var offlineAchievement = offlineAchievementProvider.getIfAvailable();
+        if (offlineAchievement != null) {
+            try {
+                Instant lastLogout = player.getLastLogout() == null
+                        ? Instant.EPOCH
+                        : player.getLastLogout().toInstant();
+                offlineAchievement.compensateOnLogin((int) player.getUid(), lastLogout);
+            } catch (Exception ignored) {
+                // 成就补偿失败不阻断登录
+            }
+        }
+        FriendOnlineStatusService friendOnline = friendOnlineStatusProvider == null
+                ? null : friendOnlineStatusProvider.getIfAvailable();
+        if (friendOnline != null) {
+            try {
+                friendOnline.publishOnline((int) player.getUid());
+            } catch (Exception ignored) {
+                // 在线状态推送失败不阻断登录
+            }
+        }
+        HomeNettyService homeNetty = homeNettyProvider == null ? null : homeNettyProvider.getIfAvailable();
+        if (homeNetty != null) {
+            try {
+                var visitorNotify = homeNetty.buildVisitorLogNotify((int) player.getUid());
+                if (visitorNotify.getUnreadCount() > 0 || visitorNotify.getEntriesCount() > 0) {
+                    session.send(new GamePacket(CmdIds.HOME_VISITOR_LOG_SC_NOTIFY, visitorNotify.toByteArray()));
+                }
+            } catch (Exception ignored) {
+                // 家园未读推送失败不阻断登录
+            }
+        }
+        var qolHook = qolLoginHookProvider == null ? null : qolLoginHookProvider.getIfAvailable();
+        if (qolHook != null) {
+            try {
+                long lastLogoutMs = player.getLastLogout() == null
+                        ? 0L
+                        : player.getLastLogout().getTime();
+                qolHook.onLoginSuccess((int) player.getUid(), lastLogoutMs);
+            } catch (Exception ignored) {
+                // QoL 推送失败不阻断登录
+            }
+        }
         String sessionToken = sessionManager.bindSessionToken(player.getUid()); // 颁发新 token，旧 token 作废
+        String sessionCryptoKey = sessionCryptoBinder.bindNewSessionKey(channel);
         Map<Integer, Integer> currency = PlayerCurrencyHelper.parseCurrency(player.getCurrencyJson()); // 解析货币 JSON
         // 构建登录响应中的 PlayerInfo 子消息
         PlayerSessionProto.PlayerInfo playerInfo = PlayerSessionProto.PlayerInfo.newBuilder()
@@ -311,13 +634,22 @@ public class PlayerSessionService {
                 .setPosZ(z)
                 .build();
         long serverTimeSeconds = System.currentTimeMillis() / 1000L; // 秒级服务器时间
-        return PlayerSessionProto.PlayerLoginScRsp.newBuilder()
+        var loginBuilder = PlayerSessionProto.PlayerLoginScRsp.newBuilder()
                 .setRetcode(RET_OK) // 成功
                 .setPlayerInfo(playerInfo) // 玩家基础信息
                 .setServerTime(serverTimeSeconds) // 服务器时间
                 .setSceneInfo(sceneInfo) // 出生/上次离线位置
                 .setSessionToken(sessionToken) // 新颁发的会话令牌，客户端下次可免密登录
-                .build();
+                .setWireVersion(CmdIds.PROTOCOL_WIRE_VERSION)
+                .setSessionCryptoKey(sessionCryptoKey == null ? "" : sessionCryptoKey)
+                .setEnabledFeatures(enabledFeatures)
+                .setInputMethods(inputMethods)
+                .setRecommendedLayoutId(layoutId == null ? "" : layoutId);
+        ClientVersionGateService gate = clientVersionGateProvider.getIfAvailable();
+        if (gate != null && gate.current() != null && gate.current().forceUpgradeDeadline() > 0) {
+            loginBuilder.setForceUpgradeDeadline(gate.current().forceUpgradeDeadline());
+        }
+        return loginBuilder.build();
     }
 
     /**
@@ -337,6 +669,14 @@ public class PlayerSessionService {
                     .build();
         }
         sessionManager.updateActive(uid); // 刷新 GameSession.lastActiveMillis
+        GameSession session = sessionManager.getOrNull(uid);
+        if (session != null) {
+            long now = System.currentTimeMillis();
+            long client = req.getClientTime();
+            if (client > 1_000_000_000_000L) {
+                session.setRttMs((int) Math.max(0L, Math.min(5_000L, now - client)));
+            }
+        }
         return PlayerSessionProto.PlayerHeartBeatScRsp.newBuilder()
                 .setRetcode(RET_OK)
                 .setServerTime(System.currentTimeMillis() / 1000L) // 回传服务器时间供客户端对时
@@ -358,15 +698,7 @@ public class PlayerSessionService {
                     .setRetcode(RET_SESSION_INVALID)
                     .build();
         }
-        try {
-            Timestamp now = new Timestamp(System.currentTimeMillis());
-            repository.updatePlayerLogout(uid, now); // 记录玩家登出时间
-        } catch (Exception e) {
-            log.warn("updatePlayerLogout failed, uid={}", uid, e); // DB 失败仍继续清理会话
-        }
-        sessionManager.removeSession(uid); // 移除会话、令牌，注销 Tick
-        channel.attr(PlayerChannelAttributes.PLAYER_UID).set(null); // 解除 Channel 与 uid 的绑定
-        // 实际 TCP/KCP 断连一般由 Netty Handler 在写回响应后触发
+        connectionLifecycleService.cleanupOnLogout(uid, channel);
         return PlayerSessionProto.PlayerLogoutScRsp.newBuilder()
                 .setRetcode(RET_OK)
                 .build();
@@ -396,17 +728,7 @@ public class PlayerSessionService {
                 .setUid((int) session.getUid())
                 .setNickname(session.getNickname() == null ? "" : session.getNickname())
                 .setLevel(Math.max(0, session.getLevel()))
+                .setSessionState(GameFlowNettyService.toProtoState(session.getSessionState())) // 主界面=0，便于客户端判断流程
                 .build();
-    }
-
-    /**
-     * null-safe 字符串相等比较。
-     *
-     * @param a 字符串 a
-     * @param b 字符串 b
-     * @return 内容相同（含双方均为 null）返回 true
-     */
-    private static boolean safeEquals(String a, String b) {
-        return a == null ? b == null : a.equals(b);
     }
 }

@@ -1,0 +1,70 @@
+syntax = "proto3";
+
+package cn.itcast.demo.mylunarcore.proto;
+
+option java_package = "cn.itcast.demo.mylunarcore.protocol";
+option java_outer_classname = "VersionUpdateProto";
+
+/** 服务端主动推送版本/资源热更新信息 */
+message VersionUpdateScNotify {
+  string client_resource_base_url = 1;
+  string hotfix_version = 2;
+  uint64 patch_version = 3;
+  ResourcePackInfo game_resource_pack = 4;
+  repeated LanguagePackInfo audio_language_packs = 5;
+  VersionManifestInfo version_info = 6;
+  repeated string deleted_files = 7;
+  repeated ConfigFileEntry config_files = 8;
+  PatchToolInfo patch_tool = 9;
+  ResourcePackInfo guide_pack = 10; // 方案 E：端侧攻略包版本元数据
+}
+
+message ResourcePackInfo {
+  string version = 1;
+  string url = 2;
+  string hash = 3;
+  uint64 size = 4;
+}
+
+message LanguagePackInfo {
+  string locale = 1;
+  string version = 2;
+  string url = 3;
+  string hash = 4;
+  uint64 size = 5;
+}
+
+message VersionManifestInfo {
+  string version = 1;
+  string manifest_url = 2;
+  string manifest_hash = 3;
+  repeated ManifestFileEntry files = 4;
+}
+
+message ManifestFileEntry {
+  string path = 1;
+  string hash = 2;
+  uint64 size = 3;
+}
+
+message ConfigFileEntry {
+  string name = 1;
+  string url = 2;
+  string hash = 3;
+  uint64 size = 4;
+}
+
+message PatchToolInfo {
+  string algorithm = 1;
+  string patch_base_url = 2;
+  string verify_tool_url = 3;
+  string manifest_hash = 4;
+}
+
+message GetVersionInfoCsReq {
+}
+
+message GetVersionInfoScRsp {
+  int32 retcode = 1;
+  VersionUpdateScNotify version = 2;
+}

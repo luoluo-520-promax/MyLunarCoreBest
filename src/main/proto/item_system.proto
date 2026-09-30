@@ -150,3 +150,52 @@ message ItemChangeScNotify {
   repeated BagItem items = 2;
 }
 
+/** 过期道具灰烬转化通知：信用点入账，而非静默删除 */
+message ItemRecycleNotify {
+  uint32 item_id = 1;
+  uint32 recycled_count = 2;
+  uint32 credit_currency_id = 3;
+  uint32 credit_amount = 4;
+  string reason = 5; // expired | archive_job
+}
+
+/** 材料反查：掉落关卡与扫荡/挑战快捷入口 */
+message QueryItemSourceCsReq {
+  uint32 item_id = 1;
+}
+
+message ItemSourceStage {
+  uint32 stage_id = 1;
+  string stage_name = 2;
+  bool sweep_unlocked = 3;
+  bool challenge_unlocked = 4;
+  /** 当日双倍/加成活动关，客户端置顶高亮 */
+  bool is_bonus_today = 5;
+}
+
+message CraftPathStep {
+  uint32 from_item_id = 1;
+  uint32 from_count = 2;
+  uint32 to_item_id = 3;
+  uint32 to_count = 4;
+}
+
+message CraftPath {
+  uint32 item_id = 1;
+  repeated CraftPathStep steps = 2;
+  string craft_cmd = 3; // 前往合成台协议名
+  bool can_craft = 4;
+}
+
+message QueryItemSourceScRsp {
+  int32 retcode = 1;
+  uint32 item_id = 2;
+  repeated uint32 stage_ids = 3;
+  repeated ItemSourceStage stages = 4;
+  /** 快捷入口协议名，客户端据此组装 EnterStageCsReq / SweepStageCsReq */
+  string enter_cmd = 5; // EnterStageCsReq
+  string sweep_cmd = 6; // SweepStageCsReq
+  repeated CraftPath craft_paths = 7;
+  string craft_cmd = 8; // CraftItemCsReq
+}
+

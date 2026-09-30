@@ -17,7 +17,8 @@ public class AccountEntity {
      */
     private String id;       // 账号主键（字符串形式）
     private String username; // 登录名
-    private String password; // 密码（演示可能明文，生产应哈希）
+    /** 密码哈希（DelegatingPasswordEncoder 前缀，如 {bcrypt}...）；遗留明文仅迁移期兼容 */ 
+    private String password;
     private String email;    // 邮箱
     private String phone;    // 手机号
     private int status;      // 账号状态：正常/封禁等，具体枚举由业务定义

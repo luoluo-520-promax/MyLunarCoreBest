@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "schedules": [
+    {
+      "npcId": 1001,
+      "defaultBehavior": "IDLE",
+      "moveSpeed": 2.5,
+      "idleAnim": "idle_stand",
+      "periods": [
+        {
+          "period": "dawn",
+          "behavior": "PATROL",
+          "waypointGroup": "market_loop",
+          "animHint": "walk"
+        },
+        {
+          "period": "noon",
+          "behavior": "OPEN_SHOP",
+          "interactionSpot": "stall",
+          "animHint": "vend"
+        },
+        {
+          "period": "dusk",
+          "behavior": "PATROL",
+          "waypointGroup": "market_loop",
+          "animHint": "walk"
+        },
+        {
+          "period": "night",
+          "behavior": "DESPAWN_OR_SLEEP",
+          "homeSpot": "home",
+          "animHint": "sleep"
+        }
+      ],
+      "spots": {
+        "stall": { "x": 12.0, "y": 0.0, "z": 8.0 },
+        "home": { "x": 5.0, "y": 0.0, "z": 3.0 }
+      },
+      "waypointGroups": {
+        "market_loop": [
+          { "x": 12.0, "y": 0.0, "z": 8.0 },
+          { "x": 18.0, "y": 0.0, "z": 10.0 },
+          { "x": 15.0, "y": 0.0, "z": 14.0 },
+          { "x": 10.0, "y": 0.0, "z": 11.0 }
+        ]
+      }
+    },
+    {
+      "npcId": 1002,
+      "defaultBehavior": "IDLE",
+      "moveSpeed": 1.8,
+      "idleAnim": "idle_animal",
+      "periods": [
+        {
+          "period": "dawn",
+          "behavior": "PATROL",
+          "waypointGroup": "graze",
+          "animHint": "walk"
+        },
+        {
+          "period": "noon",
+          "behavior": "IDLE",
+          "animHint": "idle_animal"
+        },
+        {
+          "period": "dusk",
+          "behavior": "PATROL",
+          "waypointGroup": "graze",
+          "animHint": "walk"
+        },
+        {
+          "period": "night",
+          "behavior": "DESPAWN_OR_SLEEP",
+          "animHint": "despawn"
+        }
+      ],
+      "spots": {},
+      "waypointGroups": {
+        "graze": [
+          { "x": 30.0, "y": 0.0, "z": 20.0 },
+          { "x": 34.0, "y": 0.0, "z": 24.0 },
+          { "x": 28.0, "y": 0.0, "z": 26.0 }
+        ]
+      }
+    }
+  ]
+}

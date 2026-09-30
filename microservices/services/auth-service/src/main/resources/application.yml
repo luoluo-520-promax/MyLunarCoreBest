@@ -4,6 +4,8 @@ server:
 spring:
   application:
     name: auth-service
+  config:
+    import: optional:nacos:${spring.application.name}.${spring.cloud.nacos.config.file-extension:yaml}
   cloud:
     nacos:
       server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
@@ -22,15 +24,17 @@ management:
 mylunarcore:
   auth:
     jwt:
-      secret: "change-me-to-a-secure-32-byte-secret!"
+      # 生产必须用 AUTH_JWT_SECRET 覆盖；默认值仅限 local/dev
+      secret: ${AUTH_JWT_SECRET:change-me-to-a-secure-32-byte-secret!}
       issuer: "mylunarcore-auth-service"
       expire-minutes: 120
+      # 演示用户仅脚手架用途，不可当生产 IdP；prod profile 会拒绝弱口令
       users:
         player10001:
-          password: "123456"
+          password: ${AUTH_DEMO_PLAYER_PASSWORD:123456}
           uid: 10001
           role: "player"
         admin:
-          password: "admin123"
+          password: ${AUTH_DEMO_ADMIN_PASSWORD:admin123}
           uid: 1
           role: "admin"

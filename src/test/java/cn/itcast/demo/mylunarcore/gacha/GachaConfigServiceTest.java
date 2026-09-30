@@ -14,6 +14,12 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+/**
+ * GachaConfigService 卡池配置服务测试。
+ * <p>
+ * 针对相关生产代码的单元/切片测试类 {@code GachaConfigServiceTest}：
+ * 通过 fixture、mock 与断言覆盖关键成功路径、失败码与状态边界。
+ */
 @DisplayName("GachaConfigService 卡池配置服务测试")
 class GachaConfigServiceTest {
 
@@ -29,6 +35,16 @@ class GachaConfigServiceTest {
         log.info("卡池配置服务初始化: defaultPath=data/Banners.json");
     }
 
+    /**
+     * 验证点：reload 应从 Banners.json 加载卡池并按类型索引。
+     * <p>测试方法 {@code reloadShouldLoadBannersFromFile}：
+     * <ul>
+     *   <li>{@code assertTrue(ok);}</li>
+     *   <li>{@code assertFalse(normalBanners.isEmpty());}</li>
+     *   <li>{@code assertFalse(avatarUpBanners.isEmpty());}</li>
+     *   <li>{@code assertEquals(1001, normalBanners.get(0).getId());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("reload 应从 Banners.json 加载卡池并按类型索引")
     void reloadShouldLoadBannersFromFile() {
@@ -45,6 +61,13 @@ class GachaConfigServiceTest {
         assertEquals(1001, normalBanners.get(0).getId());
     }
 
+    /**
+     * 验证点：listByType 对未配置类型应返回空列表。
+     * <p>测试方法 {@code listByTypeMissingShouldReturnEmptyList}：
+     * <ul>
+     *   <li>{@code assertTrue(newbieBanners.isEmpty());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("listByType 对未配置类型应返回空列表")
     void listByTypeMissingShouldReturnEmptyList() {
@@ -57,6 +80,14 @@ class GachaConfigServiceTest {
         assertTrue(newbieBanners.isEmpty());
     }
 
+    /**
+     * 验证点：pickActiveBanner 应命中当前开放窗口内的 Banner。
+     * <p>测试方法 {@code pickActiveBannerShouldReturnOpenBanner}：
+     * <ul>
+     *   <li>{@code assertNotNull(active);}</li>
+     *   <li>{@code assertEquals(1001, active.getId());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("pickActiveBanner 应命中当前开放窗口内的 Banner")
     void pickActiveBannerShouldReturnOpenBanner() {
@@ -70,6 +101,13 @@ class GachaConfigServiceTest {
         assertEquals(1001, active.getId());
     }
 
+    /**
+     * 验证点：pickActiveBanner 在窗口外应返回 null。
+     * <p>测试方法 {@code pickActiveBannerOutsideWindowShouldReturnNull}：
+     * <ul>
+     *   <li>{@code assertNull(active);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("pickActiveBanner 在窗口外应返回 null")
     void pickActiveBannerOutsideWindowShouldReturnNull() {
@@ -84,6 +122,14 @@ class GachaConfigServiceTest {
         assertNull(active);
     }
 
+    /**
+     * 验证点：pickNormalBannerForFallback 应返回当前开放的常驻池。
+     * <p>测试方法 {@code pickNormalBannerForFallbackShouldReturnActiveNormalBanner}：
+     * <ul>
+     *   <li>{@code assertNotNull(fallback);}</li>
+     *   <li>{@code assertEquals(1001, fallback.getId());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("pickNormalBannerForFallback 应返回当前开放的常驻池")
     void pickNormalBannerForFallbackShouldReturnActiveNormalBanner() {
@@ -99,6 +145,14 @@ class GachaConfigServiceTest {
         assertEquals(1001, fallback.getId());
     }
 
+    /**
+     * 验证点：pickActiveBanner 同类型多条时应返回第一个开放中的 Banner。
+     * <p>测试方法 {@code pickActiveBannerShouldReturnFirstOpenBanner}：
+     * <ul>
+     *   <li>{@code assertNotNull(active);}</li>
+     *   <li>{@code assertEquals(2001, active.getId());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("pickActiveBanner 同类型多条时应返回第一个开放中的 Banner")
     void pickActiveBannerShouldReturnFirstOpenBanner() {

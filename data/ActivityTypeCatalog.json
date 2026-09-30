@@ -1,0 +1,90 @@
+[
+  {
+    "type": "signin",
+    "displayName": "签到",
+    "description": "每日/累计签到领奖，支持补签次数上限。",
+    "requiredFields": ["rewards", "costAndLimits.dailyLimit"],
+    "handlerHint": "SignInActivityHandler",
+    "exampleActivityId": 5000801
+  },
+  {
+    "type": "limited_challenge",
+    "displayName": "限时挑战",
+    "description": "限时关卡/Boss，按评分发档位奖励。",
+    "requiredFields": ["stages", "beginTime", "endTime"],
+    "handlerHint": "LimitedChallengeActivityHandler",
+    "exampleActivityId": 5000802
+  },
+  {
+    "type": "tower",
+    "displayName": "爬塔",
+    "description": "多层递进挑战，通关解锁下一层。",
+    "requiredFields": ["stages", "rewardMethod"],
+    "handlerHint": "TowerActivityHandler",
+    "exampleActivityId": 5000803
+  },
+  {
+    "type": "coop",
+    "displayName": "联机活动",
+    "description": "组队/匹配共斗，依赖 Party + Matchmaking。",
+    "requiredFields": ["stages", "unlockLevel"],
+    "handlerHint": "CoopActivityHandler",
+    "exampleActivityId": 5000804
+  },
+  {
+    "type": "seasonal",
+    "displayName": "赛季/运营活动",
+    "description": "代币收集 + 活动商店兑换，当前样例夏日庆典。",
+    "requiredFields": ["pointsTokens", "shopProducts", "stages"],
+    "handlerHint": "SeasonalActivityHandler",
+    "exampleActivityId": 5000701
+  },
+  {
+    "type": "exchange_shop",
+    "displayName": "兑换商店期",
+    "description": "纯兑换窗，无关卡；可与其他活动代币互通。",
+    "requiredFields": ["shopId", "shopProducts"],
+    "handlerHint": "ExchangeShopActivityHandler",
+    "exampleActivityId": 5000805
+  },
+  {
+    "type": "endless_abyss",
+    "displayName": "无尽深渊",
+    "description": "长线爬层挑战，层数越高奖励越好；可复用匹配/组队协议。",
+    "requiredFields": ["stages", "seasonKey", "rewardMethod"],
+    "handlerHint": "EndlessAbyssActivityHandler",
+    "exampleActivityId": 5000806
+  },
+  {
+    "type": "guild_expedition",
+    "displayName": "公会远征/联合讨伐",
+    "description": "公会维度长线讨伐，共享进度与排行；依赖公会 + 组队。",
+    "requiredFields": ["stages", "guildContribution", "beginTime", "endTime"],
+    "handlerHint": "GuildExpeditionActivityHandler",
+    "exampleActivityId": 5000807
+  },
+  {
+    "type": "wheel_lottery",
+    "displayName": "转盘抽奖",
+    "description": "权重转盘，配置驱动奖池；由 ActivityTemplateService.spinWheel 处理。",
+    "requiredFields": ["weights", "rewards", "costAndLimits"],
+    "handlerHint": "WheelLotteryActivityHandler",
+    "exampleActivityId": 5000808
+  },
+  {
+    "type": "puzzle_collect",
+    "displayName": "拼图收集",
+    "description": "碎片点亮，集齐发奖；由 ActivityTemplateService.collectPuzzlePiece 处理。",
+    "requiredFields": ["totalPieces", "rewards"],
+    "handlerHint": "PuzzleCollectActivityHandler",
+    "exampleActivityId": 5000809
+  },
+  {
+    "type": "points_exchange",
+    "displayName": "积分兑换",
+    "description": "活动积分兑换商品；可与 seasonal 代币互通。",
+    "requiredFields": ["shopProducts", "pointsTokens"],
+    "handlerHint": "PointsExchangeActivityHandler",
+    "exampleActivityId": 5000810
+  }
+]

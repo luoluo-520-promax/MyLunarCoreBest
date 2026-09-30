@@ -34,27 +34,9 @@ if (Test-Path $DataSource) {
 @'
 @echo off
 chcp 65001 >nul
-echo === MyLunarCore 全流程演示 ===
-java -jar "%~dp0MyLunarCore.jar" --flow=all
-echo.
-pause
-'@ | Set-Content -Path (Join-Path $DesktopDir "run-all-demo.bat") -Encoding UTF8
-
-@'
-@echo off
-chcp 65001 >nul
-echo === MyLunarCore 战斗流程演示 ===
-java -jar "%~dp0MyLunarCore.jar" --flow=battle
-echo.
-pause
-'@ | Set-Content -Path (Join-Path $DesktopDir "run-battle-demo.bat") -Encoding UTF8
-
-@'
-@echo off
-chcp 65001 >nul
 echo === MyLunarCore 启动完整服务器 ===
 echo 需要本地 MySQL (lunarcore 库)，按 Ctrl+C 停止
-java -jar "%~dp0MyLunarCore.jar" --flow=server
+java -jar "%~dp0MyLunarCore.jar"
 pause
 '@ | Set-Content -Path (Join-Path $DesktopDir "run-server.bat") -Encoding UTF8
 
@@ -62,32 +44,9 @@ pause
 MyLunarCore 桌面运行包
 ======================
 
-1. 全流程演示（无需数据库，推荐）
-   双击 run-all-demo.bat
-   或: java -jar MyLunarCore.jar --flow=all
-   模拟: 登录→场景→挑战→战斗→结算→抽卡
-
-2. 单模块演示
-   java -jar MyLunarCore.jar --flow=battle --stageId=2500
-   java -jar MyLunarCore.jar --flow=scene
-   java -jar MyLunarCore.jar --flow=challenge
-   java -jar MyLunarCore.jar --flow=gacha --bannerId=2001 --drawCount=10 --seed=1
-
-3. 启动完整游戏服务器（需 MySQL）
+启动完整游戏服务器（需 MySQL）
    双击 run-server.bat
-   或: java -jar MyLunarCore.jar --flow=server
-
-4. 查看帮助
-   java -jar MyLunarCore.jar --help
-
-常用参数:
-  --battleId=9001       战斗 ID
-  --playerId=77         玩家 ID
-  --challengeId=1500    挑战关卡 ID
-  --bannerId=2001       卡池 ID
-  --drawCount=10        抽卡次数
-  --stageId=2500        战斗关卡 ID
-  --seed=20260705       随机种子（可复现抽卡）
+   或: java -jar MyLunarCore.jar
 '@ | Set-Content -Path (Join-Path $DesktopDir "使用说明.txt") -Encoding UTF8
 
 Write-Host ">>> 完成！文件已输出到: $DesktopDir"

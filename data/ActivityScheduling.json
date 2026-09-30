@@ -502,5 +502,11 @@
     "beginTime": 1664308800,
     "endTime": 4294967295,
     "moduleId": 80005
+  },
+  {
+    "activityId": 5000701,
+    "beginTime": 1782835200,
+    "endTime": 1785513600,
+    "moduleId": 50007
   }
 ]

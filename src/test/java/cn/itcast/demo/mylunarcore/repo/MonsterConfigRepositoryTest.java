@@ -11,6 +11,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.mock;
 
+/**
+ * MonsterConfigRepository 怪物配置仓储测试。
+ * <p>
+ * 针对相关生产代码的单元/切片测试类 {@code MonsterConfigRepositoryTest}：
+ * 通过 fixture、mock 与断言覆盖关键成功路径、失败码与状态边界。
+ */
 @DisplayName("MonsterConfigRepository 怪物配置仓储测试")
 class MonsterConfigRepositoryTest {
 
@@ -26,6 +32,16 @@ class MonsterConfigRepositoryTest {
         log.info("仓储初始化: repository={}", repository.getClass().getSimpleName());
     }
 
+    /**
+     * 验证点：findById 应返回怪物配置行。
+     * <p>测试方法 {@code findByIdShouldReturnMonsterRow}：
+     * <ul>
+     *   <li>{@code assertEquals(101, row.getId());}</li>
+     *   <li>{@code assertEquals(5, row.getLevel());}</li>
+     *   <li>{@code assertEquals(300, row.getHp());}</li>
+     *   <li>{@code assertEquals("[1,2]", row.getBuffsJson());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("findById 应返回怪物配置行")
     void findByIdShouldReturnMonsterRow() {
@@ -46,6 +62,13 @@ class MonsterConfigRepositoryTest {
         assertEquals("[1,2]", row.getBuffsJson());
     }
 
+    /**
+     * 验证点：不存在或异常时应返回 null。
+     * <p>测试方法 {@code findByIdShouldReturnNullWhenMissing}：
+     * <ul>
+     *   <li>{@code assertNull(row);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("不存在或异常时应返回 null")
     void findByIdShouldReturnNullWhenMissing() {

@@ -1,195 +1,148 @@
-// 单个在线玩家的 Tick 目标：被动同步、周期持久化与场景 Tick 转发
-
-// 在线玩家快照：uid、Channel 与 Tick 状态
 package cn.itcast.demo.mylunarcore.common;
 
-// 全局配置（被动同步间隔等）
-
-// 本项目业务类
 import cn.itcast.demo.mylunarcore.config.LunarCoreProperties;
-
-// 场景运行时上下文
-
-// 本项目业务类
 import cn.itcast.demo.mylunarcore.scene.SceneContext;
-
-// 场景管理器（按玩家查找所属场景）
-
-// 本项目业务类
 import cn.itcast.demo.mylunarcore.scene.SceneManager;
-
-// 会话对象
-
-// 本项目业务类
 import cn.itcast.demo.mylunarcore.player.GameSession;
-
-// 会话管理器
-
-// 本项目业务类
 import cn.itcast.demo.mylunarcore.player.GameSessionManager;
-
-// 异步全量加载服务
-
-// 本项目业务类
 import cn.itcast.demo.mylunarcore.player.PlayerDataAsyncLoadService;
-
-// 周期持久化服务
-
-// 本项目业务类
 import cn.itcast.demo.mylunarcore.player.PlayerDataPeriodicPersistenceService;
-
-// 同步原因枚举
-
-// 本项目业务类
+import cn.itcast.demo.mylunarcore.player.StaminaService;
 import cn.itcast.demo.mylunarcore.player.SyncReason;
-
-// 日志门面
-
-// 本项目业务类
-import cn.itcast.demo.mylunarcore.common.AppLogger;
-
-// 日志分类
-
-// 本项目业务类
-import cn.itcast.demo.mylunarcore.common.LogCategory;
-
-// SLF4J
-
-// SLF4J 日志接口
 import lombok.Getter;
 import org.slf4j.Logger;
 
 /**
- * 每个连接对应的玩家 Tick：体力类增量逻辑依赖 delta；会话超时仍由心跳路径维护 lastActive。
+ * 在线玩家 Tick 单元：挂在全局 Tick 循环上，按 delta 驱动：
+ * <ul>
+ *   <li>{@link StaminaService#onTick} 体力自然恢复；</li>
+ *   <li>被动统一同步 {@link SyncReason#TIMER} 异步重载全量玩家数据；</li>
+ *   <li>周期性落库 {@link PlayerDataPeriodicPersistenceService#persistAsync}。</li>
+ * </ul>
+ * 会话超时仍由心跳路径维护 lastActive；本类在 session 已注销时直接跳过。
  */
-
 public final class OnlinePlayer implements Tickable {
 
-    private static final Logger log = AppLogger.logger(LogCategory.BUSINESS_SESSION, OnlinePlayer.class); // 本类日志
+    private static final Logger log = AppLogger.logger(LogCategory.BUSINESS_SESSION, OnlinePlayer.class);
 
-    /**
-     * -- GETTER --
-     *
-     * @return 玩家 uid
-     */ // 返回 uid
+    /** 玩家 UID（与 GameSession / Scene 索引一致）。 */
     @Getter
-    private final long uid; // 玩家 uid
+    private final long uid;
 
-    private final GameSessionManager sessionManager; // 查询会话是否存在
+    // 查当前连接会话；null 表示已下线
+    private final GameSessionManager sessionManager;
+    // 取玩家所在场景并转发 scene.onTick
+    private final SceneManager sceneManager;
+    // 被动同步：定时 reloadFullAsync
+    private final PlayerDataAsyncLoadService playerDataAsyncLoadService;
+    // 定时把脏数据刷到 DB
+    private final PlayerDataPeriodicPersistenceService periodicPersistenceService;
+    // sync.passiveIntervalMs / periodicPersistence* 配置
+    private final LunarCoreProperties lunarCoreProperties;
+    // 可为 null（旧构造）；非空时每 tick 推进体力
+    private final StaminaService staminaService;
 
-    private final SceneManager sceneManager; // 驱动所属场景 Tick
+    // 上次被动同步墙钟毫秒
+    private long lastPassiveSyncMillis;
+    // 上次周期落库墙钟毫秒
+    private long lastPersistMillis;
 
-    private final PlayerDataAsyncLoadService playerDataAsyncLoadService; // 定时被动全量同步
-
-    private final PlayerDataPeriodicPersistenceService periodicPersistenceService; // 定时快照写库
-
-    private final LunarCoreProperties lunarCoreProperties; // 读取被动同步间隔等
-
-    private long lastPassiveSyncMillis; // 上次触发 TIMER 同步的时间
-
-    private long lastPersistMillis; // 上次触发周期持久化的时间
-
-    /**
-     * @param uid                         玩家 uid
-     * @param sessionManager              会话管理器
-     * @param sceneManager                场景管理器
-     * @param playerDataAsyncLoadService  异步加载服务
-     * @param periodicPersistenceService    周期持久化服务
-     * @param lunarCoreProperties           全局配置
-     */
-
+    /** 兼容无体力服务的构造：staminaService 传 null。 */
     public OnlinePlayer(long uid,
                         GameSessionManager sessionManager,
                         SceneManager sceneManager,
                         PlayerDataAsyncLoadService playerDataAsyncLoadService,
                         PlayerDataPeriodicPersistenceService periodicPersistenceService,
                         LunarCoreProperties lunarCoreProperties) {
-        this.uid = uid; // 保存注入的 uid 引用
-        this.sessionManager = sessionManager; // 保存注入的 sessionManager 引用
-        this.sceneManager = sceneManager; // 保存注入的 sceneManager 引用
-        this.playerDataAsyncLoadService = playerDataAsyncLoadService; // 保存注入的 playerDataAsyncLoadService 引用
-        this.periodicPersistenceService = periodicPersistenceService; // 保存注入的 periodicPersistenceService 引用
-        this.lunarCoreProperties = lunarCoreProperties; // 保存注入的 lunarCoreProperties 引用
-        this.lastPassiveSyncMillis = System.currentTimeMillis(); // 初始化基准时间
-        this.lastPersistMillis = this.lastPassiveSyncMillis; // 字段赋值
-
+        this(uid, sessionManager, sceneManager, playerDataAsyncLoadService,
+                periodicPersistenceService, lunarCoreProperties, null);
     }
 
+    public OnlinePlayer(long uid,
+                        GameSessionManager sessionManager,
+                        SceneManager sceneManager,
+                        PlayerDataAsyncLoadService playerDataAsyncLoadService,
+                        PlayerDataPeriodicPersistenceService periodicPersistenceService,
+                        LunarCoreProperties lunarCoreProperties,
+                        StaminaService staminaService) {
+        this.uid = uid;
+        this.sessionManager = sessionManager;
+        this.sceneManager = sceneManager;
+        this.playerDataAsyncLoadService = playerDataAsyncLoadService;
+        this.periodicPersistenceService = periodicPersistenceService;
+        this.lunarCoreProperties = lunarCoreProperties;
+        this.staminaService = staminaService;
+        // 以构造时刻为基准，避免立刻触发第一次被动同步/落库
+        this.lastPassiveSyncMillis = System.currentTimeMillis();
+        this.lastPersistMillis = this.lastPassiveSyncMillis;
+    }
+
+    /**
+     * 全局 Tick 入口：无会话则返回；否则先 tick 玩家态，再把 delta 转给所在场景。
+     */
     @Override
     public void onTick(long nowMillis, long deltaMillis) {
-        GameSession session = sessionManager.getOrNull(uid); // 会话可能已被移除
-
-        if (session == null) { // 条件分支
-            return;
+        GameSession session = sessionManager.getOrNull(uid);
+        if (session == null) {
+            return; // 已断开，从 Tick 列表移除前可能仍短暂调用
         }
-
-        tickPlayerState(session, nowMillis, deltaMillis); // 玩家自身逻辑
-        SceneContext scene = sceneManager.getByPlayerUid(uid); // 查找所属场景
-
-        if (scene != null) { // 条件分支
-            scene.onTick(nowMillis, deltaMillis); // 转发场景 Tick
+        tickPlayerState(session, nowMillis, deltaMillis);
+        SceneContext scene = sceneManager.getByPlayerUid(uid);
+        if (scene != null) {
+            scene.onTick(nowMillis, deltaMillis); // AOI/遭遇等场景逻辑
         }
     }
 
     /**
-     * 玩家侧状态更新：日志 trace、被动同步、持久化节拍。
+     * 玩家侧：可选体力 tick → 被动同步 → 周期持久化。
      */
-
     private void tickPlayerState(GameSession session, long nowMillis, long deltaMillis) {
-
-        // 体力恢复、Buff 过期等应使用 deltaMillis；会话超时仍由心跳刷新 lastActiveMillis
-        if (log.isTraceEnabled()) { // 条件分支
-            log.trace("player tick uid={} deltaMs={}", uid, deltaMillis); // 极低噪声诊断
+        if (log.isTraceEnabled()) {
+            log.trace("player tick uid={} deltaMs={}", uid, deltaMillis);
         }
-
-        tickPassiveUnifiedSync(session, nowMillis); // 被动统一同步
-
-        tickPeriodicPersistence(nowMillis); // 周期快照持久化
-
+        if (staminaService != null) {
+            try {
+                // uid 在体力服务侧用 int playerId
+                staminaService.onTick((int) uid, nowMillis, deltaMillis);
+            } catch (Exception e) {
+                log.debug("stamina tick skipped uid={}: {}", uid, e.getMessage());
+            }
+        }
+        tickPassiveUnifiedSync(session, nowMillis);
+        tickPeriodicPersistence(nowMillis);
     }
 
     /**
-     * 按配置间隔触发异步全量加载并以 TIMER 原因推送。
+     * 按 sync.passiveIntervalMs 节流，到期则异步全量重载（TIMER 原因），用于纠偏缓存漂移。
+     * interval&lt;=0 表示关闭被动同步。
      */
-
     private void tickPassiveUnifiedSync(GameSession session, long nowMillis) {
-
-        long intervalMs = lunarCoreProperties.getSync().getPassiveIntervalMs(); // <=0 关闭
-
-        if (intervalMs <= 0) { // 条件分支
+        long interval = lunarCoreProperties.getSync().getPassiveIntervalMs();
+        if (interval <= 0) {
             return;
         }
-
-        if (nowMillis - lastPassiveSyncMillis < intervalMs) { // 条件分支
-            return; // 未到节拍
+        if (nowMillis - lastPassiveSyncMillis < interval) {
+            return; // 未到间隔
         }
-
-        lastPassiveSyncMillis = nowMillis; // 更新上次触发时间
-
-        playerDataAsyncLoadService.reloadFullAsync(uid, SyncReason.TIMER); // 异步 reload + 推送
-
+        lastPassiveSyncMillis = nowMillis;
+        playerDataAsyncLoadService.reloadFullAsync(uid, SyncReason.TIMER);
     }
 
     /**
-     * 按持久化服务返回的间隔触发快照写库。
+     * 开关 sync.periodicPersistenceEnabled 且间隔&gt;0 时，到期触发 persistAsync。
      */
-
     private void tickPeriodicPersistence(long nowMillis) {
-
-        long intervalMs = periodicPersistenceService.intervalMs(); // 关闭时为 0
-
-        if (intervalMs <= 0) { // 条件分支
+        if (!lunarCoreProperties.getSync().isPeriodicPersistenceEnabled()) {
             return;
         }
-
-        if (nowMillis - lastPersistMillis < intervalMs) { // 条件分支
+        long interval = lunarCoreProperties.getSync().getPeriodicPersistenceIntervalMs();
+        if (interval <= 0) {
             return;
         }
-
+        if (nowMillis - lastPersistMillis < interval) {
+            return;
+        }
         lastPersistMillis = nowMillis;
-
-        periodicPersistenceService.persistAsync(uid); // 异步写库
-
+        periodicPersistenceService.persistAsync(uid);
     }
 }
-

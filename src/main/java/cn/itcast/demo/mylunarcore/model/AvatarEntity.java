@@ -21,6 +21,7 @@ public class AvatarEntity {
     private int promotion;     // 突破/晋阶阶数
     private int rank;          // 星魂/命座等等级
     private boolean locked;    // 是否锁定（防误分解）
+    private int equippedSkinId; // 当前穿戴皮肤；0 表示默认皮肤
 
     private Timestamp createdAt;  // 获得时间
     private Timestamp updatedAt;  // 最后变更时间

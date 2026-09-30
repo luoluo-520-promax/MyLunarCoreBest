@@ -12,6 +12,12 @@ import java.sql.Timestamp;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
 
+/**
+ * BattleRepository 战斗主表仓储测试。
+ * <p>
+ * 针对相关生产代码的单元/切片测试类 {@code BattleRepositoryTest}：
+ * 通过 fixture、mock 与断言覆盖关键成功路径、失败码与状态边界。
+ */
 @DisplayName("BattleRepository 战斗主表仓储测试")
 class BattleRepositoryTest {
 
@@ -27,6 +33,13 @@ class BattleRepositoryTest {
         log.info("仓储初始化: repository={}", repository.getClass().getSimpleName());
     }
 
+    /**
+     * 验证点：insertBattle 应返回自增战斗 ID。
+     * <p>测试方法 {@code insertBattleShouldReturnGeneratedId}：
+     * <ul>
+     *   <li>{@code assertEquals(9001L, battleId);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("insertBattle 应返回自增战斗 ID")
     void insertBattleShouldReturnGeneratedId() {
@@ -39,6 +52,11 @@ class BattleRepositoryTest {
         assertEquals(9001L, battleId);
     }
 
+    /**
+     * 验证点：updateBattleResult 应更新结束状态与统计。
+     * <p>测试方法 {@code updateBattleResultShouldUpdateRow}：
+     * 按用例准备数据后断言返回值或协作对象调用是否符合预期。
+     */
     @Test
     @DisplayName("updateBattleResult 应更新结束状态与统计")
     void updateBattleResultShouldUpdateRow() {

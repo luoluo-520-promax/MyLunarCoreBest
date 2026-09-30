@@ -18,6 +18,12 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * GachaBannerHotReloadService 卡池热更服务测试。
+ * <p>
+ * 针对相关生产代码的单元/切片测试类 {@code GachaBannerHotReloadServiceTest}：
+ * 通过 fixture、mock 与断言覆盖关键成功路径、失败码与状态边界。
+ */
 @DisplayName("GachaBannerHotReloadService 卡池热更服务测试")
 class GachaBannerHotReloadServiceTest {
 
@@ -43,6 +49,18 @@ class GachaBannerHotReloadServiceTest {
         log.info("卡池热更服务已停止");
     }
 
+    /**
+     * 验证点：tick 检测到文件变更且 reload 成功时应向活跃会话推送通知。
+     * <p>测试方法 {@code tickShouldReloadAndPushToActiveSessions}：
+     * <ul>
+     *   <li>{@code when(configService.reload()).thenReturn(true);}</li>
+     *   <li>{@code when(activeChannel.isActive()).thenReturn(true);}</li>
+     *   <li>{@code when(session.getChannel()).thenReturn(activeChannel);}</li>
+     *   <li>{@code when(sessionManager.snapshotSessions()).thenReturn(List.of(session));}</li>
+     *   <li>{@code verify(configService).reload();}</li>
+     *   <li>{@code verify(gachaNettyService).pushBannerUpdateNotify(activeChannel);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("tick 检测到文件变更且 reload 成功时应向活跃会话推送通知")
     void tickShouldReloadAndPushToActiveSessions() throws Exception {
@@ -62,6 +80,18 @@ class GachaBannerHotReloadServiceTest {
         log.info("热更 tick 校验: reloadCalled=true, activeSessionCount=1, pushCalled=true");
     }
 
+    /**
+     * 验证点：tick 在 reload 失败时不应推送通知。
+     * <p>测试方法 {@code tickReloadFailureShouldNotPush}：
+     * <ul>
+     *   <li>{@code when(configService.reload()).thenReturn(false);}</li>
+     *   <li>{@code when(activeChannel.isActive()).thenReturn(true);}</li>
+     *   <li>{@code when(session.getChannel()).thenReturn(activeChannel);}</li>
+     *   <li>{@code when(sessionManager.snapshotSessions()).thenReturn(List.of(session));}</li>
+     *   <li>{@code verify(configService).reload();}</li>
+     *   <li>{@code verify(gachaNettyService, never()).pushBannerUpdateNotify(activeChannel);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("tick 在 reload 失败时不应推送通知")
     void tickReloadFailureShouldNotPush() throws Exception {

@@ -1,6 +1,7 @@
 package cn.itcast.demo.mylunarcore.player;
 
 import cn.itcast.demo.mylunarcore.common.PlayerTickRegistry;
+import cn.itcast.demo.mylunarcore.center.OnlinePresenceService;
 import cn.itcast.demo.mylunarcore.config.LunarCoreProperties;
 import io.netty.channel.Channel;
 import org.junit.jupiter.api.AfterEach;
@@ -21,6 +22,12 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * GameSessionManager 会话管理器测试。
+ * <p>
+ * 针对相关生产代码的单元/切片测试类 {@code GameSessionManagerTest}：
+ * 通过 fixture、mock 与断言覆盖关键成功路径、失败码与状态边界。
+ */
 @DisplayName("GameSessionManager 会话管理器测试")
 class GameSessionManagerTest {
 
@@ -34,7 +41,7 @@ class GameSessionManagerTest {
     void setUp() {
         tickRegistry = new PlayerTickRegistry();
         properties = PlayerTestFixtures.sessionProperties(3600L, 2);
-        manager = new GameSessionManager(properties, tickRegistry);
+        manager = new GameSessionManager(properties, tickRegistry, new OnlinePresenceService());
         log.info("会话管理器初始化: maxOnline={}, timeoutSeconds={}",
                 properties.getSession().getMaxOnlinePlayers(),
                 properties.getSession().getTimeoutSeconds());
@@ -42,9 +49,18 @@ class GameSessionManagerTest {
 
     @AfterEach
     void tearDown() {
-        manager.shutdown();
+        manager.shutdownGracefully();
     }
 
+    /**
+     * 验证点：createOrReplace 应注册新会话。
+     * <p>测试方法 {@code createOrReplaceShouldRegisterSession}：
+     * <ul>
+     *   <li>{@code assertNotNull(session);}</li>
+     *   <li>{@code assertEquals(PlayerTestFixtures.PLAYER_UID, session.getUid());}</li>
+     *   <li>{@code assertEquals(1, manager.getOnlinePlayerCount());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("createOrReplace 应注册新会话")
     void createOrReplaceShouldRegisterSession() {
@@ -58,6 +74,16 @@ class GameSessionManagerTest {
         assertEquals(1, manager.getOnlinePlayerCount());
     }
 
+    /**
+     * 验证点：同 uid 顶号应关闭旧 Channel。
+     * <p>测试方法 {@code createOrReplaceShouldCloseOldChannelOnReplace}：
+     * <ul>
+     *   <li>{@code when(oldChannel.isActive()).thenReturn(true);}</li>
+     *   <li>{@code verify(oldChannel).close();}</li>
+     *   <li>{@code assertEquals(1, manager.getOnlinePlayerCount());}</li>
+     *   <li>{@code assertEquals(newChannel, manager.getOrNull(PlayerTestFixtures.PLAYER_UID).getChannel());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("同 uid 顶号应关闭旧 Channel")
     void createOrReplaceShouldCloseOldChannelOnReplace() {
@@ -75,6 +101,16 @@ class GameSessionManagerTest {
         assertEquals(newChannel, manager.getOrNull(PlayerTestFixtures.PLAYER_UID).getChannel());
     }
 
+    /**
+     * 验证点：bindSessionToken 应颁发令牌并使旧令牌失效。
+     * <p>测试方法 {@code bindSessionTokenShouldRotateToken}：
+     * <ul>
+     *   <li>{@code assertEquals(64, token1.length());}</li>
+     *   <li>{@code assertEquals(64, token2.length());}</li>
+     *   <li>{@code assertNull(resolvedOld);}</li>
+     *   <li>{@code assertEquals(PlayerTestFixtures.PLAYER_UID, resolvedNew);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("bindSessionToken 应颁发令牌并使旧令牌失效")
     void bindSessionTokenShouldRotateToken() {
@@ -94,6 +130,14 @@ class GameSessionManagerTest {
         assertEquals(PlayerTestFixtures.PLAYER_UID, resolvedNew);
     }
 
+    /**
+     * 验证点：resolveToken 对空令牌应返回 null。
+     * <p>测试方法 {@code resolveTokenShouldRejectBlank}：
+     * <ul>
+     *   <li>{@code assertNull(nullToken);}</li>
+     *   <li>{@code assertNull(blankToken);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("resolveToken 对空令牌应返回 null")
     void resolveTokenShouldRejectBlank() {
@@ -105,6 +149,14 @@ class GameSessionManagerTest {
         assertNull(blankToken);
     }
 
+    /**
+     * 验证点：canAcceptNewOnlineSlot 应遵守最大在线人数。
+     * <p>测试方法 {@code canAcceptNewOnlineSlotShouldRespectMaxOnline}：
+     * <ul>
+     *   <li>{@code assertTrue(sameUid);}</li>
+     *   <li>{@code assertFalse(newUidWhenFull);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("canAcceptNewOnlineSlot 应遵守最大在线人数")
     void canAcceptNewOnlineSlotShouldRespectMaxOnline() {
@@ -122,6 +174,15 @@ class GameSessionManagerTest {
         assertFalse(newUidWhenFull);
     }
 
+    /**
+     * 验证点：removeSession 应清理会话与令牌。
+     * <p>测试方法 {@code removeSessionShouldClearSessionAndToken}：
+     * <ul>
+     *   <li>{@code assertEquals(0, manager.getOnlinePlayerCount());}</li>
+     *   <li>{@code assertTrue(found.isEmpty());}</li>
+     *   <li>{@code assertNull(resolved);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("removeSession 应清理会话与令牌")
     void removeSessionShouldClearSessionAndToken() {
@@ -140,6 +201,13 @@ class GameSessionManagerTest {
         assertNull(resolved);
     }
 
+    /**
+     * 验证点：updateActive 应刷新最后活跃时间。
+     * <p>测试方法 {@code updateActiveShouldRefreshTimestamp}：
+     * <ul>
+     *   <li>{@code assertTrue(lastActive > 1L);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("updateActive 应刷新最后活跃时间")
     void updateActiveShouldRefreshTimestamp() {

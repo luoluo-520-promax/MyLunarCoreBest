@@ -11,6 +11,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.mock;
 
+/**
+ * MazeSkillRepository 迷宫技能仓储测试。
+ * <p>
+ * 针对相关生产代码的单元/切片测试类 {@code MazeSkillRepositoryTest}：
+ * 通过 fixture、mock 与断言覆盖关键成功路径、失败码与状态边界。
+ */
 @DisplayName("MazeSkillRepository 迷宫技能仓储测试")
 class MazeSkillRepositoryTest {
 
@@ -26,6 +32,16 @@ class MazeSkillRepositoryTest {
         log.info("仓储初始化: repository={}", repository.getClass().getSimpleName());
     }
 
+    /**
+     * 验证点：findById 应返回技能静态定义。
+     * <p>测试方法 {@code findByIdShouldReturnMazeSkill}：
+     * <ul>
+     *   <li>{@code assertEquals(5001, skill.getId());}</li>
+     *   <li>{@code assertEquals("烈焰斩", skill.getName());}</li>
+     *   <li>{@code assertEquals(2, skill.getSkillType());}</li>
+     *   <li>{@code assertEquals(1, skill.getTriggerBattle());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("findById 应返回技能静态定义")
     void findByIdShouldReturnMazeSkill() {
@@ -45,6 +61,13 @@ class MazeSkillRepositoryTest {
         assertEquals(1, skill.getTriggerBattle());
     }
 
+    /**
+     * 验证点：不存在或异常时应返回 null。
+     * <p>测试方法 {@code findByIdShouldReturnNullWhenMissing}：
+     * <ul>
+     *   <li>{@code assertNull(skill);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("不存在或异常时应返回 null")
     void findByIdShouldReturnNullWhenMissing() {

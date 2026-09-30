@@ -1,130 +1,321 @@
-// 游戏主循环与在线玩家 Tick 所在包
 package cn.itcast.demo.mylunarcore.common;
 
-// 活动排期服务：按游戏 Tick 做每日重置等
-import cn.itcast.demo.mylunarcore.common.ActivityScheduleService;
-// 全局配置（含游戏循环开关与周期）
+import cn.itcast.demo.mylunarcore.battle.BattleManager;
+import cn.itcast.demo.mylunarcore.center.OnlinePresenceService;
+import cn.itcast.demo.mylunarcore.center.SceneRegistry;
 import cn.itcast.demo.mylunarcore.config.LunarCoreProperties;
-// Spring Bean 作用域常量（如 SINGLETON）
-import org.springframework.beans.factory.config.ConfigurableBeanFactory;
-// 声明 Bean 是单例还是原型等作用域
-import org.springframework.context.annotation.Scope;
-// Bean 创建完成后的初始化回调注解
+import cn.itcast.demo.mylunarcore.scene.ZoneContext;
+import cn.itcast.demo.mylunarcore.scene.ZoneManager;
+import cn.itcast.demo.mylunarcore.scene.ZoneTickService;
 import jakarta.annotation.PostConstruct;
-// Bean 销毁前的清理回调注解
-import jakarta.annotation.PreDestroy;
-// 项目统一日志门面
-import cn.itcast.demo.mylunarcore.common.AppLogger;
-// 日志分类（系统、业务等）
-import cn.itcast.demo.mylunarcore.common.LogCategory;
-// SLF4J 日志接口
 import org.slf4j.Logger;
-// 标记为 Spring 管理的组件
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.config.ConfigurableBeanFactory;
+import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 
-// JDK 定时器：按固定周期执行任务
-import java.util.Timer;
-// 定时器要执行的一次性任务抽象类
-import java.util.TimerTask;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * 游戏主循环：用 {@link Timer} 周期性调用 {@link #onTick()}，
- * 驱动在线玩家状态与全局活动等与时间相关的逻辑。
+ * 游戏时钟：拆分 GlobalTick / ZoneTick / BattleTick。
+ * <p>
+ * 生产默认启用独立线程池（Scene-IO / Battle-CPU），避免 Zone AOI 挤占战斗出手。
+ * Battle 积压超过 {@link BattleSceneThrottleService#BACKLOG_THRESHOLD_MS} 时下发 ThrottleScNotify。
  */
-@Component // 注册为 Spring Bean，可被其他类注入
-@Scope(ConfigurableBeanFactory.SCOPE_SINGLETON) // 全进程只有一个 GameServer 实例
+@Component
+@Scope(ConfigurableBeanFactory.SCOPE_SINGLETON)
 public class GameServer {
 
-    // 本类使用的日志记录器（分类为 SYSTEM）
     private static final Logger log = AppLogger.logger(LogCategory.SYSTEM, GameServer.class);
 
-    // 注入的配置：含 game-loop.enabled、periodMs 等
     private final LunarCoreProperties properties;
-    // 在线玩家注册表：提供 snapshot 供 Tick 遍历
     private final PlayerTickRegistry playerTickRegistry;
-    // 活动排期：在 Tick 中做日切等
     private final ActivityScheduleService activityScheduleService;
+    private final BattleManager battleManager;
+    private final ZoneTickService zoneTickService;
+    private final SceneRegistry sceneRegistry;
+    private final ZoneManager zoneManager;
+    private final OnlinePresenceService onlinePresenceService;
+    private final BusinessMetrics businessMetrics;
+    private final BattleSceneThrottleService throttleService;
+    private final ScheduledExecutorService sceneTickExecutor;
+    private final ScheduledExecutorService battleTickExecutor;
 
-    // 游戏循环用的 JDK Timer，stop 时置 null
-    private Timer gameLoopTimer;
-    // 上一帧 Tick 的时间戳（毫秒），用于计算 delta
-    private long lastTickMillis;
+    private ScheduledExecutorService gameLoopExecutor;
+    private volatile long lastGlobalTickMillis;
+    private volatile long lastZoneTickMillis;
+    private volatile long lastBattleTickMillis;
+    private volatile long lastHeartbeatMillis;
+    private final AtomicLong zonePeriodOverrideMs = new AtomicLong(0);
 
-    /**
-     * 构造器注入：Spring 自动传入三个依赖 Bean。
-     */
     public GameServer(LunarCoreProperties properties,
                       PlayerTickRegistry playerTickRegistry,
-                      ActivityScheduleService activityScheduleService) {
+                      ActivityScheduleService activityScheduleService,
+                      BattleManager battleManager,
+                      ZoneTickService zoneTickService,
+                      SceneRegistry sceneRegistry,
+                      ZoneManager zoneManager,
+                      OnlinePresenceService onlinePresenceService,
+                      BusinessMetrics businessMetrics) {
+        this(properties, playerTickRegistry, activityScheduleService, battleManager, zoneTickService,
+                sceneRegistry, zoneManager, onlinePresenceService, businessMetrics,
+                new BattleSceneThrottleService(null),
+                java.util.concurrent.Executors.newSingleThreadScheduledExecutor(r -> {
+                    Thread t = new Thread(r, "scene-tick-test");
+                    t.setDaemon(true);
+                    return t;
+                }),
+                java.util.concurrent.Executors.newSingleThreadScheduledExecutor(r -> {
+                    Thread t = new Thread(r, "battle-tick-test");
+                    t.setDaemon(true);
+                    return t;
+                }));
+        properties.getGameLoop().setIsolatedTickPools(false);
+    }
+
+    public GameServer(LunarCoreProperties properties,
+                      PlayerTickRegistry playerTickRegistry,
+                      ActivityScheduleService activityScheduleService,
+                      BattleManager battleManager,
+                      ZoneTickService zoneTickService,
+                      SceneRegistry sceneRegistry,
+                      ZoneManager zoneManager,
+                      OnlinePresenceService onlinePresenceService,
+                      BusinessMetrics businessMetrics,
+                      BattleSceneThrottleService throttleService,
+                      @Qualifier("sceneTickExecutor") ScheduledExecutorService sceneTickExecutor,
+                      @Qualifier("battleTickExecutor") ScheduledExecutorService battleTickExecutor) {
         this.properties = properties;
         this.playerTickRegistry = playerTickRegistry;
         this.activityScheduleService = activityScheduleService;
+        this.battleManager = battleManager;
+        this.zoneTickService = zoneTickService;
+        this.sceneRegistry = sceneRegistry;
+        this.zoneManager = zoneManager;
+        this.onlinePresenceService = onlinePresenceService;
+        this.businessMetrics = businessMetrics;
+        this.throttleService = throttleService;
+        this.sceneTickExecutor = sceneTickExecutor;
+        this.battleTickExecutor = battleTickExecutor;
     }
 
-    /**
-     * Bean 初始化后启动游戏循环定时器。
-     */
     @PostConstruct
     public void start() {
-        // 配置关闭游戏循环时直接返回，不创建 Timer
         if (!properties.getGameLoop().isEnabled()) {
             log.info("Game loop disabled (lunarcore.game-loop.enabled=false)");
             return;
         }
-        // 周期至少 50ms，防止配置过小导致 CPU 飙高
-        long period = Math.max(50L, properties.getGameLoop().getPeriodMs());
-        lastTickMillis = System.currentTimeMillis(); // 记录起始时间
-        // 守护线程 Timer：JVM 退出时不会阻塞进程结束
-        gameLoopTimer = new Timer("game-loop-timer", true);
-        // 按固定频率 schedule：首次延迟 period，之后每 period 执行一次
-        gameLoopTimer.scheduleAtFixedRate(new TimerTask() {
-            @Override
-            public void run() {
+        long globalPeriod = Math.max(50L, properties.getGameLoop().getPeriodMs());
+        long zonePeriod = properties.getGameLoop().getZonePeriodMs();
+        long battlePeriod = properties.getGameLoop().getBattlePeriodMs();
+        long now = System.currentTimeMillis();
+        lastGlobalTickMillis = now;
+        lastZoneTickMillis = now;
+        lastBattleTickMillis = now;
+        lastHeartbeatMillis = now;
+
+        boolean isolated = properties.getGameLoop().isIsolatedTickPools();
+        if (isolated) {
+            gameLoopExecutor = Executors.newSingleThreadScheduledExecutor(r -> {
+                Thread t = new Thread(r, "game-loop-global");
+                t.setDaemon(true);
+                return t;
+            });
+            gameLoopExecutor.scheduleWithFixedDelay(() -> {
                 try {
-                    onTick(); // 单帧逻辑
+                    long t0 = System.currentTimeMillis();
+                    long delta = t0 - lastGlobalTickMillis;
+                    lastGlobalTickMillis = t0;
+                    onGlobalTick(t0, delta);
                 } catch (Exception e) {
-                    // 单帧异常不终止整个循环，只打错误日志
+                    log.error("Global tick failed", e);
+                }
+            }, globalPeriod, globalPeriod, TimeUnit.MILLISECONDS);
+
+            long zp = zonePeriod > 0 ? zonePeriod : 100L;
+            sceneTickExecutor.scheduleWithFixedDelay(() -> {
+                try {
+                    long t0 = System.currentTimeMillis();
+                    int hz = throttleService.resolveSceneHz(t0);
+                    long effectivePeriod = Math.max(zp, 1000L / Math.max(1, hz));
+                    zonePeriodOverrideMs.set(effectivePeriod);
+                    if (t0 - lastZoneTickMillis >= effectivePeriod) {
+                        long delta = t0 - lastZoneTickMillis;
+                        lastZoneTickMillis = t0;
+                        onZoneTick(t0, delta);
+                    }
+                } catch (Exception e) {
+                    log.error("Zone tick failed", e);
+                }
+            }, zp, Math.max(20L, zp / 2), TimeUnit.MILLISECONDS);
+
+            long bp = battlePeriod > 0 ? battlePeriod : 200L;
+            battleTickExecutor.scheduleWithFixedDelay(() -> {
+                try {
+                    long enq = System.currentTimeMillis();
+                    throttleService.markBattleEnqueued(enq);
+                    long t0 = System.currentTimeMillis();
+                    throttleService.markBattleStarted(t0);
+                    if (t0 - lastBattleTickMillis >= bp) {
+                        lastBattleTickMillis = t0;
+                        onBattleTick(t0);
+                    }
+                } catch (Exception e) {
+                    log.error("Battle tick failed", e);
+                }
+            }, bp, bp, TimeUnit.MILLISECONDS);
+
+            log.info("GameServer isolated clocks: globalMs={}, zoneMs={}, battleMs={}",
+                    globalPeriod, zonePeriod, battlePeriod);
+        } else {
+            long tickPeriod = Math.min(globalPeriod,
+                    Math.min(zonePeriod > 0 ? zonePeriod : globalPeriod,
+                            battlePeriod > 0 ? battlePeriod : globalPeriod));
+            tickPeriod = Math.max(20L, tickPeriod);
+            gameLoopExecutor = Executors.newSingleThreadScheduledExecutor(r -> {
+                Thread t = new Thread(r, "game-loop");
+                t.setDaemon(true);
+                return t;
+            });
+            gameLoopExecutor.scheduleWithFixedDelay(() -> {
+                try {
+                    onSchedulerPulse();
+                } catch (Exception e) {
                     log.error("Game loop tick failed", e);
                 }
-            }
-        }, period, period);
-        log.info("GameServer game loop started: Timer periodMs={}", period);
-    }
-
-    /**
-     * 应用关闭时取消定时器，释放资源。
-     */
-    @PreDestroy
-    public void stop() {
-        if (gameLoopTimer != null) {
-            gameLoopTimer.cancel(); // 取消所有已调度任务
-            gameLoopTimer = null;
+            }, tickPeriod, tickPeriod, TimeUnit.MILLISECONDS);
+            log.info("GameServer clocks started (shared): globalMs={}, zoneMs={}, battleMs={}, pulseMs={}",
+                    globalPeriod, zonePeriod, battlePeriod, tickPeriod);
         }
     }
 
-    /**
-     * 每一帧游戏逻辑：先 Tick 所有在线玩家，再 Tick 活动排期。
-     * 包内可见，主要由 Timer 任务调用。
-     */
-    void onTick() {
-        long now = System.currentTimeMillis(); // 当前帧时间
-        long delta = now - lastTickMillis; // 与上一帧的时间差（毫秒）
-        lastTickMillis = now; // 更新上一帧时间
+    public void shutdownGracefully() {
+        if (gameLoopExecutor != null) {
+            gameLoopExecutor.shutdown();
+            try {
+                if (!gameLoopExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
+                    gameLoopExecutor.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                gameLoopExecutor.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
+            gameLoopExecutor = null;
+        }
+    }
 
-        // 遍历当前在线玩家快照（避免并发修改注册表）
+    void onSchedulerPulse() {
+        long now = System.currentTimeMillis();
+        long globalPeriod = Math.max(50L, properties.getGameLoop().getPeriodMs());
+        long zonePeriod = properties.getGameLoop().getZonePeriodMs();
+        long battlePeriod = properties.getGameLoop().getBattlePeriodMs();
+
+        if (now - lastGlobalTickMillis >= globalPeriod) {
+            long delta = now - lastGlobalTickMillis;
+            lastGlobalTickMillis = now;
+            onGlobalTick(now, delta);
+        }
+        if (zonePeriod <= 0) {
+            // 合并到 Global
+        } else if (now - lastZoneTickMillis >= zonePeriod) {
+            long delta = now - lastZoneTickMillis;
+            lastZoneTickMillis = now;
+            onZoneTick(now, delta);
+        }
+        if (battlePeriod <= 0) {
+            // 合并到 Global
+        } else if (now - lastBattleTickMillis >= battlePeriod) {
+            lastBattleTickMillis = now;
+            onBattleTick(now);
+        }
+    }
+
+    void onGlobalTick(long now, long delta) {
         for (OnlinePlayer player : playerTickRegistry.snapshotOnlinePlayers()) {
             try {
-                player.onTick(now, delta); // 每个玩家独立 Tick（移动、体力等）
+                player.onTick(now, delta);
             } catch (Exception e) {
-                // 单个玩家异常不影响其他玩家
                 log.warn("Player tick failed, uid={}, isolating error", player.getUid(), e);
             }
         }
 
         try {
-            activityScheduleService.onTick(now, delta); // 全局活动日切等
+            activityScheduleService.onTick(now, delta);
         } catch (Exception e) {
             log.warn("Activity schedule tick failed", e);
+        }
+
+        try {
+            renewLocalZoneLeases(now);
+            int evicted = sceneRegistry.evictExpired(now);
+            if (evicted > 0) {
+                log.info("SceneRegistry evicted {} expired zone lease(s)", evicted);
+            }
+        } catch (Exception e) {
+            log.warn("SceneRegistry heartbeat/evict failed", e);
+        }
+
+        if (!properties.getGameLoop().isIsolatedTickPools()) {
+            if (properties.getGameLoop().getZonePeriodMs() <= 0) {
+                onZoneTick(now, delta);
+            }
+            if (properties.getGameLoop().getBattlePeriodMs() <= 0) {
+                onBattleTick(now);
+            }
+        }
+    }
+
+    void onZoneTick(long now, long delta) {
+        try {
+            zoneTickService.onZoneTick(now, delta);
+        } catch (Exception e) {
+            log.warn("Zone tick failed", e);
+        }
+    }
+
+    void onBattleTick(long now) {
+        try {
+            long ttl = properties.getGameLoop().getBattleTtlSeconds();
+            if (ttl > 0) {
+                int evicted = battleManager.evictExpired(now / 1000L, ttl);
+                for (int i = 0; i < evicted; i++) {
+                    businessMetrics.recordBattleTimeout();
+                }
+            }
+            businessMetrics.setActiveBattles(battleManager.activeUnendedCount());
+            businessMetrics.setZoneStats(sceneRegistry.size(), sceneRegistry.totalPlayerHint());
+            int maxPlayers = Math.max(1, zoneManager.effectiveMaxPlayers() > 0
+                    ? zoneManager.effectiveMaxPlayers()
+                    : properties.getZone().getMaxPlayers());
+            int zones = Math.max(1, sceneRegistry.size());
+            double load = (double) sceneRegistry.totalPlayerHint() / (double) (zones * maxPlayers);
+            businessMetrics.setZoneLoadRatio(load);
+        } catch (Exception e) {
+            log.warn("Battle TTL eviction failed", e);
+        }
+    }
+
+    private void renewLocalZoneLeases(long now) {
+        long heartbeatMs = properties.getCenter().getHeartbeatMs();
+        if (heartbeatMs <= 0) {
+            heartbeatMs = 3_000L;
+        }
+        if (now - lastHeartbeatMillis < heartbeatMs) {
+            return;
+        }
+        lastHeartbeatMillis = now;
+        String nodeId = properties.getCenter().getLocalNodeId();
+        if (nodeId == null || nodeId.isBlank()) {
+            nodeId = "local";
+        }
+        for (ZoneContext zone : zoneManager.snapshotZones()) {
+            sceneRegistry.heartbeat(zone.getZoneId(), nodeId, zone.getPlayerUids().size());
+        }
+        if (log.isDebugEnabled()) {
+            log.debug("onlinePresence count={}", onlinePresenceService.onlineCount());
         }
     }
 }

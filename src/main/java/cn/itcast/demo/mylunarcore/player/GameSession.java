@@ -72,6 +72,46 @@ public class GameSession {
     @Setter
     private volatile String sessionToken;
 
+    /** 玩家当前所处玩法状态（大厅/场景/战斗等） */
+    @Setter
+    private volatile PlayerSessionState sessionState = PlayerSessionState.HALL;
+
+    /**
+     * 登录握手后的能力交集（ClientFeatureFlags 位掩码）。
+     * 用于隐藏客户端不支持的玩法入口（如公会战）。
+     */
+    @Setter
+    private volatile long enabledFeatures;
+
+    /** 登录握手上报的输入能力掩码（键鼠/触屏/手柄）。 */
+    @Setter
+    private volatile int inputMethods;
+
+    /** QA 隐身测试账号：可看未开启活动，操作不进正式排行榜。 */
+    @Setter
+    private volatile boolean qaTester;
+
+    /** 设备 ID，用于推荐 UI 布局。 */
+    @Setter
+    private volatile String deviceId;
+
+    /** 服务端推荐的 UI 皮肤 ID。 */
+    @Setter
+    private volatile String recommendedLayoutId;
+
+    /** 最近一次心跳估算的 RTT（毫秒）。 */
+    @Setter
+    private volatile int rttMs;
+
+    /** 滑动窗口丢包率（万分比）。 */
+    @Setter
+    private volatile int packetLossBp;
+
+    /** 匹配轻量状态：排队不锁会话。 */
+    @Setter
+    private volatile cn.itcast.demo.mylunarcore.matchmaking.MatchPhase matchPhase =
+            cn.itcast.demo.mylunarcore.matchmaking.MatchPhase.IDLE;
+
     // volatile 写，对其他线程立即可见
     /**
      * 会话挂载的玩家聚合数据引用；
@@ -95,6 +135,19 @@ public class GameSession {
      * 加载完成时比对版本，丢弃已被更新请求取代的过期结果。
      */
     private final AtomicLong dataLoadVersion = new AtomicLong(0);
+
+    /**
+     * 与 DB player.data_version 对齐的乐观锁版本（内存侧）。
+     */
+    private final AtomicLong dataVersion = new AtomicLong(0);
+
+    /**
+     * dirty 世代：每次内存提交递增；落盘成功且世代未变时清零脏标记。
+     */
+    private final AtomicLong dirtyGeneration = new AtomicLong(0);
+
+    /** 已成功落盘的 dirty 世代 */
+    private volatile long persistedGeneration;
 
     /**
      * 构造会话对象，绑定 uid 与网络通道。
@@ -144,5 +197,55 @@ public class GameSession {
      */
     public boolean isCurrentDataLoadVersion(long version) {
         return dataLoadVersion.get() == version; // 原子读当前版本并比较
+    }
+
+    /**
+     * 标记内存已修改，需要异步落盘。
+     *
+     * @return 当前 dirty 世代，供落盘成功后比对
+     */
+    public long markDirty() {
+        return dirtyGeneration.incrementAndGet();
+    }
+
+    public boolean isDirty() {
+        return dirtyGeneration.get() != persistedGeneration;
+    }
+
+    public long currentDirtyGeneration() {
+        return dirtyGeneration.get();
+    }
+
+    /**
+     * 落盘成功且期间无新的脏写时清除 dirty。
+     */
+    public void markPersisted(long dirtyGenerationAtSnapshot) {
+        if (dirtyGeneration.get() == dirtyGenerationAtSnapshot) {
+            persistedGeneration = dirtyGenerationAtSnapshot;
+        }
+    }
+
+    public void clearDirty() {
+        persistedGeneration = dirtyGeneration.get();
+    }
+
+    public long getDataVersion() {
+        return dataVersion.get();
+    }
+
+    public void bindDataVersion(long version) {
+        dataVersion.set(Math.max(0L, version));
+        if (playerData != null && playerData.getPlayer() != null) {
+            playerData.getPlayer().setDataVersion(dataVersion.get());
+        }
+    }
+
+    public void onPersistVersionAdvanced(long expectedVersion, long newVersion) {
+        if (dataVersion.get() == expectedVersion) {
+            dataVersion.set(newVersion);
+            if (playerData != null && playerData.getPlayer() != null) {
+                playerData.getPlayer().setDataVersion(newVersion);
+            }
+        }
     }
 }

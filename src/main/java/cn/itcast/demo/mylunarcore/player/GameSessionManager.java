@@ -6,6 +6,7 @@ import cn.itcast.demo.mylunarcore.config.LunarCoreProperties;
 
 // 在线玩家 Tick 注册表，会话移除时联动注销
 import cn.itcast.demo.mylunarcore.common.PlayerTickRegistry;
+import cn.itcast.demo.mylunarcore.center.OnlinePresenceService;
 
 // Spring Bean 作用域常量
 import org.springframework.beans.factory.config.ConfigurableBeanFactory;
@@ -30,9 +31,6 @@ import io.jpower.kcp.netty.Ukcp;
 
 // Netty 通道
 import io.netty.channel.Channel;
-
-// Bean 销毁钩子，关闭定时清理线程
-import jakarta.annotation.PreDestroy;
 
 // 密码学安全随机数，生成会话令牌
 import java.security.SecureRandom;
@@ -81,6 +79,9 @@ public class GameSessionManager {
     /** Tick 注册表，removeSession 时 unregister 对应 uid */
     private final PlayerTickRegistry playerTickRegistry;
 
+    /** 跨节点在线表（Redis 或内存） */
+    private final OnlinePresenceService onlinePresenceService;
+
     /** 主索引：uid -> 当前在线 GameSession */
     private final ConcurrentHashMap<Long, GameSession> sessionsByUid = new ConcurrentHashMap<>();
 
@@ -102,9 +103,12 @@ public class GameSessionManager {
      * @param properties         全局配置
      * @param playerTickRegistry Tick 注册表
      */
-    public GameSessionManager(LunarCoreProperties properties, PlayerTickRegistry playerTickRegistry) {
+    public GameSessionManager(LunarCoreProperties properties,
+                              PlayerTickRegistry playerTickRegistry,
+                              OnlinePresenceService onlinePresenceService) {
         this.properties = properties;
         this.playerTickRegistry = playerTickRegistry;
+        this.onlinePresenceService = onlinePresenceService;
         startCleaner(); // 启动后台超时扫描
     }
 
@@ -147,6 +151,7 @@ public class GameSessionManager {
                 oldChannel.close(); // 踢掉旧连接
             }
         }
+        onlinePresenceService.markOnline(uid);
         return sessionsByUid.get(uid); // 返回新建立的会话
     }
 
@@ -266,14 +271,22 @@ public class GameSessionManager {
         }
         sessionsByUid.remove(uid); // 删除 uid 主索引
         playerTickRegistry.unregister(uid); // 停止对该玩家的 Tick 调度
+        onlinePresenceService.markOffline(uid);
     }
 
     /**
-     * Spring 容器销毁 Bean 时：立即停止超时扫描线程池。
+     * 优雅关闭超时清理线程。
      */
-    @PreDestroy
-    public void shutdown() {
-        cleaner.shutdownNow(); // 中断定时任务
+    public void shutdownGracefully() {
+        cleaner.shutdown();
+        try {
+            if (!cleaner.awaitTermination(5, TimeUnit.SECONDS)) {
+                cleaner.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            cleaner.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
     }
 
     /**

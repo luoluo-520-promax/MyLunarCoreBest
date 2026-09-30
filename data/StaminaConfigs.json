@@ -1,0 +1,11 @@
+{
+  "maxStamina": 240,
+  "regenPerMinute": 1,
+  "regenIntervalMs": 60000,
+  "dungeonCost": 40,
+  "materialFarmCost": 20,
+  "dailyBuyLimit": 8,
+  "buyCostCurrencyId": 101,
+  "buyCostAmounts": [50, 100, 150, 200, 250, 300, 350, 400],
+  "buyGrantAmount": 60
+}

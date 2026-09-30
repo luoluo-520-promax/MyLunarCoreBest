@@ -1,0 +1,40 @@
+{
+  "chapters": [
+    {
+      "chapterId": 1,
+      "title": "序章·启程",
+      "mainlineQuestIds": [10001],
+      "unlockPlaneId": 10000,
+      "unlockFloorId": 1,
+      "requiredChallengeId": 0,
+      "requiredBattleStageId": 0,
+      "nextChapterId": 2,
+      "priority": 100
+    },
+    {
+      "chapterId": 2,
+      "title": "第一章·空间站",
+      "mainlineQuestIds": [10002],
+      "unlockPlaneId": 10001,
+      "unlockFloorId": 1,
+      "requiredChallengeId": 0,
+      "requiredBattleStageId": 1001,
+      "nextChapterId": 3,
+      "priority": 90
+    },
+    {
+      "chapterId": 3,
+      "title": "第二章·雅利洛",
+      "mainlineQuestIds": [],
+      "unlockPlaneId": 10002,
+      "unlockFloorId": 1,
+      "requiredChallengeId": 2001,
+      "requiredBattleStageId": 0,
+      "nextChapterId": 0,
+      "priority": 80
+    }
+  ],
+  "defaultUnlockedPlanes": [
+    {"planeId": 10000, "floorId": 1}
+  ]
+}

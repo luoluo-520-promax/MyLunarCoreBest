@@ -127,4 +127,12 @@ public class ItemPacketHandlers {
         ItemSystemProto.DiscardItemScRsp rsp = itemNettyService.handleDiscardItem(req, ctx.channel()); // 业务处理
         ctx.writeAndFlush(new GamePacket(CmdIds.DISCARD_ITEM_SC_RSP, rsp.toByteArray())); // 写回响应
     }
+
+    @PacketCmd(CmdIds.QUERY_ITEM_SOURCE_CS_REQ)
+    public void onQueryItemSource(ChannelHandlerContext ctx, GamePacket packet) throws Exception {
+        ItemSystemProto.QueryItemSourceCsReq req = ItemSystemProto.QueryItemSourceCsReq.parseFrom(
+                packet.getPayload() == null ? new byte[0] : packet.getPayload());
+        ItemSystemProto.QueryItemSourceScRsp rsp = itemNettyService.handleQueryItemSource(req, ctx.channel());
+        ctx.writeAndFlush(new GamePacket(CmdIds.QUERY_ITEM_SOURCE_SC_RSP, rsp.toByteArray()));
+    }
 }

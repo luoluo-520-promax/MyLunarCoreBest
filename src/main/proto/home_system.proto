@@ -1,0 +1,217 @@
+syntax = "proto3";
+
+package cn.itcast.demo.mylunarcore.proto;
+
+option java_package = "cn.itcast.demo.mylunarcore.protocol";
+option java_outer_classname = "HomeSystemProto";
+
+message HomeFurnitureItem {
+  uint32 furniture_id = 1;
+  float x = 2;
+  float y = 3;
+  float z = 4;
+  int32 rotate_y = 5;
+}
+
+message HomeInfo {
+  uint32 player_id = 1;
+  uint32 stamina = 2;
+  uint32 stamina_cap = 3;
+  map<uint32, uint32> facilities = 4;
+  map<uint32, uint32> pending_produce = 5;
+  repeated HomeFurnitureItem furniture = 6;
+}
+
+message GetHomeInfoCsReq {}
+
+message GetHomeInfoScRsp {
+  int32 retcode = 1;
+  HomeInfo home = 2;
+}
+
+message HomePlaceFacilityCsReq {
+  uint32 facility_id = 1;
+  uint32 level = 2;
+}
+
+message HomePlaceFacilityScRsp {
+  int32 retcode = 1;
+  HomeInfo home = 2;
+}
+
+message HomeClaimProduceCsReq {}
+
+message HomeClaimProduceScRsp {
+  int32 retcode = 1;
+  map<uint32, uint32> claimed = 2;
+  HomeInfo home = 3;
+}
+
+message HomeVisitCsReq {
+  uint32 host_player_id = 1;
+}
+
+message HomeVisitScRsp {
+  int32 retcode = 1;
+  HomeInfo host_home = 2;
+  /** 房主家园内可见 Avatar（位置/皮肤/待机动作，不同步战斗属性） */
+  repeated HomeAvatarPresence host_avatars = 3;
+}
+
+/** 家园内玩家表现同步（AOI 轻量：仅位置/动作/皮肤） */
+message HomeAvatarPresence {
+  uint64 player_uid = 1;
+  float x = 2;
+  float y = 3;
+  float z = 4;
+  float rot_y = 5;
+  uint32 skin_id = 6;
+  string idle_anim = 7; // stand / sit / lie / play_piano
+  uint32 interact_furniture_id = 8; // 当前互动家具，0=无
+  /** true=非好友虚影/剪影，降低开销同时保留「有人在家」 */
+  bool silhouette = 9;
+}
+
+message HomePlaceFurnitureCsReq {
+  uint32 furniture_id = 1;
+  float x = 2;
+  float y = 3;
+  float z = 4;
+  int32 rotate_y = 5;
+}
+
+message HomePlaceFurnitureScRsp {
+  int32 retcode = 1;
+  HomeInfo home = 2;
+}
+
+/** 坐椅子/躺床/弹钢琴等家具互动 */
+message HomeFurnitureInteractCsReq {
+  uint32 furniture_id = 1;
+  /** sit | lie | play_piano | photo | leave */
+  string action = 2;
+  float x = 3;
+  float y = 4;
+  float z = 5;
+  float rot_y = 6;
+}
+
+message HomeFurnitureInteractScRsp {
+  int32 retcode = 1; // 0成功 1未登录 2家具不存在 3动作非法
+  HomeAvatarPresence self_presence = 2;
+}
+
+message HomeUpdatePresenceCsReq {
+  float x = 1;
+  float y = 2;
+  float z = 3;
+  float rot_y = 4;
+  uint32 skin_id = 5;
+  string idle_anim = 6;
+}
+
+message HomeUpdatePresenceScRsp {
+  int32 retcode = 1;
+}
+
+/** 同家园访客/房主互相看见的表现推送 */
+message HomeAvatarSyncScNotify {
+  uint32 host_player_id = 1;
+  uint32 sync_type = 2; // 1=add/update 2=remove
+  repeated HomeAvatarPresence avatars = 3;
+}
+
+message HomeVisitorLogEntry {
+  uint32 visitor_id = 1;
+  string action = 2; // visit | like | message | assist
+  string message = 3;
+  int64 at_ms = 4;
+  bool unread = 5;
+  uint32 facility_id = 6;
+  string facility_name = 7;
+  string facility_icon = 8;
+}
+
+message GetHomeVisitorLogCsReq {
+  uint32 limit = 1;
+}
+
+message GetHomeVisitorLogScRsp {
+  int32 retcode = 1;
+  repeated HomeVisitorLogEntry entries = 2;
+}
+
+message HomeVisitorLogNotify {
+  repeated HomeVisitorLogEntry entries = 1;
+  uint32 unread_count = 2;
+}
+
+message HomeLeaveMessageCsReq {
+  uint32 host_player_id = 1;
+  string message = 2;
+  bool like = 3;
+}
+
+message HomeLeaveMessageScRsp {
+  int32 retcode = 1; // 0成功 1未登录 2参数非法
+}
+
+/** 拜访好友家园：帮助加速产出（减少剩余 CD 的 5%） */
+message HomeHarvestAssistCsReq {
+  uint32 host_player_id = 1;
+  uint32 facility_id = 2;
+}
+
+message HomeHarvestAssistScRsp {
+  int32 retcode = 1; // 0成功 1未登录 2参数非法 3非好友家园 4设施不存在 5今日已助产
+  uint32 host_player_id = 2;
+  uint32 facility_id = 3;
+  uint32 reduced_cd_ms = 4;
+  bool claimed_overflow = 5;
+}
+
+/** 家园产出溢出 / 好友代收提醒 */
+message HomeOverflowNotify {
+  uint32 host_player_id = 1;
+  uint32 facility_id = 2;
+  uint32 item_id = 3;
+  uint32 overflow_count = 4;
+  uint32 helper_player_id = 5;
+  string helper_name = 6;
+  string reason = 7; // overflow | assist_claim
+}
+
+/** 好友助产视觉正反馈：设施发光 + 飘字 */
+message HomeAssistEffectScNotify {
+  uint32 host_player_id = 1;
+  uint32 facility_id = 2;
+  string facility_name = 3;
+  string facility_icon = 4;
+  uint32 helper_player_id = 5;
+  string helper_name = 6;
+  string float_text = 7; // 「xxx 帮你加速了产量！」
+  string vfx_id = 8; // golden_flash
+  uint32 reduced_cd_ms = 9;
+}
+
+/** 点击好友家园虚影：点赞/赠礼问候 */
+message HomeShadowGreetingCsReq {
+  uint32 host_player_id = 1;
+  uint64 silhouette_uid = 2; // 目标虚影玩家，0=问候房主
+  string greeting_type = 3;  // like | gift
+}
+
+message HomeShadowGreetingScRsp {
+  int32 retcode = 1; // 0成功 1未登录 2非好友家园 3今日已问候 4目标无效
+  uint32 host_player_id = 2;
+  uint32 reserve_stamina_gifted = 3;
+}
+
+/** 对方上线时收到虚影问候回馈 */
+message FriendShadowGreetingNotify {
+  uint64 from_player_uid = 1;
+  string from_name = 2;
+  string greeting_type = 3;
+  uint32 reserve_stamina = 4;
+  string float_text = 5;
+}

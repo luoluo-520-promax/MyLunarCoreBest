@@ -1,0 +1,247 @@
+7|Normal|（含技术架构、业务能力、安全运维、微服务迁移、体验缺口补齐、体验闭环、体验沉浸、体验优化二期/三期、AI 助手增强、战斗手感与拥堵防雪崩、性能深化、运营热更七项短板、wire v4 稳定性与体验深化，以及「十大体验/生产缺口」补齐：客户端联调清单、钱包 TCC/对账、战斗取消窗与 QTE、公会语音/
+10|Normal|报告生成日期：2026年09月04日（在 CmdId 1130–1143 与环境生态假死感优化基础上，已同步落地 P11 体验/社交缺口补齐：qol_social_system.proto、QolSocialPacketHandlers、QolLoginHookService 登录聚合推送；配置 C
+13|Heading 1|目录
+14|Normal|下面先给出章节速览（方便不打开自动目录时也能快速跳读）。其后是 Word 自动目录域：请用 Microsoft Word 或 WPS 打开本文件后，右键点击自动目录区域，选择「更新域 / 更新整个目录」，即可显示带页码的完整目录。 第七章已新增 7.31「十大体验/生产缺口补齐（CmdId 1130
+32|Normal|十六、后续发展建议
+33|Normal|十七、给不同角色读者的阅读指引
+42|Heading 2|自动目录（打开后请更新域）
+45|Heading 1|一、写在前面：这份报告在讲什么
+47|Normal|阅读时不必先懂 Java 或游戏服务器。可以把整套系统想象成：一台「游戏主机」（主工程）负责真正开房间、打怪、抽卡、存档；旁边有一个「实验工作台」（microservices 目录）在试着把部分能力拆成独立小服务；还有一个「办公室小窗口」（管理后台 HTTP）给运营和运维改配置、热更新、看工单。
+48|List Bullet|报告依据：当前仓库 README、源码包结构、配置文件与已有评估文档快照；此前已写入体验闭环（CmdId 1020–1045）、体验沉浸（1046–1069）、体验优化二期（1070–1076）、三期（1078–1097）、AI 增强（1098–1104）、手感/拥堵（1105–1107）、运营热更
+51|Heading 1|二、一句话读懂本项目
+52|Normal|MyLunarCore 是一套基于 Spring Boot 4 + Netty/KCP + Protobuf + MySQL 的「崩坏：星穹铁道式」游戏私服 / 自研服务端：玩家在分区场景里探索，遇敌后进入回合制战斗；同时提供抽卡、商店支付、活动任务、组队匹配、排行榜聊天，以及管理后台热更与可选多节
+53|Heading 2|2.1 三个最容易误解的点
+55|Heading 1|三、产品定位与玩法形态
+56|Normal|从玩家感受来说，本项目更接近「星穹铁道」：地图按区域（Plane/Floor）开实例，在场景里移动、交互、触发遭遇，再进入独立的回合制战斗；同时有模拟宇宙（Rogue）、挑战关卡、养成、抽卡和经济循环。它不是「原神 / 鸣潮」那种在同一张大地图上高频实时动作战斗的无缝大世界。
+57|Heading 2|3.1 与两类主流玩法对照
+59|Heading 2|3.2 单机与多节点
+64|Heading 1|四、技术栈一览（用生活化比喻解释）
+68|Heading 1|五、总体架构：谁和谁怎么配合
+69|Heading 2|5.1 架构鸟瞰
+70|Normal|玩家客户端
+  │
+  ├─ TCP / KCP 端口 9000  ──►  游戏网络层（编解码、限流、分发）
+  │                              └─ 各业务服务（战斗/场景/抽卡/…）
+  │                              └─ 游戏主循
+71|Heading 2|5.2 架构原则（为什么这样分）
+76|Heading 2|5.3 启动入口
+78|Heading 1|六、关键目录与代码包结构
+79|Heading 2|6.1 仓库顶层目录
+80|Normal|MyLunarCore/
+├── README.md / QUICKSTART.md # 定位、快速启动与 FAQ
+├── pom.xml                   # 主工程 Maven 依赖
+├── docker-compose.dev.yml    # 本地 MySQL + Redi
+81|Heading 2|6.2 主工程业务包一览
+84|Heading 1|七、核心业务能力详解
+85|Normal|本章按「玩家会感知到的功能」展开。每个小节说明：能做什么、系统里谁在管、配置大概在哪里。类名留给需要对照代码的同事。
+86|Heading 2|7.1 登录与账号会话
+90|Heading 2|7.2 角色养成与皮肤
+91|Normal|覆盖创角、成长晋阶、天赋、属性计算，以及皮肤衣柜的拥有与装备。属性计算由 AttributeCalculator 等组件完成，皮肤配置来自 data/SkinConfigs.json。养成计划（DevelopmentPlanService）按目标角色+目标等级汇总材料总清单、缺口与体力缺口，并按掉落
+95|Heading 2|7.3 场景与世界
+96|Normal|玩家进入某个 Plane/Floor 对应的 Zone 实例后，可移动、与 NPC/道具交互，服务器按兴趣范围（AOI）同步周围实体。Zone 可配置人数上限与租约心跳。MoveCsReq 带 move_state（走/跑/跳/攀爬）；MovementPhysics 按坐标分区给出地板材质、触觉强度
+98|List Bullet|实体休眠 EntitySleepService；碰撞 SceneCollisionProxy + SceneCollisionMeshPushService（CmdId 1107）；MoveSpeedGuard.CORRECTED_COLLISION + SmoothPositionCorrecti
+99|List Bullet|NPC 日程作息：EntityBehaviorService + DailyRoutineBehavior（PATROL/IDLE/WORK/OPEN_SHOP/SLEEP/DESPAWN）；配置 data/NPCScheduleConfig.json；时段监听 WorldTimePeriodLis
+102|List Bullet|预加载协议：ScenePreloadCsReq/ScRsp、ScenePreloadReadyScNotify（CmdId 354–356）；服务端强制/方向预判推送 ScenePreloadPushScNotify（1028，reason=1/2/3）；切图完成 SceneLoadComplete
+103|List Bullet|移动物理反馈：MovementPhysics；SceneInteractPhysicsScNotify（CmdId 1053）下发地板材质、触觉、脚步声效与 landing 标记。
+104|Heading 2|7.4 回合制战斗
+105|Normal|场景中触发遭遇后进入战斗实例：开战、行动、结算、退出。支持遇敌配置与波次；多人共战通过 BattleContext.participantPlayerIds 等字段表达。BattleAutoService 按启发式真正出手：基准等待 1500ms，speed_multiplier 仅允许 1/2/3
+107|List Bullet|预输入缓冲：PlayerInputBufferService（队列≤3，取消层级闪避>终结技>战技>普攻）；断线回放：BattleSnapshotService 最近 10 条 BattleDeltaRecord → BattleReplayDeltaScNotify（CmdId 1105）。
+112|List Bullet|Auto/倍速/策略：BattleAutoService；auto_strategy 优先战技/普攻/攒能量；BattleManualUlt 抢占式手动大招（1051–1052，estimated_cast_time_ms / client_pre_fx_ms）；CmdId 1020–1024；掉线
+113|Heading 2|7.5 挑战关卡与模拟宇宙
+114|Normal|挑战玩法负责开局、结果上报、组奖励与历史；模拟宇宙（Rogue）则包含地图生成、移动、祝福/奇物、战斗上报与天赋等完整 Roguelike 流程。已通关关卡可走 SweepService 扫荡：以历史最低回合数解锁，跳过完整 BattleManager，按 1/2/3 倍体力消耗发放倍率掉落（单道具
+116|List Bullet|扫荡：SweepService / SweepNettyService；表 player_stage_clear_best；单次倍率扫荡 CmdId 1010–1013；一键连续扫荡 BatchSweep 1048–1050。胜利结算会 recordClear。SQL：db/migration_ex
+118|Heading 2|7.6 抽卡
+119|Normal|卡池信息可热更；一次抽卡尽量把「扣费 → 发奖 → pity 更新 → 流水记录」放在同一事务里，避免出现扣了钱没卡、或重复发奖。另有天井兑换与抽卡历史查询。 P11：GetGachaGuaranteeInfo（1244–1245）下发各卡池 pity5/pity4/硬保底剩余与 UP 软保底；Ex
+122|Heading 2|7.7 商店、钱包与内购（IAP）
+127|Heading 2|7.8 背包与道具
+128|Normal|提供背包快照以及使用、装备、强化、升阶、锁定、丢弃等操作。道具表可由 CSV 等素材导入维护。材料不足时可 QueryItemSource（CmdId 1037–1038）反查来源：返回 stage_ids，并指向 FightStartCsReq / SweepStageCsReq 以便直接开战或扫
+131|Heading 2|7.9 活动与任务
+132|Normal|活动侧有排期与配置查询，支持热更推送，也支持 Excel/JSON 导入。独有计算逻辑（如签到第 7 天多倍、限时挑战特殊积分）可抽到 data/scripts/activity/*.groovy，由 ActivityScriptEngine（Groovy JSR-223）编译执行；Activity
+133|List Bullet|活动：ActivityNettyService、ActivityScheduleService、ActivityConfigService、ActivityScriptEngine、ActivityVisibilityService、ActivityCircuitBreakerService；dat
+136|Heading 2|7.10 大厅社交：好友、邮件、聊天、排行榜
+137|Normal|大厅模块把社交能力收在一起：好友、邮件、世界/私聊，以及历史最高分类排行榜。排行榜与世界聊天在开启 Redis 后可跨进程共享；聊天里 @助手 可转给 AI 模块。好友在线由 FriendOnlineStatusService 经 Redis online_status_channel 跨节点广播，
+140|Heading 2|7.11 组队与匹配
+141|Normal|Party 是大世界组队雏形（同进程权威，人数上限约 4 人）。Match/Room 面向副本匹配：排队、开房、兼容性打分，并与挑战匹配协调器联动。大厅排队保持会话 HALL、MatchPhase.QUEUED，不锁界面；成局推送 MatchSuccessScNotify（CmdId 1043，10
+143|List Bullet|匹配：MatchNettyService、MatchmakingService、RoomService、MatchQueue、ChallengeMatchCoordinator；Ready Check 超时 10000ms（CmdId 1043–1045）；倒计时迷你交互 MatchCountdow
+144|Heading 2|7.12 反作弊
+147|Heading 2|7.13 版本推送与玩家设置
+148|Normal|版本/热更相关协议可向客户端推送更新信息；设置与客服工单允许玩家改偏好并提交问题单，后台可继续处理。键位支持云同步：SyncKeyBind（CmdId 1062–1063）按设备（pc/mobile/gamepad）写入KeyBindCloudService（Redis 优先，失败回退内存）；登录拉
+149|List Bullet|VersionNettyService；SettingsNettyService、SupportTicketApplicationService、KeyBindCloudService（SyncKeyBind 1062–1064）；跨端适配 UiAdaptConfigService（云端 ui_sc
+150|Heading 2|7.14 成就与新手引导
+151|Normal|成就系统记录玩家达成条件与领取状态，适合做长期留存目标。进度达标立即推送 AchievementUnlockPushScNotify（CmdId 1036），不必等客户端轮询领取列表。新手引导则按配置步骤引导新玩家完成关键操作，并落库检查点（checkpoint_step_id / committe
+154|Heading 2|7.15 公会与公会战
+155|Normal|公会已落地基础能力：创建、加入、退出、贡献，以及公会商店兑换。在此之上，公会战已形成可运行闭环：匹配 → 报分 → 积分榜 → 周期结算（GuildWarService；命令号约 984–989；表 guild_war_*）。另有公会 Raid 调度与贡献榜（GuildRaidScheduler、G
+158|Heading 2|7.16 对话树、过场与家园
+159|Normal|除了战斗与经济循环，项目还补齐了「讲故事」和「家园养成」能力，方便策划做剧情与轻养成。剧情侧在选项节点写入 SAVEPOINT（savepointNodeId），选项可带 impact_tags（如 +Affinity / UnlockRoute / -Morality）；GetStoryTreeS
+160|List Bullet|对话树：DialogueTriggerEngine、DialogueProgressService（选项节点 SAVEPOINT，markPlayed/advance 保留 savepointNodeId；选项 impact_tags；+Affinity 触发 SceneEnvironmentMod
+161|List Bullet|过场：CutsceneTriggerService；配置 data/CutsceneConfigs.json；ReplayCutsceneCsReq 校验已播后发 ticket（CmdId 1041–1042）。
+164|Heading 2|7.17 竞技场、日周刷新与存档运维
+170|Heading 2|7.18 战斗安全与快照（玩家不容易看见、但很重要）
+174|Heading 2|7.19 体力、每日任务、战令与主线章节
+175|Normal|这是近期补齐的「日常运营循环」能力，让玩家每天都有明确目标，也让数值消耗可控。体力（Stamina）会自然恢复，打本消耗，也可日购补充；满体时自然恢复的 30% 进入储备体力（上限 240，StaminaOverflowService），玩家用 ClaimReserveStamina（CmdId 1
+176|List Bullet|体力：StaminaService + StaminaOverflowService + StaminaOverflowHintService；配置 data/StaminaConfigs.json；满体 30% 进储备（上限 240）；ClaimReserveStamina 1025–1026；≥
+178|List Bullet|战令：BattlePassService / BattlePassPacketHandlers；配置 data/BattlePassConfigs.json；CmdId 约 990–995、1009。
+179|List Bullet|主线章节：StoryChapterService；配置 data/ChapterConfigs.json；进图前可做解锁校验；CmdId 约 1006–1008。
+180|List Bullet|版本活动：VersionActivityService；配置 data/VersionActivityConfigs.json。
+182|Heading 2|7.20 好友助战、公会科技与切图加载态
+186|List Bullet|切图加载：PlayerLoadingStateService（含 handshakeOnly 短 TTL）+ ScenePreloadService（CmdId 352–353 兼容完成；354–356 客户端预加载；1028 服务端强制/方向预判；遮罩分级 DISSOLVE / RIFT / FA
+188|Heading 2|7.21 缺口补齐玩法（世界 BOSS / 深渊 / 养成 / 社交）
+189|Normal|在日常循环之外，仓库还按 docs/feature-gap-fill.md 落地了一批「崩铁式」内容深度能力，方便策划做长线目标与社交互动。服务端逻辑与配置已具备；部分客户端表现层仍可继续联调。
+193|List Bullet|社交扩展：GiftService、GuildRedPacketService、VoiceSignalingService（赠礼/红包/语音信令）。
+195|List Bullet|活动模板：ActivityTemplateService + ActivityTypeCatalog（转盘/拼图/积分兑换）+ invokeScript（脚本扩展机制）；熔断时限时玩法返回 503，奖励可降级 basic_mail。
+197|Heading 2|7.22 玩家一天可能经历的主路径（故事化）
+198|Normal|为了让非技术同学建立整体画面，下面用一条「普通玩家的一天」串起系统：登录进服（校验协议 wire ≥ 2，交换 input_methods 与推荐布局，拉取云端键位）→看邮件/好友（跨节点在线推送与离线私聊邮箱），在聊天或场景打表情包 →消耗体力进场景走动（跳跃落地有材质/触觉/声效；接近传送门强制
+202|Heading 2|7.23 体验沉浸补齐（CmdId 1046–1069）
+203|Normal|在体验闭环（1020–1045）之后，本轮按「养成路径、战斗手感、箱庭微交互、社交表情、多端键位、剧情可读、家园互助、体力消耗引导」八条线补齐服务端能力。协议成对规则仍是CS_REQ = N、SC_RSP = N+1；号段占用 1046–1069。
+204|Normal|养成计划 CalculateUpgradeMaterials（1046–1047）按目标等级返回材料总清单、缺口、按掉落效率排序的推荐关卡与体力缺口；确认后 BatchSweep（1048–1050）按顺序连续扫荡并统一发奖。Auto 增加 auto_strategy，BattleManualUlt
+205|List Bullet|测试入口：ExperienceImmersionFlowsTest（领域 8 项）、ExperienceImmersionProtocolFlowsTest（协议门面与 PacketHandler 回包）、SweepServiceTest.batchSweep、CmdIdUniquenessTest
+206|Heading 2|7.24 体验优化二期（CmdId 1070–1076）
+207|Normal|在体验沉浸（1046–1069）之后，本轮针对箱庭割裂感、大招手感、跨节点社交、养成闭环深度、剧情即时反馈、家园烟火气、体力打扰感与匹配等待无聊感做了 8 项优化。协议仍遵循 CS_REQ = N、SC_RSP = N+1；新增推送号段占用 1070–1076。
+208|Normal|场景：预加载命中升级为 DISSOLVE/RIFT（带 duration_ms），方向预判提前 2~3 身位推送 1028。战斗：BattleManualUlt 抢占 1500ms 倒计时，ScRsp 带 estimated_cast_time_ms / client_pre_fx_ms。社交：Pa
+210|Heading 2|7.25 体验优化三期（CmdId 1078–1097）
+211|Normal|在体验优化二期（1070–1076）之后，本轮针对箱庭微交互手感、设备烫手掉帧、世界时段呼吸感、Auto 扫荡目标锁定、连战结算耗时、虚影社交深度、AI 站内指令化与多端触觉反馈做了 7 项补齐。协议仍遵循 CS_REQ = N、SC_RSP = N+1；新增号段占用 1078、1080–1097。
+212|Normal|移动：EnvInteractDetector 微交互池推送 1078；PlayerMoveService 轨迹向量校验 + 100ms 预测先行。性能：ReportDevicePerf（1080–1081）上报温度/FPS/电量；>45℃ 下发 ScenePerformanceAdjust（1082
+213|Heading 2|7.26 AI 助手增强（CmdId 1098–1104）
+214|Normal|针对「看不见屏幕、建议落不了地、口吻工业、推送死板、打字成本高、导航停在门口、攻略滞后」七个短板，服务端补齐协议与业务编排（客户端需对接对应 Cmd）。UploadScreenshot（1098–1099）上传 ≤50KB JPEG，VisualAssistService 结合 Plane/Floo
+215|List Bullet|测试：AssistEnhancementBusinessFlowTest（12 条业务流程）+ AssistEnhancementFeaturesTest；相关回归约 85 条（含 Assist/Battle/CmdId/HotReload/外链攻略）；沉浸增强六维见 7.28 与第十章 10.7，
+216|Heading 2|7.27 战斗手感与拥堵防雪崩（CmdId 1105–1106）
+217|Normal|本轮补齐三类「二游高水准」缺口。（1）战斗手感：服务端权威 Hit-stop 数组同源下发；预输入缓冲与取消层级；断线增量回放 1105。（2）拥堵确定性：Scene/Battle 时钟隔离；积压节流 1106；钱包 WAL；匹配对象池+批次；KCP 按 RTT<50 / >200 切换 fasta
+218|List Bullet|实现入口：HitStopComposer、PlayerInputBufferService、BattleSnapshotService、TickSchedulerConfiguration、BattleSceneThrottleService、WalletWalService、MatchObject
+219|Heading 2|7.27.1 战斗卡顿 / 场景人数过多 / 建模穿模（CmdId 1107）
+221|List Bullet|实现入口：BattleInstancePool、CombatAttributeSheet、BuffModifierCatalog、BattleAssistDecisionCache、BattleTurnPredictor、BattleAuditService、BattleSnapshotServic
+223|Heading 2|7.28 AI 沉浸增强六维（协议字段扩展）
+224|Normal|在 7.26 截图 VLM / 一键 Auto / 人设 TTS 之上，进一步补齐「看得懂动态机关、打得准下一动、记得住玩家情绪、答得快且可预期、渲染得像游戏内 UI、养谁算得清」六条链路。（1）箱庭空间智能：VisualFrameTemporalAnalyzer 对 2 秒窗口 JPEG 做帧差，
+226|Heading 2|7.30 稳定性与体验深化（wire v4 / CmdId 1109–1125）
+227|Normal|在 7.27–7.29 手感、拥堵、性能与运营热更短板补齐之后，本轮针对「高并发多节点稳定性、战斗高延迟手感、活动生命周期、社交深度、协议/资源发布风险、生产可观测止血、AI 主动陪伴、CI 质量」八个方向落地服务端能力。协议线升至 PROTOCOL_WIRE_VERSION = 4；新增号段 11
+228|Normal|（1）跨节点组队与私聊：MigrateState 状态机 INIT→SERIALIZING→TRANSFERRING→CONFIRMED/ROLLBACK；PartyMigrateSagaService 任一节点失败补偿回滚；PartyFollowMigrationService 票据可 Redis
+230|List Bullet|测试入口：WireV4EnhancementBusinessFlowsTest（10 组业务流程全覆盖）、StabilityEnhancementFlowTest；回归 ExperienceOptV2FlowsTest、CmdIdUniquenessTest、WireVersionGuardTest
+232|Heading 2|7.31 十大体验/生产缺口补齐（CmdId 1130–1142）
+233|Normal|在 7.30 wire v4（CmdId 1109–1125）之后，本轮按产品报告中的十大短板一次性补齐服务端能力，新增号段 1130–1142（推送与确认为主）。（1）客户端联调：docs/client-integration-priority.md 按 P0/P1/P2 分级；Presentat
+237|Heading 2|7.32 十大生产/体验优化落地（热点缓存·迁移熔断·Lockstep·SLO·LocalRL·OTel）
+238|Normal|在 7.31「十大体验/生产缺口」（CmdId 1130–1142）之上，本轮针对开服/活动高峰与跨节点容错再落地十项生产优化。（1）热点写路径：货币读走 HotWalletCache（Caffeine+Redis）写后双写+延迟双删；ReadOnlyRoutingAspect 强制 @Transa
+241|Heading 2|7.33 NPC/生物日程作息与生态循环（CmdId 1143）
+243|List Bullet|实现入口：EntityBehaviorService、DailyRoutineBehavior、NpcScheduleConfigRepository、WorldTimePeriodListener、WorldTimeService.forcePeriod、ZoneContext.ZoneNpc（b
+244|Heading 2|7.34 P11 体验/社交缺口补齐（CmdId 1200–1247）
+245|Normal|在 7.31–7.33（CmdId 1130–1143）之后，本轮按「日常收菜、箱庭探索、社交表达、社区健康、回流召回、精彩时刻传播、挑战次数提醒、自制表情、月卡补签、找人找公会、荣誉展示、组队效率、活动临期提醒、抽卡透明度」十四条产品缺口，一次性补齐服务端框架。协议文件 qol_social_sy
+246|Normal|（1）一键领取 ClaimAllDailyRewards（1200–1201）：ClaimAllDailyRewardsService 按 ClaimAllDailyRewardsConfig.json 开关聚合每日任务/战令免费·付费轨/邮件（可排除高价值）/成就/签到，失败项跳过并返回模块摘要。
+247|List Bullet|实现入口：qol/ClaimAllDailyRewardsService、DailyReminderService、QolLoginHookService、QolSocialNettyService；exploration/ExplorationService；scene/SceneInteract
+248|List Bullet|测试入口：QolSocialGapFillFlowsTest（协议门禁 + 14 项业务流 + 登录钩子 + 跨模块 E2E）；ClaimAllDailyRewardsServiceTest；CmdIdUniquenessTest / CmdIdProtoCompletenessTest（已纳入 Q
+249|List Bullet|客户端联调要点：对接 1200–1247；登录后消费 ReturnActivity / DailyChallengeReminder / ActivityEndingSoon / MonthlyCard 等 Notify；一键领奖展示各模块摘要；探索进度条消费 ExplorationUpdate；好
+250|Heading 1|八、网络与通信协议
+251|Heading 2|8.1 端口与传输方式
+254|Heading 2|8.2 报文长什么样（通俗版）
+255|Normal|客户端与服务器约定了一种叫「Lunar 帧」的包装方式：前后有魔术数字防错乱，中间写明命令号、头长度、数据长度，真正的业务内容用 Protobuf 编码。可以把它想成：信封（帧头尾）+ 收件类型（命令号）+ 信纸内容（Protobuf）。
+257|Heading 2|8.3 协议如何分系统
+258|Normal|src/main/proto 下按系统拆分多个 .proto 文件（会话、大厅、战斗、场景、道具、抽卡、Rogue、挑战、活动、任务、匹配、AI、经济、角色、皮肤、设置、版本等）。命令号集中在 CmdIds，修改必须与客户端同步。包到达后由分发器按注解注册到对应 Handler，避免巨大的 swit
+260|Heading 2|8.4 协议版本兼容（非常重要）
+261|Normal|为避免新旧客户端「各说各话」，工程引入了协议线版本概念。当前 PROTOCOL_WIRE_VERSION = 4（迁移进度/战斗修正/活动流程/资源差量等 CmdId 1109–1125）；ProtocolCompatService.isCompatible 仍接受 wire ≥ 2，拒绝过旧的 v
+262|Heading 2|8.5 连接保护
+270|Heading 2|8.6 给非程序员的一句话总结
+272|Heading 1|九、数据存储与配置热更
+273|Heading 2|9.1 MySQL：玩家世界的「保险柜」
+274|Normal|账号、角色、背包、钱包等需要长期保存的数据放在 MySQL。开发环境常见库名 lunarcore，并可自动执行初始化 SQL；生产环境通过环境变量注入连接信息，且不再自动乱执行 init SQL。仓库内提供合并结构参考 lunarcore_merged.sql，以及 db/migration 增量脚
+275|Heading 2|9.2 data/ 目录：策划与运营的「可热更说明书」
+276|Normal|很多玩法数值不以硬编码写死在 Java 里，而是放在 data/ 下的 JSON、CSV、Excel。这样改活动、改卡池、改商店，往往不必重新发整包程序，只要走热更/导入流程。本轮进一步把「活动独有计算」也配置化：data/scripts/activity/*.groovy 可随 /reload 生
+278|Heading 2|9.3 Redis：多机共用的「白板」（可选）
+280|Heading 2|9.4 热更新怎么工作（通俗）
+281|Normal|可以把热更想成「换一本新说明书，但不要把正在营业的店关掉」。协调器分阶段加载新配置；若中途失败，回滚到旧的内存指针；成功则广播通知并留下审计。控制台 stdin 输入 /reload 之类的能力在生产默认关闭，避免误操作。更进一步，配置发布可写入 config_release 指纹表（ConfigR
+282|List Bullet|核心类：HotReloadCoordinator、HotfixDataService、ConfigImportService、ConfigPublishAuditService、ConfigReleaseService；AI 外链：ExternalGuideCatalogRepository；人设：
+285|Heading 1|十、AI 助手与教练系统
+286|Normal|AI 模块的定位是「游戏内向导」，不是替代游戏逻辑的裁判。默认启用规则教练（按配置提示），本地大模型与远程 sidecar 默认关闭。处理链路大致是：安全分类 → 意图执行（导航/UI 深链）→ 本地规则/FAQ/缓存快路径 → 拼装玩家上下文与多轮历史 → 可选远程/本地 LLM → 人设包装与可
+287|Heading 2|10.1 能帮玩家做什么
+288|List Bullet|任务与探索引导、环境旁白类提示
+294|List Bullet|主流平台外链/视频攻略（B站、抖音、官方网站）：玩家问「攻略/打法/教程/视频/官网」时，服务端从 data/ExternalGuideCatalog.json 先匹配运营精选条目（curated），不足则按三平台搜索模板生成深链；回答正文附链接摘要，协议 AskAiAssistScRsp / Ai
+302|List Bullet|长期记忆与情感陪伴：AssistLongTermMemoryService 记录连败/抽卡歪池等 salience 事件；promptBlock 注入多轮上下文；ProactiveCoach 对「连败愤怒」等标签启用治愈系 persona。
+309|Heading 2|10.2 故障隔离与高可用
+316|Heading 2|10.3 内容、安全与合规边界
+317|Normal|入站安全在关键词/正则（AssistSafetyRules）之外增加轻量语义意图分类；出站仍做敏感句清洗。送入 LLM 前对 UID/手机号/邮箱等做 PII 脱敏；审计用 uidHash。配额按教练/LLM 分桶，语音输入可减免 daily；支持 VIP 日预算与同问短时限流。内容素材来自 Gui
+321|Heading 2|10.4 可观测性与环境隔离
+325|Heading 2|10.5 主流平台外链/视频攻略业务流程
+326|Normal|这是「建议面」能力：助手不仅给文字攻略，还能把 B站、抖音、官方网站上的视频或页面交给玩家。设计原则是「白名单深链 + 站内打开」——服务端只返回可打开的 URL，内容仍在原平台播放/阅读，客户端用游戏内 WebView/内嵌播放器打开，不跳系统浏览器。
+330|Heading 2|10.6 AI 助手增强七项业务流程
+332|List Bullet|实现入口：assist_system.proto、CmdIds 1098–1104、AssistPacketHandlers、BattlePacketHandlers、AssistNettyService、VisualAssistService、AssistRagIngestController；配
+333|Heading 2|10.7 AI 沉浸增强六维业务流程
+336|Heading 2|7.29 二游运营热更七项短板补齐（脚本/生效窗/资源锁/热补丁/Freeze/QA/负向发放）
+337|Normal|本轮针对报告中「活动机制硬编码、缺未来版本沙盒、客户端资源与服耦合、紧急屏蔽粒度粗、版本更新断线落盘风险、QA 灰度不彻底、刷产物回溯弱」七项短板，在单体工程落地可运营闭环（能力摘要如下）。
+338|List Bullet|（1）活动脚本热更：策划 Excel + 几行 Groovy 放入 data/scripts/activity/，HotReloadCoordinator.reloadAll 重编译；示例 sign_in_bonus / challenge_score。
+343|List Bullet|（6）QA 可见性掩码：Session.isQaTester；未开启活动对普通玩家隐藏/未开始，QA 返回完整配置并可交互预演；excludeFromLeaderboard 保证操作不污染正式榜。
+345|List Bullet|实现入口：ActivityScriptEngine、ConfigActiveWindow、ServerClockService、ClientResourceManifestService.checkResourceLock、ConfigOverrideHotfixService、ActivityCi
+347|Heading 1|十一、管理后台与运维能力
+348|Normal|管理后台走 HTTP，与玩家游戏口隔离。登录使用 Session，并有 CSRF 与 RBAC 权限控制。常见能力包括：热更触发、配置导入、中心路由计划查询、客服工单处理、登录失败锁定等。CommercialOpsController 聚合运营热更增强：Override 热补丁、活动熔断、Time 
+351|Heading 1|十二、可观测性、埋点与生产加固
+353|Heading 2|12.1 监控与告警：给系统装仪表盘
+354|Normal|主工程通过 BusinessMetrics 暴露业务指标到 /actuator/prometheus。可观察登录失败、抽卡异常、战斗超时、匹配成功率，以及 AI 助手请求终态、延迟与缓存命中等；wire v4 起补充 IAP 验单成功/失败（lunarcore.iap.verify）、钱包负余额（l
+356|List Bullet|建议初值（需压测校准）：登录失败 warning >1%/5m、critical >5%/5m；抽卡异常 >2%/5m。
+360|Heading 2|12.2 数据一致性与防重放：让「钱和奖」可追溯
+361|Normal|抽卡等关键写路径会写入本地事务日志（表 local_tx_log + LocalTxLogService），方便排查「扣了没有发」类问题。另有防重放表 biz_replay_guard，用于 IAP 渠道交易号、抽卡 nonce 等，降低重复提交刷奖风险。数据归档任务 DataArchiveJob 
+362|Heading 2|12.3 运营埋点与分析仓
+363|Normal|AnalyticsEventPublisher 输出结构化 analytics {...} 日志，便于采集。除登录/抽卡/战斗/内购外，已补充 ai_ask（问答来源、场景、缓存命中、策略版本）与 ai_feedback（有用/无用、原因码）事件，供 AI 质量看板与策略灰度评估。可选启用 Clic
+364|Heading 2|12.4 优雅停机在做什么（故事版）
+365|Normal|想象商场要打烊：先向在场顾客广播预计打烊时间（ServerMaintenancePush / CmdId 1108）→停止接待新战斗（ServerFreezeService.acceptNewBattles=false）→强制同步落盘进行中战斗快照与钱包 WAL、清 session_dirty →再
+366|Heading 1|十三、安全机制与上线注意事项
+369|Heading 2|13.1 上线前必做清单（建议打印核对）
+377|List Bullet|确认客户端协议线版本与 CmdId 已对齐 PROTOCOL_WIRE_VERSION=3（兼容守卫仍为 wire ≥ 2；v3 字段为 input_methods / recommended_layout_id；沉浸 1046–1069、二期 1070–1076 与三期 1078–1097 需与客
+379|Heading 1|十四、微服务脚手架现状
+382|Heading 2|14.1 基础设施与启动顺序
+384|Heading 2|14.2 哪些适合先拆、哪些不要急着拆
+385|Normal|箱庭回合制战斗虽是 CPU 密集，但不涉及高频位置同步，单体完全可扛。开服活动洪峰最大且允许最终一致的，优先拆「匹配大厅」与「世界聊天」；其他高一致写路径（战斗/场景/钱包）保留单体，可显著降低分布式事务风险。单体 JVM 内已先做 Scene/Battle 时钟隔离与战斗积压时场景节流，避免 Zo
+387|Heading 1|十五、成熟度评估与已知局限
+388|Heading 2|15.1 已经比较像样的能力（Phase 0–2 最小集方向）
+389|List Bullet|模块化单体游戏核：登录、场景、回合战、挑战、Rogue、抽卡、商店/IAP、任务活动、匹配皮肤等。
+390|List Bullet|日常循环：体力、每日任务、战令、主线章节门闸、版本活动容器（DailyLoop/BattlePass 协议已接线）；已通关关卡扫荡（1/2/3 倍体力，CmdId 1010–1013）与一键连续扫荡（1048–1050）；养成日程表 CalculateOptimalSchedule（1071–107
+391|List Bullet|缺口补齐玩法：世界 BOSS、深渊赛季、光锥遗器词条、赠礼/红包、图鉴、好感、名片、活动模板等。
+392|List Bullet|体验缺口回归：ExperienceGapBusinessFlowsTest 覆盖预加载握手、站内攻略摘要、扫荡倍率、家园交互/在场、战斗 FX、引导检查点；库表增量 db/migration_experience_gaps.sql。
+395|List Bullet|移动反作弊、抽卡扣费流水、本地事务日志与防重放；切图 LoadingTicket 防半截进图；ScenePreload 预加载命中后 handshake_only 短握手 + 切图遮罩；靠近传送门强制 ScenePreloadPushScNotify（1028），命中 FADE、未命中 BLACK；
+396|List Bullet|组队协议与多人共战/助战；成就即时推送（1036）与材料反查（1037–1038）、新手引导（检查点续跑 + 一键跳过 CmdId 960–966）、公会基础 + 公会战 + 公会科技；家园家具交互/在场/拜访日志（858–859、870–874、1030–1035）；对话 SAVEPOINT 与过
+397|List Bullet|Admin 热更/导入/审计/配置版本/聊天审核/敏感审批、Center local/remote、AI 规则教练 + 多轮/画像/主动推送/熔断灰度与 sidecar 旁路；AI 外链攻略（B站/抖音/官网 media_links）；默认站内 WebView/内嵌视频 + ≤200 字 inlin
+399|List Bullet|稳定性与体验深化（wire v4）：PartyMigrateSagaService / DynamicZoneSplitService / ShardAllocationService；BattleCorrectionService + BattleAutoWeakNetService；Activi
+400|Heading 2|15.2 明确局限（写进报告是为了避免误判）
+404|List Bullet|对话/过场/家园：服务端已加深（SAVEPOINT/回放/剧情树快照/环境联动、家具交互、在场虚影、拜访日志、好友助产视觉）；预加载 DISSOLVE/RIFT/BLACK、站内 WebView、扫荡/连续扫荡/日程表入口、战斗 Auto 策略 UI 与大招预表现、FX 播片与降档、Ready Ch
+405|List Bullet|协议已迁到 wire v4（兼容守卫仍 ≥ 2）；v1 客户端必须升级；改 CmdId（含 1020–1045 闭环、1046–1069 沉浸、1070–1076 二期、1078–1097 三期、1098–1104 AI、1105–1108 手感/拥堵/性能/维护、1109–1125 稳定性深化）必
+410|List Bullet|配置灰度已有 ConfigGrayRelease；卡池等业务读路径需显式按 inGray 分支。活动侧已升级为 Visibility Mask（QA 隐身账号），可与灰度策略叠加使用。
+411|Heading 2|15.3 成熟度雷达（定性，非精确打分）
+413|Heading 1|十六、后续发展建议
+414|Heading 2|16.1 短期（巩固可运营闭环）
+415|List Bullet|继续以模块化单体打磨崩铁式体验与数值内容；客户端对齐环境微交互粒子、100ms 预测移动、热管理降级指令、昼夜光照、Auto target_focus UI、连战增量结算、虚影问候与死亡残影抚慰、AI 荧光引路线/自动寻路、以及 DeviceHaptics 震动波形；并延续 DISSOLVE/RIF
+419|List Bullet|补齐战斗/抽卡等专用压测场景与关键集成测试：CI 已增加 RUN_TESTCONTAINERS 门控的 MysqlRedisSmokeIT/CoreLoopContainersIT，以及 PR 侧 k6 回归烟雾；正式阈值门禁需回填 docs/load-test-baseline.md 后收紧。
+420|Heading 2|16.2 中期（验证多节点）
+422|List Bullet|完善大厅社交与匹配体验：跨节点组队 Saga+DeadLetter/混沌、公会 Raid 语音房/战术 Ping/实时 DPS 已落地；继续压测 Center remote + 共享 Redis，并完善第三方 RTC AppId 生产注入。 MigrateFallback 超时熔断与进度 UI 已落
+424|Heading 2|16.3 长期（有条件再拆高一致性域）
+428|Heading 1|十七、给不同角色读者的阅读指引
+430|Heading 1|十八、附录：常用命令与配置速查
+431|Heading 2|18.1 主工程启动
+433|Heading 2|18.2 发布演练
+435|Heading 2|18.3 微服务脚手架与监控
+437|Heading 2|18.4 关键配置项（摘录）
+439|Heading 2|18.5 双节点切服最小提示
+441|Heading 2|18.6 仓库文档索引
+443|Heading 2|18.7 打开本 Word 后如何刷新目录页码
+445|Heading 1|十九、术语小词典（给非技术同学）
+448|Heading 1|二十、如何向他人讲解本项目（电梯演讲稿）
+449|Normal|如果你只有一分钟向领导、同事或客户介绍 MyLunarCore，可以按下面四句说：（1）这是一套崩坏星穹铁道风格的游戏服务端：分区场景探索，遇敌进回合战，并带抽卡、商店、活动。（2）真正能开服的是根目录「一个主程序」；旁边的 microservices 只是拆分试验，不能单独当生产账号系统。（3）运
+450|Heading 2|20.1 三分钟版（稍展开）
+451|List Bullet|玩家：登录 → 场景 → 战斗 → 养成/抽卡/活动 → 社交/公会 → 可选问助手。
+454|List Bullet|边界：不做无缝大世界主路线；不先拆战斗/钱包；优先拆匹配与世界聊天这类洪峰社交能力。
+455|Heading 2|20.2 常见问答（FAQ）
+457|Heading 1|二十一、发布、备份与日常运维手册摘要
+459|Heading 2|21.1 版本号怎么理解
+461|List Bullet|协议：CmdIds.PROTOCOL_WIRE_VERSION；不兼容变更必须升版本并出客户端说明。
+463|Heading 2|21.2 发布前检查（建议按顺序勾）
+464|List Bullet|跑测试：mvn test（含 CmdIdUniquenessTest）。
+469|Heading 2|21.3 发布中与回滚
+471|Heading 2|21.4 备份与恢复（人话版）
+473|Heading 2|21.5 网络隔离与错误码
+475|Heading 2|21.6 优雅停机在发布窗口的意义
+476|Normal|GracefulShutdownCoordinator 会：排空匹配 → 中止进行中战斗并收尾 → 停 Netty/KCP → 同步落盘。发布窗口应覆盖「进行中的抽卡/钱包事务」回归用例，避免关机瞬间留下半截账。
+477|Heading 1|二十二、架构决策记录（ADR）与持续集成
+479|Heading 2|22.1 三份 ADR 一览
+482|Heading 2|22.2 持续集成（CI）在替大家盯什么
+486|List Bullet|定向单测：CmdId 唯一性/完整性、WireVersion 守卫、公会战、切服、抽卡、匹配、热更、PublishDrill，以及 StabilityEnhancementFlowTest / WireV4EnhancementBusinessFlowsTest 等稳定性深化回归。；十大缺口：Cli
+491|Heading 2|22.3 压测能力量级（定性参考）
+495|Heading 1|二十三、端口与组件速查总表
+498|Heading 2|23.1 新人最小路径（再浓缩一次）
+500|Heading 2|23.2 完整文档地图（按读者）
+502|Heading 1|二十四、结语
+503|Normal|MyLunarCore 已经不是「只有空壳的演示仓库」：它在单体形态下具备较完整的崩铁式 RPG 服务端能力——联网、场景（含强制/方向预判预加载、DISSOLVE/RIFT/BLACK 切图、跳跃落地物理反馈、环境微交互池、100ms 客户端预测移动、世界时段、死亡荧光残影与热管理渲染降级）、回合
+504|Normal|对普通人最重要的结论只有三句：第一，想体验或继续开发，请先跑主工程；第二，想上线，请走 prod 并认真对待密钥、支付验签与监控告警；第三，想变「更大、更微服务、更无缝」，请先验证 Center 与产品形态，再决定拆什么——而不是为了拆而拆。
+505|Normal|本报告基于仓库当前代码与文档快照整理，2026年09月02日 已在本文档内同步「二游运营热更七项短板」落地（活动脚本 / 生效窗+Time Travel / 资源 Manifest 锁 / Override+熔断 / Server Freeze 1108 / QA 可见性 / 负向发放+钱包快照；此

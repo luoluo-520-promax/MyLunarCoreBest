@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "events": [
+    {
+      "eventId": "rift_dusk_10001",
+      "planeId": 10001,
+      "floorId": 1,
+      "pos": {"x": 50.0, "y": 0.0, "z": 30.0},
+      "worldTimePeriods": ["DUSK", "NIGHT"],
+      "activityWindowHint": "version_theme_active",
+      "miniChallengeId": "rift_wave_3",
+      "waves": 3,
+      "maxTurns": 12,
+      "rewardItemId": 21001,
+      "rewardCount": 5,
+      "rewardHint": "relic_fragment"
+    }
+  ]
+}

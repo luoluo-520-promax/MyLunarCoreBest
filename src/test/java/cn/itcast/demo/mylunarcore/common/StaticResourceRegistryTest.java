@@ -14,6 +14,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+/**
+ * StaticResourceRegistry 静态资源注册表测试。
+ * <p>
+ * 针对相关生产代码的单元/切片测试类 {@code StaticResourceRegistryTest}：
+ * 通过 fixture、mock 与断言覆盖关键成功路径、失败码与状态边界。
+ */
 @DisplayName("StaticResourceRegistry 静态资源注册表测试")
 class StaticResourceRegistryTest {
 
@@ -30,6 +36,15 @@ class StaticResourceRegistryTest {
         log.info("注册表初始化: registeredCount={}", registry.snapshot().size());
     }
 
+    /**
+     * 验证点：registerKnownResources 应注册 ITEM_CONFIG。
+     * <p>测试方法 {@code registerKnownResourcesShouldRegisterItemConfig}：
+     * <ul>
+     *   <li>{@code assertTrue(itemConfig.isPresent());}</li>
+     *   <li>{@code assertEquals(1, snapshot.size());}</li>
+     *   <li>{@code assertEquals(StaticResourceId.ITEM_CONFIG.getLocation(), itemConfig.get().getResourceLocation());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("registerKnownResources 应注册 ITEM_CONFIG")
     void registerKnownResourcesShouldRegisterItemConfig() {
@@ -41,9 +56,16 @@ class StaticResourceRegistryTest {
                 itemConfig.map(TabularStaticResource::getResourceLocation).orElse(null));
         assertTrue(itemConfig.isPresent());
         assertEquals(1, snapshot.size());
-        assertEquals(CommonTestFixtures.ITEM_CONFIG_CSV, itemConfig.get().getResourceLocation());
+        assertEquals(StaticResourceId.ITEM_CONFIG.getLocation(), itemConfig.get().getResourceLocation());
     }
 
+    /**
+     * 验证点：getByType 未注册类型应返回 empty。
+     * <p>测试方法 {@code getByTypeUnknownShouldReturnEmpty}：
+     * <ul>
+     *   <li>{@code assertFalse(unknown.isPresent());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("getByType 未注册类型应返回 empty")
     void getByTypeUnknownShouldReturnEmpty() {
@@ -53,6 +75,13 @@ class StaticResourceRegistryTest {
         assertFalse(unknown.isPresent());
     }
 
+    /**
+     * 验证点：reloadAll 应使缓存失效并可重新读取。
+     * <p>测试方法 {@code reloadAllShouldInvalidateCachedRows}：
+     * <ul>
+     *   <li>{@code assertEquals(rowsBefore.size(), rowsAfter.size());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("reloadAll 应使缓存失效并可重新读取")
     void reloadAllShouldInvalidateCachedRows() {

@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "windowMs": 2000,
+  "reactions": [
+    {
+      "comboKey": "FIRE+ICE",
+      "elements": ["FIRE", "ICE"],
+      "name": "融化",
+      "damageBonusPct": 30,
+      "fxId": "melt_burst"
+    },
+    {
+      "comboKey": "FIRE+LIGHTNING",
+      "elements": ["FIRE", "LIGHTNING"],
+      "name": "超载",
+      "damageBonusPct": 25,
+      "fxId": "overload_blast"
+    },
+    {
+      "comboKey": "ICE+LIGHTNING",
+      "elements": ["ICE", "LIGHTNING"],
+      "name": "超导",
+      "damageBonusPct": 20,
+      "defShredPct": 15,
+      "fxId": "superconduct"
+    },
+    {
+      "comboKey": "WIND+FIRE",
+      "elements": ["WIND", "FIRE"],
+      "name": "扩散·火",
+      "damageBonusPct": 15,
+      "aoeRadius": 5.0,
+      "fxId": "swirl_fire"
+    }
+  ]
+}

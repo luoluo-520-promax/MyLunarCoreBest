@@ -1,0 +1,122 @@
+syntax = "proto3";
+
+package cn.itcast.demo.mylunarcore.proto;
+
+option java_package = "cn.itcast.demo.mylunarcore.protocol";
+option java_outer_classname = "DialogueCutsceneProto";
+
+message DialogueChoice {
+  string choice_id = 1;
+  string text = 2;
+  /** +Affinity / -Morality / UnlockRoute 等预览标签 */
+  repeated string impact_tags = 3;
+}
+
+message DialogueNodeView {
+  string tree_id = 1;
+  string node_id = 2;
+  string speaker = 3;
+  string text = 4;
+  repeated DialogueChoice choices = 5;
+  string cutscene_id = 6;
+  uint32 unlock_cg_id = 7;
+}
+
+message DialogueChooseCsReq {
+  string tree_id = 1;
+  string choice_id = 2;
+}
+
+message DialogueChooseScRsp {
+  int32 retcode = 1;
+  DialogueNodeView node = 2;
+  string cutscene_id = 3;
+  uint32 unlock_cg_id = 4;
+}
+
+message DialogueSkipCsReq {
+  string tree_id = 1;
+}
+
+message DialogueSkipScRsp {
+  int32 retcode = 1;
+}
+
+message CutsceneSkipCsReq {
+  string cutscene_id = 1;
+}
+
+message CutsceneSkipScRsp {
+  int32 retcode = 1;
+  bool skipped = 2;
+}
+
+message CutsceneCompleteCsReq {
+  string cutscene_id = 1;
+}
+
+message CutsceneCompleteScRsp {
+  int32 retcode = 1;
+}
+
+message CutsceneScNotify {
+  string cutscene_id = 1;
+  string timeline_asset = 2;
+  bool skippable = 3;
+  uint32 unlock_cg_id = 4;
+}
+
+/** 断线后从选项前 SAVEPOINT 恢复，避免整段重播 */
+message ResumeFromBranchCsReq {
+  string tree_id = 1;
+}
+
+message ResumeFromBranchScRsp {
+  int32 retcode = 1; // 0成功 1未登录 2无存档点
+  DialogueNodeView node = 2;
+  string savepoint_node_id = 3;
+}
+
+/** 剧情回放：服务端校验已完成 ID 后下发播放密钥 */
+message ReplayCutsceneCsReq {
+  string cutscene_id = 1;
+}
+
+message ReplayCutsceneScRsp {
+  int32 retcode = 1; // 0允许 1未登录 2未完成 3配置不存在
+  string cutscene_id = 2;
+  string replay_ticket = 3;
+  string timeline_asset = 4;
+}
+
+/** 剧情树快照：仅节点 ID 与锁/解锁，缓解盲选焦虑 */
+message StoryTreeNodeSnapshot {
+  string node_id = 1;
+  bool unlocked = 2;
+  bool current = 3;
+  bool savepoint = 4;
+  repeated string outgoing_choice_ids = 5;
+}
+
+message GetStoryTreeSnapshotCsReq {
+  string tree_id = 1;
+}
+
+message GetStoryTreeSnapshotScRsp {
+  int32 retcode = 1; // 0成功 1未登录 2树不存在
+  string tree_id = 2;
+  string title = 3;
+  repeated StoryTreeNodeSnapshot nodes = 4;
+}
+
+/** 剧情表演时间轴：文字/语音/动作/镜头按 start_time 对齐 */
+message DialoguePerformanceScNotify {
+  uint32 node_id = 1;
+  string timeline_json = 2;
+  string voice_id = 3;
+  int32 estimated_duration_ms = 4;
+  string performance_id = 5;
+  string audio_key = 6;
+  repeated int32 lip_sync_timestamps = 7;
+  string node_id_str = 8;
+}

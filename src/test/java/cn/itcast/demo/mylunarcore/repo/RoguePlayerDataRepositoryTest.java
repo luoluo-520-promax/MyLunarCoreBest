@@ -13,6 +13,12 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
 
+/**
+ * RoguePlayerDataRepository 模拟宇宙玩家数据仓储测试。
+ * <p>
+ * 针对相关生产代码的单元/切片测试类 {@code RoguePlayerDataRepositoryTest}：
+ * 通过 fixture、mock 与断言覆盖关键成功路径、失败码与状态边界。
+ */
 @DisplayName("RoguePlayerDataRepository 模拟宇宙玩家数据仓储测试")
 class RoguePlayerDataRepositoryTest {
 
@@ -28,6 +34,17 @@ class RoguePlayerDataRepositoryTest {
         log.info("仓储初始化: repository={}", repository.getClass().getSimpleName());
     }
 
+    /**
+     * 验证点：loadOrCreate 应确保行存在并返回扩展数据。
+     * <p>测试方法 {@code loadOrCreateShouldEnsureRowAndReturnEntity}：
+     * <ul>
+     *   <li>{@code assertEquals(77, entity.getPlayerId());}</li>
+     *   <li>{@code assertEquals(3, entity.getSelectedPath());}</li>
+     *   <li>{@code assertEquals(5, entity.getCompletedRuns());}</li>
+     *   <li>{@code assertEquals(12, entity.getHighestFloor());}</li>
+     *   <li>{@code assertEquals(8800L, entity.getTotalScore());}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("loadOrCreate 应确保行存在并返回扩展数据")
     void loadOrCreateShouldEnsureRowAndReturnEntity() {
@@ -57,6 +74,13 @@ class RoguePlayerDataRepositoryTest {
         assertEquals(8800L, entity.getTotalScore());
     }
 
+    /**
+     * 验证点：updateSelectedPath 应更新命途。
+     * <p>测试方法 {@code updateSelectedPathShouldUpdatePath}：
+     * <ul>
+     *   <li>{@code assertEquals(1, affected);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("updateSelectedPath 应更新命途")
     void updateSelectedPathShouldUpdatePath() {
@@ -68,6 +92,13 @@ class RoguePlayerDataRepositoryTest {
         assertEquals(1, affected);
     }
 
+    /**
+     * 验证点：applyRunEndStats 应累加通关统计。
+     * <p>测试方法 {@code applyRunEndStatsShouldUpdateStats}：
+     * <ul>
+     *   <li>{@code assertEquals(1, affected);}</li>
+     * </ul>
+     */
     @Test
     @DisplayName("applyRunEndStats 应累加通关统计")
     void applyRunEndStatsShouldUpdateStats() {
